@@ -18,7 +18,7 @@ const IMG: usize = 48; // 纯 CPU candle 的可训练"甜点"尺寸
 const J: usize = 5; // 侧面深蹲：头 肩 髋 膝 踝
 const SIGMA: f32 = 2.0;
 const BONES: [(usize, usize); 4] = [(0, 1), (1, 2), (2, 3), (3, 4)]; // 头-肩 肩-髋 髋-膝 膝-踝
-// 膝关节角阈值（度）：下阈值=蹲到位，上阈值=站直；两者之间是滞回死区
+                                                                     // 膝关节角阈值（度）：下阈值=蹲到位，上阈值=站直；两者之间是滞回死区
 const TH_LO: f32 = 110.0;
 const TH_HI: f32 = 150.0;
 const TH_SINGLE: f32 = 130.0; // 单阈值计数器用的中间阈值（作对照）
@@ -30,7 +30,10 @@ impl Lcg {
         Self(s)
     }
     fn next(&mut self) -> u64 {
-        self.0 = self.0.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        self.0 = self
+            .0
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
         self.0
     }
     fn unit(&mut self) -> f32 {
@@ -66,7 +69,10 @@ fn squat_pose(depth: f32, base_x: f32, base_y: f32, scale: f32) -> Joints {
     let knee = [ankle[0] + ls * a_shin.sin(), ankle[1] - ls * a_shin.cos()];
     let hip = [knee[0] - lt * g_thigh.sin(), knee[1] - lt * g_thigh.cos()]; // 髋随下蹲后移并降低
     let shoulder = [hip[0] + torso * lean.sin(), hip[1] - torso * lean.cos()];
-    let head = [shoulder[0] + neck * lean.sin(), shoulder[1] - neck * lean.cos()];
+    let head = [
+        shoulder[0] + neck * lean.sin(),
+        shoulder[1] - neck * lean.cos(),
+    ];
     let mut js: Joints = [head, shoulder, hip, knee, ankle];
     for p in js.iter_mut() {
         p[0] = clampf(p[0], 2.0, IMG as f32 - 2.0);
@@ -123,7 +129,13 @@ fn draw_thick_line(img: &mut RgbImage, a: [f32; 2], b: [f32; 2], r: i32, color: 
     let steps = ((a[0] - b[0]).abs().max((a[1] - b[1]).abs()) as i32 * 2).max(1);
     for s in 0..=steps {
         let t = s as f32 / steps as f32;
-        stamp_disk(img, a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, r, color);
+        stamp_disk(
+            img,
+            a[0] + (b[0] - a[0]) * t,
+            a[1] + (b[1] - a[1]) * t,
+            r,
+            color,
+        );
     }
 }
 fn img_to_chw(img: &RgbImage) -> Vec<f32> {
@@ -222,8 +234,14 @@ struct PoseNet {
 }
 impl PoseNet {
     fn load(vb: VarBuilder) -> Result<Self> {
-        let c = Conv2dConfig { padding: 1, ..Default::default() };
-        let c0 = Conv2dConfig { padding: 0, ..Default::default() };
+        let c = Conv2dConfig {
+            padding: 1,
+            ..Default::default()
+        };
+        let c0 = Conv2dConfig {
+            padding: 0,
+            ..Default::default()
+        };
         Ok(Self {
             enc1: conv2d(3, 16, 3, c, vb.pp("enc1"))?,
             enc2: conv2d(16, 32, 3, c, vb.pp("enc2"))?,
@@ -357,17 +375,32 @@ fn save_angle_plot(gt: &[f32], pred: &[f32], path: &str) {
 }
 fn save_skeleton(img: &RgbImage, gt: &Joints, pred: &Joints, path: &str) {
     const S: u32 = 6;
-    let mut c = image::imageops::resize(img, IMG as u32 * S, IMG as u32 * S, image::imageops::FilterType::Nearest);
+    let mut c = image::imageops::resize(
+        img,
+        IMG as u32 * S,
+        IMG as u32 * S,
+        image::imageops::FilterType::Nearest,
+    );
     let sf = S as f32;
     let (green, yellow) = (Rgb([40u8, 230, 90]), Rgb([250u8, 220, 40]));
     for &(a, b) in BONES.iter() {
-        draw_line_segment_mut(&mut c, (gt[a][0] * sf, gt[a][1] * sf), (gt[b][0] * sf, gt[b][1] * sf), green);
+        draw_line_segment_mut(
+            &mut c,
+            (gt[a][0] * sf, gt[a][1] * sf),
+            (gt[b][0] * sf, gt[b][1] * sf),
+            green,
+        );
     }
     for p in gt.iter() {
         draw_hollow_circle_mut(&mut c, ((p[0] * sf) as i32, (p[1] * sf) as i32), 3, green);
     }
     for &(a, b) in BONES.iter() {
-        draw_line_segment_mut(&mut c, (pred[a][0] * sf, pred[a][1] * sf), (pred[b][0] * sf, pred[b][1] * sf), yellow);
+        draw_line_segment_mut(
+            &mut c,
+            (pred[a][0] * sf, pred[a][1] * sf),
+            (pred[b][0] * sf, pred[b][1] * sf),
+            yellow,
+        );
     }
     for p in pred.iter() {
         draw_cross_mut(&mut c, yellow, (p[0] * sf) as i32, (p[1] * sf) as i32);
@@ -385,7 +418,12 @@ fn main() -> Result<()> {
     let mut train_imgs: Vec<RgbImage> = Vec::new();
     for _ in 0..n_train {
         let depth = trng.unit(); // 覆盖 0..1 全深度
-        let js = squat_pose(depth, trng.rangef(22.0, 26.0), trng.rangef(39.0, 42.0), trng.rangef(0.95, 1.1));
+        let js = squat_pose(
+            depth,
+            trng.rangef(22.0, 26.0),
+            trng.rangef(39.0, 42.0),
+            trng.rangef(0.95, 1.1),
+        );
         train_imgs.push(render(&js, &mut trng));
         train_poses.push(js);
     }
@@ -401,7 +439,13 @@ fn main() -> Result<()> {
     let vb = VarBuilder::from_varmap(&vm, DType::F32, &dev);
     let net = PoseNet::load(vb)?;
     det_init(&vm, 42)?;
-    let mut opt = AdamW::new(vm.all_vars(), ParamsAdamW { lr: 3e-3, ..Default::default() })?;
+    let mut opt = AdamW::new(
+        vm.all_vars(),
+        ParamsAdamW {
+            lr: 3e-3,
+            ..Default::default()
+        },
+    )?;
     for epoch in 1..=150 {
         if epoch == 100 {
             opt.set_learning_rate(5e-4);
@@ -414,7 +458,8 @@ fn main() -> Result<()> {
         }
     }
     vm.save("pose.safetensors")?;
-    let vb2 = unsafe { VarBuilder::from_mmaped_safetensors(&["pose.safetensors"], DType::F32, &dev)? };
+    let vb2 =
+        unsafe { VarBuilder::from_mmaped_safetensors(&["pose.safetensors"], DType::F32, &dev)? };
     let model = PoseNet::load(vb2)?;
 
     // ===== 第 2 步：演示序列（8 次深蹲）——图像 → 姿态 → 膝角 → 计数 =====
@@ -437,7 +482,11 @@ fn main() -> Result<()> {
     let kp_err = kp_err_sum / (seq.len() * J) as f32;
     let amin = gt_ang.iter().cloned().fold(f32::MAX, f32::min);
     let amax = gt_ang.iter().cloned().fold(f32::MIN, f32::max);
-    println!("\n===== 演示序列：{} 帧、真实 {} 次深蹲 =====", seq.len(), true_reps);
+    println!(
+        "\n===== 演示序列：{} 帧、真实 {} 次深蹲 =====",
+        seq.len(),
+        true_reps
+    );
     println!("  姿态估计器关键点定位误差 = {kp_err:.3} 像素（这就是本项目的'感知质量'）");
     println!("  膝关节角范围：{amin:.0}° (蹲到底) ~ {amax:.0}° (站直)；阈值 下={TH_LO:.0}° 上={TH_HI:.0}°");
 
@@ -495,10 +544,37 @@ fn main() -> Result<()> {
             }
         }
         let pct = |k: usize| 100.0 * k as f32 / n_seq as f32;
-        println!("  {sigma:>4.0}    {:>5.1}%     {:>5.1}%      {:>5.1}%", pct(ok_s), pct(ok_h), pct(ok_hs));
+        println!(
+            "  {sigma:>4.0}    {:>5.1}%     {:>5.1}%      {:>5.1}%",
+            pct(ok_s),
+            pct(ok_h),
+            pct(ok_hs)
+        );
     }
-    println!("\n（对照上面的估计器误差 {kp_err:.2}px：只要感知误差落在计数器仍稳的区间，端到端就可靠；");
+    println!(
+        "\n（对照上面的估计器误差 {kp_err:.2}px：只要感知误差落在计数器仍稳的区间，端到端就可靠；"
+    );
     println!("  感知一旦太差，再好的逻辑也救不回。单阈值最脆、滞回更稳、滞回+平滑最强——");
     println!("  这就是'感知 vs 逻辑'的瓶颈定位：先看清是关键点不准，还是计数逻辑不够稳。）");
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn hysteresis_counts_only_complete_repetitions() {
+        let angles = [170.0, 140.0, 89.0, 100.0, 139.0, 151.0, 145.0, 85.0, 155.0];
+        assert_eq!(count_hysteresis(&angles, 90.0, 150.0), 2);
+        assert_eq!(count_hysteresis(&[170.0, 80.0, 100.0], 90.0, 150.0), 0);
+    }
+
+    #[test]
+    fn smoothing_preserves_constant_signal_and_length() {
+        let input = vec![42.0; 17];
+        let output = smooth(&input, 5);
+        assert_eq!(output.len(), input.len());
+        assert!(output.iter().all(|v| (*v - 42.0).abs() < 1e-6));
+    }
 }

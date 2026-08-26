@@ -97,7 +97,12 @@ struct Perimeter {
 }
 
 /// 一次绊线跨越：Some(true)=入侵方向(进院)，Some(false)=离开方向(出院)，None=没跨（含只跨延长线）。
-fn crossing_dir(a: (f32, f32), b: (f32, f32), p_prev: (f32, f32), p_curr: (f32, f32)) -> Option<bool> {
+fn crossing_dir(
+    a: (f32, f32),
+    b: (f32, f32),
+    p_prev: (f32, f32),
+    p_curr: (f32, f32),
+) -> Option<bool> {
     if !segments_intersect(a, b, p_prev, p_curr) {
         return None;
     }
@@ -205,7 +210,13 @@ fn alarms_two_factor(peri: &Perimeter, tracks: &[Track]) -> (Vec<Event>, usize) 
 const STEP_MS: u64 = 40; // 25 fps
 
 /// 用“分段脚点轨迹”造一条 Track：segs 是若干 (起始帧, 结束帧, foot0, foot1) 段，线性插值。
-fn build_track(id: u64, label: &str, w: f32, h: f32, segs: &[(usize, usize, (f32, f32), (f32, f32))]) -> Track {
+fn build_track(
+    id: u64,
+    label: &str,
+    w: f32,
+    h: f32,
+    segs: &[(usize, usize, (f32, f32), (f32, f32))],
+) -> Track {
     let mut history = Vec::new();
     for &(f0, f1, p0, p1) in segs {
         for f in f0..=f1 {
@@ -233,7 +244,7 @@ fn scene() -> Vec<Track> {
             30.0,
             70.0,
             &[
-                (0, 30, (300.0, 145.0), (300.0, 300.0)), // 翻入
+                (0, 30, (300.0, 145.0), (300.0, 300.0)),   // 翻入
                 (31, 130, (300.0, 300.0), (300.0, 300.0)), // 逗留
             ],
         ),
@@ -249,16 +260,33 @@ fn scene() -> Vec<Track> {
             ],
         ),
         // track#3 保安：本就在院内(y=300)，向上走出院子(y=120)。→ 越线【离开】方向，非报警。
-        build_track(3, "person", 30.0, 70.0, &[(0, 40, (400.0, 300.0), (400.0, 120.0))]),
+        build_track(
+            3,
+            "person",
+            30.0,
+            70.0,
+            &[(0, 40, (400.0, 300.0), (400.0, 120.0))],
+        ),
         // track#4 路人：沿街面(y=110)平行走过，从不越线、从不进区。→ 0 报警。
-        build_track(4, "person", 30.0, 70.0, &[(0, 40, (100.0, 110.0), (540.0, 110.0))]),
+        build_track(
+            4,
+            "person",
+            30.0,
+            70.0,
+            &[(0, 40, (100.0, 110.0), (540.0, 110.0))],
+        ),
     ]
 }
 
 fn main() {
     println!("==== 第 103 章：周界入侵报警（ROI 多边形 + 绊线方向 + cooldown）====");
     let peri = Perimeter {
-        poly: vec![(150.0, 180.0), (490.0, 180.0), (520.0, 330.0), (120.0, 330.0)],
+        poly: vec![
+            (150.0, 180.0),
+            (490.0, 180.0),
+            (520.0, 330.0),
+            (120.0, 330.0),
+        ],
         wire_a: (150.0, 180.0),
         wire_b: (490.0, 180.0),
         cd_ms: 10_000, // 冷却 10s
@@ -300,7 +328,13 @@ fn main() {
     println!("\n—— 方案 A：仅 ROI + cooldown（不看方向）——");
     let a = alarms_roi_only(&peri, &tracks);
     for e in &a {
-        println!("  [{}] t={:>4}ms track#{} {}", e.kind, e.ts_ms, e.track_id.unwrap_or(0), e.message);
+        println!(
+            "  [{}] t={:>4}ms track#{} {}",
+            e.kind,
+            e.ts_ms,
+            e.track_id.unwrap_or(0),
+            e.message
+        );
     }
     println!("  方案 A 报警数 = {}（把离场保安 track#3 也报了）", a.len());
 
@@ -311,9 +345,18 @@ fn main() {
         "  不做 cooldown：每个“入侵后仍在区内”的帧都报 → {} 条",
         two_factor_frames
     );
-    println!("  实际报警（按 track_id 冷却 {}s 去重）：", peri.cd_ms / 1000);
+    println!(
+        "  实际报警（按 track_id 冷却 {}s 去重）：",
+        peri.cd_ms / 1000
+    );
     for e in &b {
-        println!("  [{}] t={:>4}ms track#{} {}", e.kind, e.ts_ms, e.track_id.unwrap_or(0), e.message);
+        println!(
+            "  [{}] t={:>4}ms track#{} {}",
+            e.kind,
+            e.ts_ms,
+            e.track_id.unwrap_or(0),
+            e.message
+        );
     }
     println!("  入侵事件数 = {}", b.len());
 
@@ -321,8 +364,43 @@ fn main() {
     println!("\n—— 去重 / 过滤前后对比 ——");
     println!(
         "原始命中帧 {} → 两因子过滤(进入方向且在区内) {} → cooldown 后报警 {} 条",
-        raw_inside, two_factor_frames, b.len()
+        raw_inside,
+        two_factor_frames,
+        b.len()
     );
-    println!("方案 A（仅 ROI）{} 条  vs  方案 B（两因子）{} 条", a.len(), b.len());
+    println!(
+        "方案 A（仅 ROI）{} 条  vs  方案 B（两因子）{} 条",
+        a.len(),
+        b.len()
+    );
     println!("差异来自：track#3 保安在区内但方向是“离开”，两因子直接排除；track#4 从未进区，ROI 直接排除。");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn crossing_direction_and_extension_are_distinguished() {
+        let a = (0.0, 0.0);
+        let b = (10.0, 0.0);
+        assert_eq!(crossing_dir(a, b, (5.0, -1.0), (5.0, 1.0)), Some(true));
+        assert_eq!(crossing_dir(a, b, (5.0, 1.0), (5.0, -1.0)), Some(false));
+        assert_eq!(crossing_dir(a, b, (15.0, -1.0), (15.0, 1.0)), None);
+    }
+
+    #[test]
+    fn concave_polygon_membership_is_not_bbox_membership() {
+        let l_shape = [
+            (0.0, 0.0),
+            (4.0, 0.0),
+            (4.0, 1.0),
+            (1.0, 1.0),
+            (1.0, 4.0),
+            (0.0, 4.0),
+        ];
+        assert!(point_in_polygon(0.5, 3.0, &l_shape));
+        assert!(point_in_polygon(3.0, 0.5, &l_shape));
+        assert!(!point_in_polygon(3.0, 3.0, &l_shape));
+    }
 }
