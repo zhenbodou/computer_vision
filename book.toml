@@ -1,0 +1,33 @@
+[book]
+title = "用 Rust 玩转机器视觉：从入门到精通"
+authors = ["Rust CV Book"]
+description = "一本用通俗易懂的语言讲解如何用纯 Rust（不依赖 OpenCV）进行机器视觉开发的书，从零基础一路带你到精通。"
+language = "zh"
+src = "src"
+
+[rust]
+edition = "2021"
+
+[output.html]
+default-theme = "light"
+preferred-dark-theme = "navy"
+mathjax-support = true
+admonitions = true
+no-section-label = false
+additional-css = ["theme/custom.css"]
+
+[output.html.fold]
+enable = true
+level = 1
+
+[output.html.search]
+enable = true
+limit-results = 30
+use-boolean-and = true
+boost-title = 2
+boost-hierarchy = 2
+boost-paragraph = 1
+
+[output.html.playground]
+runnable = false
+copyable = true

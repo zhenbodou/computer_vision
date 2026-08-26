@@ -1,0 +1,42 @@
+/* ── 自定义样式：让这本机器视觉书读起来更舒服 ── */
+
+/* 中文正文行高与字号微调 */
+.content p,
+.content li {
+  line-height: 1.75;
+}
+
+/* 提示框：> 引用块用作 "小贴士 / 注意 / 坑" */
+blockquote {
+  border-inline-start: 4px solid var(--quote-border, #4a90d9);
+  background: var(--quote-bg, rgba(74, 144, 217, 0.08));
+  padding: 0.6em 1em;
+  border-radius: 4px;
+}
+
+/* 表格更清晰 */
+table {
+  margin: 1em 0;
+}
+table thead th {
+  background: rgba(127, 127, 127, 0.12);
+}
+
+/* 行内代码更醒目 */
+code {
+  border-radius: 3px;
+  padding: 0.1em 0.3em;
+}
+
+/* 章节标题下方加一条淡分隔线 */
+.content h2 {
+  border-bottom: 1px solid rgba(127, 127, 127, 0.2);
+  padding-bottom: 0.2em;
+  margin-top: 1.6em;
+}
+
+/* "本章小结 / 动手练习" 等结尾块的 emoji 标题留白 */
+.content h2 + h3,
+.content h3 {
+  margin-top: 1.1em;
+}

@@ -1,0 +1,16 @@
+[package]
+name = "ch44_multilabel"
+version = "0.1.0"
+edition = "2021"
+
+# 声明为独立 workspace，使其与主 code/ 工程完全隔离
+# （cargo 不会向上把它并进 cv_examples 的构建）。
+[workspace]
+
+# 独立可运行工程（不参与主 cv_examples 构建）。
+# 演示「多标签分类」：合成一图含多个可同时成立属性的数据，
+# 用 candle 小 CNN + sigmoid + 二元交叉熵（BCE）训练，并打印逐标签指标。
+# 运行：cd code/dl_labs/ch44_multilabel && cargo run --release
+[dependencies]
+candle-core = "0.11.0"
+candle-nn = "0.11.0"

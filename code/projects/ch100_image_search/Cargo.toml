@@ -1,0 +1,14 @@
+[package]
+name = "ch100_image_search"
+version = "0.1.0"
+edition = "2021"
+
+# 空的 [workspace] 让本工程成为独立工作区，不被上层 code/Cargo.toml 收编。
+[workspace]
+
+# 独立可运行工程（不参与主 cv_examples 构建）。
+# 运行：cd code/projects/ch100_image_search && cargo run --release
+[dependencies]
+candle-core = "0.11.0"
+candle-nn = "0.11.0"
+image = "0.25"

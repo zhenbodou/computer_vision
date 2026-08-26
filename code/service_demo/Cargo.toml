@@ -1,0 +1,34 @@
+# 第 96 章配套：最小可跑的 axum 视觉服务（独立工程，与主 code/ 完全隔离）
+#
+# ⚠️ 这是一个「独立工程」：axum + tokio 会拉入一棵较重的异步依赖树，
+#    绝不能并入主 code/Cargo.toml（会拖慢/污染主工程的 cargo build）。
+#    下面的空 [workspace] 声明本目录为独立 workspace 根，
+#    避免被上层 code/ 的 cv_examples 包“吸”进去（与 wasm_demo/ 同样的隔离手法）。
+[workspace]
+
+[package]
+name = "service_demo"
+version = "0.1.0"
+edition = "2021"
+
+# 版本为本机 cargo 实测解析值（2026-08，Rust 1.97.1）；用相近的次版本即可。
+[dependencies]
+axum = "0.8"                                              # 实测 0.8.9：路由/提取器/响应
+tokio = { version = "1", features = [                     # 实测 1.53.1：异步运行时
+    "rt-multi-thread",   # 多线程运行时（#[tokio::main] 默认）
+    "macros",            # #[tokio::main] / #[tokio::test] 宏
+    "net",               # TcpListener 绑定端口
+    "signal",            # ctrl_c 优雅关停
+    "time",              # 超时/延时
+] }
+tower-http = { version = "0.7", features = ["trace", "timeout"] }  # 实测 0.7.0：日志 + 超时中间件
+serde = { version = "1", features = ["derive"] }         # 实测 1.0.229：JSON 序列化派生
+serde_json = "1"                                          # 实测 1.0.151：json! 宏
+image = "0.25"                                            # 实测 0.25.10：与主工程同版本，解码/灰度
+tracing = "0.1"                                           # 实测 0.1.44：结构化日志门面
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }  # 实测 0.3.23：日志输出
+
+# 单二进制部署时可打开：更小的可执行文件（呼应第 2 章“单文件部署”）
+# [profile.release]
+# lto = true
+# strip = true

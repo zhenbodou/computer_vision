@@ -1,0 +1,16 @@
+[package]
+name = "gpu_demo"
+version = "0.1.0"
+edition = "2021"
+
+# 独立可运行工程（不参与主 cv_examples 构建）。
+# 硬件要求：需要一个可用的 GPU 适配器（Metal / Vulkan / DX12 / GL）。
+#   本示例在 Apple M1 Pro（Metal 后端）实测通过；
+#   headless / 无显卡的 CI 环境可能拿不到适配器 —— 程序会打印提示并优雅退出（不 panic）。
+# 运行：cd code/gpu_demo && cargo run --release
+#
+# 依赖版本（本机实测，2026-08，wgpu 30.x 系列）：
+[dependencies]
+wgpu = "30.0.1"                                     # 纯 Rust WebGPU 实现，跨平台 GPU 计算
+pollster = "1.0.1"                                  # 极简 async 执行器：阻塞等待 wgpu 的 Future
+bytemuck = { version = "1.25.2", features = ["derive"] } # 安全地把 &[u32] 当 &[u8] 传给 GPU

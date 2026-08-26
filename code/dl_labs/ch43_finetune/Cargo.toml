@@ -1,0 +1,15 @@
+[package]
+name = "ch43_finetune"
+version = "0.1.0"
+edition = "2021"
+
+# 空的 [workspace] 让本工程成为独立工作区，不被上层 code/Cargo.toml 收编。
+# （你在别处 cargo new 时不需要这行；这里因为嵌在本书 code/ 目录下才加。）
+[workspace]
+
+# 独立可运行工程（不参与主 cv_examples 构建）。
+# candle 依赖较重、首次编译较久（本机首次约 1 分钟）。
+# 运行：cd code/dl_labs/ch43_finetune && cargo run --release
+[dependencies]
+candle-core = "0.11.0"
+candle-nn = "0.11.0"

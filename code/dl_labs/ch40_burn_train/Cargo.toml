@@ -1,0 +1,10 @@
+[package]
+name = "ch40_burn_train"
+version = "0.1.0"
+edition = "2021"
+
+# 独立可运行工程（不参与主 cv_examples 构建）。
+# burn 依赖较重、首次编译较久（本机首次约 50 秒）。
+# 运行：cd code/dl_labs/ch40_burn_train && cargo run --release
+[dependencies]
+burn = { version = "0.21.0", features = ["ndarray", "autodiff"] }

@@ -1,0 +1,10 @@
+[package]
+name = "ch104_counting"
+version = "0.1.0"
+edition = "2021"
+
+# 空的 [workspace] 让本工程成为独立工作区，不被上层 code/Cargo.toml 收编。
+[workspace]
+
+[dependencies]
+# 只用标准库：合成带 track_id 的轨迹当输入，确定性可复现。

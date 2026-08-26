@@ -1,0 +1,24 @@
+[package]
+name = "wasm_demo"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+# 编成 C ABI 动态库 —— wasm 目标下即 .wasm 模块，供 JS 加载
+crate-type = ["cdylib"]
+
+[dependencies]
+# JS <-> Rust 互操作胶水，唯一依赖，保证 .wasm 尽量小
+wasm-bindgen = "0.2"
+
+# 声明本工程为独立 workspace 根，避免被上层 code/ 的 cv_examples 包“吸”进去。
+# 这样在 code/wasm_demo/ 里跑 cargo/wasm-pack 与主工程完全隔离。
+[workspace]
+
+# 面向浏览器的体积优化：release 编出更小的 .wasm
+[profile.release]
+opt-level = "z"     # 体积优先（'z' 比 's' 更激进）
+lto = true          # 链接期优化，去除跨 crate 冗余
+codegen-units = 1   # 牺牲编译并行度换更好优化
+panic = "abort"     # 不生成 panic 展开表，省一截体积
+strip = true        # 去掉符号信息

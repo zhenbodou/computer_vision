@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <title>Rust + WASM 浏览器视觉 Demo</title>
+  <style>
+    body { font-family: sans-serif; max-width: 720px; margin: 2rem auto; }
+    canvas { max-width: 100%; border: 1px solid #ccc; margin-top: 1rem; }
+    button { margin-right: .5rem; }
+  </style>
+</head>
+<body>
+  <h1>浏览器里跑 Rust 视觉算法</h1>
+  <p>选一张图片，点按钮 —— 所有处理都在你本地的浏览器里完成，图片不会上传。</p>
+
+  <input type="file" id="file" accept="image/*" />
+  <p>
+    阈值：<input type="range" id="t" min="0" max="255" value="128" />
+    <button id="btn-gray">灰度</button>
+    <button id="btn-thr">阈值二值化</button>
+    <button id="btn-reset">还原</button>
+  </p>
+  <canvas id="cv"></canvas>
+
+  <script type="module">
+    // wasm-pack build --target web 会在 ./pkg/ 生成 wasm_demo.js 与 wasm_demo_bg.wasm
+    import init, { grayscale, threshold } from "./pkg/wasm_demo.js";
+
+    await init(); // 异步加载并实例化 .wasm 模块
+
+    const cv = document.getElementById("cv");
+    const ctx = cv.getContext("2d", { willReadFrequently: true });
+    let original = null; // 缓存原图，供“还原”用
+
+    document.getElementById("file").addEventListener("change", (e) => {
+      const img = new Image();
+      img.onload = () => {
+        cv.width = img.width;
+        cv.height = img.height;
+        ctx.drawImage(img, 0, 0);
+        original = ctx.getImageData(0, 0, cv.width, cv.height);
+      };
+      img.src = URL.createObjectURL(e.target.files[0]);
+    });
+
+    // 通用：取 Canvas 像素 -> 交给 wasm 处理 -> 写回 Canvas
+    function apply(fn) {
+      if (!original) return;
+      const src = ctx.getImageData(0, 0, cv.width, cv.height);
+      const out = fn(src.data);          // src.data 是 Uint8ClampedArray(RGBA)
+      const result = new ImageData(new Uint8ClampedArray(out), cv.width, cv.height);
+      ctx.putImageData(result, 0, 0);
+    }
+
+    document.getElementById("btn-gray").onclick = () => apply(grayscale);
+    document.getElementById("btn-thr").onclick  = () => {
+      const t = +document.getElementById("t").value;
+      apply((buf) => threshold(buf, t));
+    };
+    document.getElementById("btn-reset").onclick = () => {
+      if (original) ctx.putImageData(original, 0, 0);
+    };
+  </script>
+</body>
+</html>

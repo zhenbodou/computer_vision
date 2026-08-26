@@ -1,0 +1,12 @@
+[package]
+name = "ch106_panorama"
+version = "0.1.0"
+edition = "2021"
+
+# 空的 [workspace] 让本工程成为独立工作区，不被上层 code/Cargo.toml 收编。
+[workspace]
+
+[dependencies]
+image = "0.25.10"
+imageproc = "0.27.0"
+nalgebra = "0.35.0"

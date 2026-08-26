@@ -1,0 +1,16 @@
+[package]
+name = "ch94_tract_onnx"
+version = "0.1.0"
+edition = "2021"
+
+# 空的 [workspace] 让本工程成为独立工作区，不被上层 code/Cargo.toml 收编。
+# （你在别处 cargo new 时不需要这行；这里因为嵌在本书 code/ 目录下才加。）
+[workspace]
+
+# 独立可运行工程（不参与主 cv_examples 构建）。
+# tract-onnx 纯 Rust、零 C/C++ 依赖，但依赖链较长，首次编译较久（本机首次约 1.5 分钟）。
+# 运行：cd code/dl_labs/ch94_tract_onnx && cargo run --release
+[dependencies]
+tract-onnx = "0.23.5"   # Sonos 纯 Rust ONNX 推理引擎
+prost = "0.14"          # 仅本例演示"用 Rust 造 .onnx"时用来序列化 protobuf；
+                        # 真实项目里 .onnx 由 PyTorch/TF 导出，无需 prost

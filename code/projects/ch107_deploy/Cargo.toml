@@ -1,0 +1,25 @@
+# 第 107 章配套：端到端「模型 → 纯 Rust Web 服务」部署骨架（独立工程，与主 code/ 完全隔离）
+#
+# ⚠️ 这是一个「独立工程」：axum + tokio + tract 会拉入一棵较重的依赖树，
+#    绝不能并入主 code/Cargo.toml（会拖慢/污染主工程的 cargo build）。
+#    下面的空 [workspace] 声明本目录为独立 workspace 根，
+#    避免被上层 code/ 的 cv_examples 包“吸”进去（与 service_demo/、ch94_tract_onnx/ 同样的隔离手法）。
+[workspace]
+
+[package]
+name = "ch107_deploy"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1"
+axum = "0.8"
+base64 = "0.22"
+image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
+prost = "0.14"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "signal"] }
+tower = { version = "0.5", features = ["util"] }
+tract-onnx = "0.23.5"
