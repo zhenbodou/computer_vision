@@ -189,6 +189,10 @@
 - [附录 E：进阶学习资源与论文清单](appendix/e-resources.md)
 - [附录 F：从这里到真正的专家（学习路线图）](appendix/f-roadmap.md)
 - [附录 G：专家级能力与逐章验收标准](appendix/g-expert-standard.md)
+- [附录 H：零基础学习导航与数学热身](appendix/h-learning-path.md)
+- [附录 I：分级实训、参考答案与失败诊断](appendix/i-guided-labs.md)
+- [附录 J：高级视觉工程师毕业项目与评审](appendix/j-capstone.md)
+- [附录 K：逐章代码入口与运行边界](appendix/k-code-index.md)
 
 ---
 

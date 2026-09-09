@@ -1,0 +1,37 @@
+name: Book and core examples checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  core:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check book structure and code index
+        run: python3 scripts/check_book.py
+      - name: Select verified Rust toolchain
+        run: rustup default 1.98.1
+      - name: Check core examples
+        run: cargo check --manifest-path code/Cargo.toml --locked --examples
+      - name: Test core library and integration
+        run: cargo test --manifest-path code/Cargo.toml --locked --lib --tests
+      - name: Lint core library and binary
+        run: cargo clippy --manifest-path code/Cargo.toml --locked -- -D warnings
+      - name: Test guided metrics lab
+        run: |
+          rustc --edition=2024 --test code/learning_labs/metrics.rs -o /tmp/cv_metrics_test
+          /tmp/cv_metrics_test
+      - name: Install mdBook
+        run: |
+          curl -fLsS https://github.com/rust-lang/mdBook/releases/download/v0.5.3/mdbook-v0.5.3-x86_64-unknown-linux-gnu.tar.gz -o /tmp/mdbook.tar.gz
+          mkdir -p /tmp/cv-mdbook
+          tar -xzf /tmp/mdbook.tar.gz -C /tmp/cv-mdbook
+      - name: Build book
+        run: /tmp/cv-mdbook/mdbook build

@@ -6,7 +6,7 @@ language = "zh"
 src = "src"
 
 [rust]
-edition = "2021"
+edition = "2024"
 
 [output.html]
 default-theme = "light"

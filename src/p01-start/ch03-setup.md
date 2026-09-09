@@ -102,14 +102,14 @@ cargo run
 我们要用到本书的主力图像库 **`image`**。在项目目录下执行：
 
 ```bash
-cargo add image
+cargo add image@=0.25.10
 ```
 
-`cargo` 会自动把最新的 `image` 版本写进 `Cargo.toml`，你会看到 `[dependencies]` 下多了一行（版本号可能略有不同，本书统一用 `0.25` 系列）：
+这里明确选择本书示例使用的版本，避免入门时混入 API 差异。`Cargo.toml` 中会出现如下依赖；生成的 `Cargo.lock` 也应保留：
 
 ```toml
 [dependencies]
-image = "0.25.10"
+image = "=0.25.10"
 ```
 
 现在，用下面的内容**完整替换** `src/main.rs`。这段程序不读任何外部图片，纯靠代码"算"出每个像素的颜色——非常适合当第一个程序，因为它自包含、跑起来一定有结果：
