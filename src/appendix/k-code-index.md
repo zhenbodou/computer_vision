@@ -53,7 +53,7 @@
 | [第 37 章 卷积神经网络 CNN 原理](../p07-dl-basics/ch37-cnn.md) | `ch37_cnn` | 主工程 example |
 | [第 38 章 经典网络结构演进（LeNet→ResNet→Transformer）](../p07-dl-basics/ch38-architectures.md) | 无独立入口；阅读正文的解释或工程搭建步骤 | 概念/片段 |
 | [第 39 章 Rust 深度学习生态全景（candle/burn/tch/tract/ort）](../p07-dl-basics/ch39-dl-ecosystem.md) | 无独立入口；阅读正文的解释或工程搭建步骤 | 概念/片段 |
-| [第 40 章 用 burn 从零训练一个 CNN（MNIST）](../p07-dl-basics/ch40-burn-train.md) | `code/dl_labs/ch40_burn_train` | 独立 CPU 工程 |
+| [第 40 章 用 burn 从零训练一个 CNN：合成形状入门与 MNIST 迁移](../p07-dl-basics/ch40-burn-train.md) | `code/dl_labs/ch40_burn_train` | 独立 CPU 工程 |
 | [第 41 章 训练技巧：数据增强、优化器、迁移学习](../p07-dl-basics/ch41-training-tricks.md) | `ch41_augment` | 主工程 example |
 | [第 42 章 用 Candle 加载预训练模型做图像分类](../p08-classification/ch42-candle-classify.md) | `code/dl_labs/ch42_candle_classify` | 独立 CPU 工程 |
 | [第 43 章 微调自己的分类器：数据、策略与消融](../p08-classification/ch43-finetune.md) | `code/dl_labs/ch43_finetune` | 独立 CPU 工程 |
@@ -84,7 +84,7 @@
 | [第 68 章 运动恢复结构 SfM 与视觉 SLAM 概览](../p14-3d/ch68-sfm-slam.md) | `ch68_sfm_slam` | 主工程 example |
 | [第 69 章 自编码器与表示学习](../p15-generative/ch69-autoencoder.md) | `code/dl_labs/ch69_autoencoder` | 独立 CPU 工程 |
 | [第 70 章 生成对抗网络 GAN](../p15-generative/ch70-gan.md) | `code/dl_labs/ch70_gan` | 独立 CPU 工程 |
-| [第 71 章 扩散模型（Stable Diffusion 推理）](../p15-generative/ch71-diffusion.md) | `code/dl_labs/ch71_diffusion` | 独立 CPU 工程 |
+| [第 71 章 扩散模型：手写 DDPM 与理解 Stable Diffusion](../p15-generative/ch71-diffusion.md) | `code/dl_labs/ch71_diffusion` | 独立 CPU 工程 |
 | [第 72 章 超分辨率、去噪与风格迁移](../p15-generative/ch72-superres-style.md) | `code/dl_labs/ch72_restoration` | 独立 CPU 工程 |
 | [第 73 章 视觉-语言多模态（CLIP、图文检索、图像描述）](../p15-generative/ch73-clip-vlm.md) | `code/dl_labs/ch73_clip` | 独立 CPU 工程 |
 | [第 74 章 视频读写与帧处理](../p16-video/ch74-video-io.md) | `ch74_video_io` | 主工程 example |

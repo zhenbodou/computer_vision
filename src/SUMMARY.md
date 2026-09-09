@@ -63,7 +63,7 @@
 - [第 37 章 卷积神经网络 CNN 原理](p07-dl-basics/ch37-cnn.md)
 - [第 38 章 经典网络结构演进（LeNet→ResNet→Transformer）](p07-dl-basics/ch38-architectures.md)
 - [第 39 章 Rust 深度学习生态全景（candle/burn/tch/tract/ort）](p07-dl-basics/ch39-dl-ecosystem.md)
-- [第 40 章 用 burn 从零训练一个 CNN（MNIST）](p07-dl-basics/ch40-burn-train.md)
+- [第 40 章 用 burn 从零训练一个 CNN：合成形状入门与 MNIST 迁移](p07-dl-basics/ch40-burn-train.md)
 - [第 41 章 训练技巧：数据增强、优化器、迁移学习](p07-dl-basics/ch41-training-tricks.md)
 
 # 第八部分 · 图像分类（Classification）
@@ -118,7 +118,7 @@
 
 - [第 69 章 自编码器与表示学习](p15-generative/ch69-autoencoder.md)
 - [第 70 章 生成对抗网络 GAN](p15-generative/ch70-gan.md)
-- [第 71 章 扩散模型（Stable Diffusion 推理）](p15-generative/ch71-diffusion.md)
+- [第 71 章 扩散模型：手写 DDPM 与理解 Stable Diffusion](p15-generative/ch71-diffusion.md)
 - [第 72 章 超分辨率、去噪与风格迁移](p15-generative/ch72-superres-style.md)
 - [第 73 章 视觉-语言多模态（CLIP、图文检索、图像描述）](p15-generative/ch73-clip-vlm.md)
 
