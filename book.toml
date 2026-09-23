@@ -1,0 +1,20 @@
+[book]
+title = "机器视觉工程实战：用 Rust 看懂图像与模型"
+description = "一本面向零基础读者的机器视觉工程教程：从像素、编解码、预处理、推理、后处理到模型转换，全部用 Rust 动手实现。"
+authors = ["douzhenbo"]
+language = "zh"
+src = "src"
+
+[preprocessor.index]
+default-preprocessor = "index"
+
+[preprocessor.links]
+default-preprocessor = "links"
+
+[output.html]
+default-theme = "rust"
+preferred-dark-theme = "navy"
+mathjax-support = true
+print = { enable = true }
+fold = { enable = true }
+playground = { copyable = true, editable = false, line-numbers = true }

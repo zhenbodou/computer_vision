@@ -1,0 +1,576 @@
+<!DOCTYPE HTML>
+<html lang="zh" class="rust sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>第 13 章 · 模型转换：格式、Batch 与跨平台适配 - 机器视觉工程实战：用 Rust 看懂图像与模型</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="一本面向零基础读者的机器视觉工程教程：从像素、编解码、预处理、推理、后处理到模型转换，全部用 Rust 动手实现。">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="favicon-de23e50b.svg">
+        <link rel="shortcut icon" href="favicon-8114d1fc.png">
+        <link rel="stylesheet" href="css/variables-8adf115d.css">
+        <link rel="stylesheet" href="css/general-e96d0476.css">
+        <link rel="stylesheet" href="css/chrome-d279d366.css">
+        <link rel="stylesheet" href="css/print-9e4910d8.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="fonts/fonts-9644e21d.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="mdbook-highlight-css" href="highlight-493f70e1.css">
+        <link rel="stylesheet" id="mdbook-tomorrow-night-css" href="tomorrow-night-4c0ae647.css">
+        <link rel="stylesheet" id="mdbook-ayu-highlight-css" href="ayu-highlight-3fdfc3ac.css">
+
+        <!-- Custom theme stylesheets -->
+
+        <!-- MathJax -->
+        <script async src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "";
+            const default_light_theme = "rust";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "searchindex-4d8e5ec0.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="toc-c1d54236.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="mdbook-body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('rust')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="mdbook-sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("mdbook-sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="mdbook-sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="toc.html"></iframe>
+            </noscript>
+            <div id="mdbook-sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="mdbook-page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="mdbook-menu-bar-hover-placeholder"></div>
+                <div id="mdbook-menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="mdbook-sidebar-toggle" class="icon-button" for="mdbook-sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="mdbook-sidebar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M0 96C0 78.3 14.3 64 32 64H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H416c17.7 0 32 14.3 32 32z"/></svg></span>
+                        </label>
+                        <button id="mdbook-theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="mdbook-theme-list">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M371.3 367.1c27.3-3.9 51.9-19.4 67.2-42.9L600.2 74.1c12.6-19.5 9.4-45.3-7.6-61.2S549.7-4.4 531.1 9.6L294.4 187.2c-24 18-38.2 46.1-38.4 76.1L371.3 367.1zm-19.6 25.4l-116-104.4C175.9 290.3 128 339.6 128 400c0 3.9 .2 7.8 .6 11.6c1.8 17.5-10.2 36.4-27.8 36.4H96c-17.7 0-32 14.3-32 32s14.3 32 32 32H240c61.9 0 112-50.1 112-112c0-2.5-.1-5-.2-7.5z"/></svg></span>
+                        </button>
+                        <ul id="mdbook-theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-ayu">Ayu</button></li>
+                        </ul>
+                        <button id="mdbook-search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="mdbook-searchbar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352c79.5 0 144-64.5 144-144s-64.5-144-144-144S64 128.5 64 208s64.5 144 144 144z"/></svg></span>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">机器视觉工程实战：用 Rust 看懂图像与模型</h1>
+
+                    <div class="right-buttons">
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <span class=fa-svg id="print-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M128 0C92.7 0 64 28.7 64 64v96h64V64H354.7L384 93.3V160h64V93.3c0-17-6.7-33.3-18.7-45.3L400 18.7C388 6.7 371.7 0 354.7 0H128zM384 352v32 64H128V384 368 352H384zm64 32h32c17.7 0 32-14.3 32-32V256c0-35.3-28.7-64-64-64H64c-35.3 0-64 28.7-64 64v96c0 17.7 14.3 32 32 32H64v64c0 35.3 28.7 64 64 64H384c35.3 0 64-28.7 64-64V384zm-16-88c-13.3 0-24-10.7-24-24s10.7-24 24-24s24 10.7 24 24s-10.7 24-24 24z"/></svg></span>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="mdbook-search-wrapper" class="hidden">
+                    <form id="mdbook-searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="mdbook-searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="mdbook-searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <span class=fa-svg id="fa-spin"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M304 48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zm0 416c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM48 304c26.5 0 48-21.5 48-48s-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48zm464-48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM142.9 437c18.7-18.7 18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zm0-294.2c18.7-18.7 18.7-49.1 0-67.9S93.7 56.2 75 75s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zM369.1 437c18.7 18.7 49.1 18.7 67.9 0s18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9z"/></svg></span>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="mdbook-searchresults-outer" class="searchresults-outer hidden">
+                        <div id="mdbook-searchresults-header" class="searchresults-header"></div>
+                        <ul id="mdbook-searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('mdbook-sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('mdbook-sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#mdbook-sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="mdbook-content" class="content">
+                    <main>
+                        <h1 id="第-13-章--模型转换格式batch-与跨平台适配"><a class="header" href="#第-13-章--模型转换格式batch-与跨平台适配">第 13 章 · 模型转换：格式、Batch 与跨平台适配</a></h1>
+<blockquote>
+<p><strong>本章导读</strong>：第 12 章我们学会了打开一个模型文件、读出它的输入输出形状、数据类型和元数据——相当于把一张图纸看懂了。可现实里你拿到的图纸，常常“不是这个工地能用的版本“：训练组扔给你一个 PyTorch 的 <code>.pt</code>，可你要部署的是一块瑞芯微 NPU、一台 Intel 工控机、或者一部 iPhone，它们根本不认这个格式。本章只干一件事——<strong>把模型从“训练时的样子“翻译成“目标硬件吃得下的样子“</strong>。我们会讲清楚：为什么必须转换、ONNX 为什么是绕不开的中转枢纽、怎么从 PyTorch 导出 ONNX、<strong>batch 维怎么选（固定还是动态）</strong>、怎么把 ONNX 送上各家芯片（TFLite/NCNN/RKNN/TensorRT/CoreML）、怎么用量化给模型瘦身，以及最关键的——<strong>转换完怎么验证它没被翻译错</strong>。本章命令与脚本以 Python/bash 为主（把它们当“命令行工具“用），Rust 侧给一个“加载转换后 ONNX 能跑通“的冒烟测试。</p>
+</blockquote>
+<p><strong>学习目标</strong>：</p>
+<ul>
+<li>说清“训练格式 ≠ 部署格式“，以及为什么不同芯片/引擎要吃不同格式</li>
+<li>建立<strong>格式全景图</strong>：<code>.pt</code>/SavedModel → <strong>ONNX（枢纽）</strong> → 各家端侧格式</li>
+<li>会用 <code>torch.onnx.export</code> 导出 ONNX，讲得清 <code>opset_version</code>、<code>input_names</code>、<code>dynamic_axes</code></li>
+<li>分清<strong>固定 batch</strong> 与<strong>动态 batch</strong>，知道各自的取舍和怎么改已有 ONNX 的 batch 维</li>
+<li>认识跨平台转换工具链，知道“<strong>算子不被目标平台支持</strong>“是头号大坑</li>
+<li>理解<strong>量化</strong>（FP32→FP16→INT8）的动机、PTQ 与 QAT 的区别、为什么 INT8 要校准数据集</li>
+<li>会写“转换前后数值比对“来验证转换正确，并用 Rust 的 <code>ort</code> 加载验证能跑通</li>
+</ul>
+<h2 id="131-为什么要转换训练格式--部署格式"><a class="header" href="#131-为什么要转换训练格式--部署格式">13.1 为什么要转换：训练格式 ≠ 部署格式</a></h2>
+<p>先想清楚一件事：训练组交给你的模型文件，天生就不是为你的现场准备的。</p>
+<p>打个比方——训练格式像<strong>厨师的私人手写菜谱本</strong>：写满了草稿、注释、试验记录，还夹着“上次盐放多了“的便签，只有原来那间厨房（PyTorch + Python）看得懂、用得动。而部署格式像<strong>贴在出餐口的标准工序卡</strong>：精简、固定、去掉了所有多余信息，任何一个灶台（推理引擎、各家芯片）照着就能做。你要上线，需要的是工序卡，不是菜谱本。</p>
+<p>具体来说，直接拿 PyTorch 的 <strong>训练格式</strong>（<code>.pt</code> / <code>.pth</code>）去部署，会撞上四堵墙：</p>
+<ol>
+<li><strong>和 Python/框架强绑定</strong>：<code>.pt</code> 通常要靠 PyTorch 运行时才能加载，而完整的 PyTorch + Python 环境动辄上 GB。一块嵌入式板子既装不下，也不该为跑一个模型背这么重的包袱。</li>
+<li><strong>要脱离 Python</strong>：真实产线上的推理服务多用 C++/Rust 写（就像本书），追求启动快、内存省、无 GIL。它们需要一个<strong>自包含</strong>的模型文件，而不是一段要 <code>import torch</code> 才能跑的代码。</li>
+<li><strong>目标硬件只认自家格式</strong>：NVIDIA 的 GPU 吃 TensorRT engine，瑞芯微 NPU 吃 <code>.rknn</code>，苹果芯片吃 CoreML，Intel 吃 OpenVINO IR。这就像不同国家的插座——你带的插头不对，电器再好也插不上，得先过一个转换头。</li>
+<li><strong>转换顺手做优化</strong>：转换器在翻译的同时，会做算子融合、常量折叠、为特定芯片重排计算——<strong>部署格式往往比原始格式跑得更快</strong>，这是白捡的收益。</li>
+</ol>
+<p>一句话收束：<strong>训练格式是给“改模型的人“用的，部署格式是给“跑模型的机器“用的，二者目标不同，所以要转换。</strong> 接下来的问题是——从哪个格式转到哪个格式，中间要不要经过谁？这就要看格式全景图了。</p>
+<h2 id="132-格式全景与转换路线图"><a class="header" href="#132-格式全景与转换路线图">13.2 格式全景与转换路线图</a></h2>
+<p>模型格式很多，但真正要记住的关系只有一句：<strong>几乎所有转换，都先汇聚到 ONNX，再从 ONNX 发散到各家端侧格式。</strong> ONNX 就是那个中转枢纽。</p>
+<pre><code class="language-text">                                  ┌─► TFLite ───────► 手机 / 嵌入式 (Android/MCU)
+                                  ├─► NCNN / MNN ───► 手机 / 端侧 (腾讯 / 阿里)
+  .pt / .pth (PyTorch) ─┐         ├─► RKNN ─────────► 瑞芯微 NPU (RK3588 / RK3566…)
+  SavedModel (TF) ──────┼─► ONNX ─┼─► OpenVINO IR ──► Intel CPU / 核显 / VPU
+  .pb / .h5 ────────────┘ (枢纽)  ├─► TensorRT ─────► NVIDIA GPU / Jetson
+                                  └─► CoreML ───────► 苹果 A/M 芯片 (iPhone / Mac)
+</code></pre>
+<p>把“源格式 → 目标格式 → 工具 → 典型硬件/引擎“列成一张大表，随查随用：</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>源格式</th><th>目标格式</th><th>常用转换工具</th><th>典型硬件 / 引擎</th></tr>
+</thead>
+<tbody>
+<tr><td>PyTorch <code>.pt</code> / <code>.pth</code></td><td>ONNX</td><td><code>torch.onnx.export</code></td><td>跨平台中转枢纽</td></tr>
+<tr><td>TF SavedModel / <code>.pb</code></td><td>ONNX</td><td><code>tf2onnx</code></td><td>跨平台中转枢纽</td></tr>
+<tr><td>ONNX</td><td>TFLite</td><td><code>onnx2tf</code></td><td>安卓 / 嵌入式（Google）</td></tr>
+<tr><td>ONNX</td><td>NCNN（<code>.param</code>+<code>.bin</code>）</td><td><code>onnx2ncnn</code></td><td>手机端（腾讯）</td></tr>
+<tr><td>ONNX</td><td>MNN</td><td><code>MNNConvert</code></td><td>手机端（阿里）</td></tr>
+<tr><td>ONNX</td><td><strong>RKNN</strong></td><td><code>rknn-toolkit2</code></td><td>瑞芯微 NPU</td></tr>
+<tr><td>ONNX</td><td>OpenVINO IR（<code>.xml</code>+<code>.bin</code>）</td><td><code>ovc</code> / <code>mo</code></td><td>Intel CPU / 核显</td></tr>
+<tr><td>ONNX</td><td>TensorRT engine</td><td><code>trtexec</code></td><td>NVIDIA GPU / Jetson</td></tr>
+<tr><td>ONNX</td><td>CoreML（<code>.mlpackage</code>）</td><td><code>coremltools</code></td><td>苹果芯片</td></tr>
+</tbody>
+</table>
+</div>
+<blockquote>
+<p><strong>注意方向别搞反</strong>：<code>tf2onnx</code> 是 TensorFlow <strong>→</strong> ONNX（源头在 TF 时用它先汇入枢纽）；<code>onnx2tf</code> 是 ONNX <strong>→</strong> TF/TFLite（从枢纽发散到安卓时用它）。名字长得像，方向正相反，转错方向会直接报错。</p>
+</blockquote>
+<p>看这张图有个直觉要建立：如果没有 ONNX 这个枢纽，<code>N</code> 种源格式对 <code>M</code> 种目标格式，就要写 <code>N×M</code> 个两两之间的转换器；有了枢纽，只需 <code>N</code> 个“汇入“+ <code>M</code> 个“发散“，共 <code>N+M</code> 个。这正是下一节要讲的、ONNX 存在的意义。</p>
+<h2 id="133-onnx部署界的中转枢纽"><a class="header" href="#133-onnx部署界的中转枢纽">13.3 ONNX：部署界的“中转枢纽“</a></h2>
+<p>第 11 章我们把 ONNX 叫作“部署界的普通话“，这一节把这个比喻讲透。<strong>ONNX（Open Neural Network Exchange，开放神经网络交换格式）</strong> 是一个开放标准：它规定了“一个神经网络的计算图和权重（第 11 章讲过，模型文件里就这两样）该怎么写下来“，任何框架都能按这个标准<strong>导出</strong>，任何引擎都能按这个标准<strong>导入</strong>。</p>
+<p>再打个比方——它像航空的<strong>中转枢纽机场</strong>。你不会指望“每个小城市都对飞每个小城市“，那航线会爆炸；现实是大家都先飞到枢纽（北京/上海），再转到目的地。ONNX 就是模型界的枢纽：PyTorch、TensorFlow 都先转成 ONNX，各家芯片工具再从 ONNX 出发。于是本书才敢说“主用 ONNX“——它是覆盖面最广、生态最全的那个中间格式。</p>
+<p>这里要引入一个<strong>每次转换都会碰到、也最容易踩坑</strong>的概念：<strong>opset（算子集版本，operator set version）</strong>。</p>
+<p>ONNX 用一套标准<strong>算子（operator）</strong> 来描述计算——<code>Conv</code>（卷积）、<code>Relu</code>、<code>Add</code>、<code>MatMul</code>（矩阵乘）……opset 就是这套算子的<strong>版本号</strong>，可以理解成“ONNX 的词汇表第几版“。版本越高，收录的算子越多、越新，一些新网络结构才表达得出来。</p>
+<pre><code class="language-text">opset 越低 ←─────────────────────────────────→ opset 越高
+词汇少、老引擎都认            词汇多、能表达新算子，但老引擎可能不认
+   (opset 9/11)                        (opset 17/19…)
+</code></pre>
+<p>选 opset 是个平衡活儿，也是新手常栽的地方：</p>
+<ul>
+<li><strong>选太高</strong>：导出很顺，但下游那个老版本的 NPU 工具/推理引擎不认识这么新的算子，转换直接报错。</li>
+<li><strong>选太低</strong>：老引擎都认，但你网络里的新算子表达不出来，导出时就报“不支持“。</li>
+</ul>
+<p>经验做法：<strong>先查清目标引擎支持到哪个 opset，再挑一个它认得、又够表达你模型的版本</strong>。工程上 <code>opset 12</code>、<code>13</code>、<code>17</code> 是常见的安全档位。记住这个词，下面导出时马上就要用到它。</p>
+<h2 id="134-从-pytorch-导出-onnx"><a class="header" href="#134-从-pytorch-导出-onnx">13.4 从 PyTorch 导出 ONNX</a></h2>
+<p>第一步转换——把 <code>.pt</code> 汇入枢纽。PyTorch 自带 <code>torch.onnx.export</code>，把它当一个命令行小工具用即可。下面是一段可跑的脚本骨架（以本书主模型 YOLOv8 的输入 <code>1×3×640×640</code> 为例）：</p>
+<pre><code class="language-python"># export_onnx.py —— 把 PyTorch 模型导出为 ONNX
+import torch
+
+# 1) 载入训练好的模型，并切到推理模式（关键！）
+model = torch.load("yolov8n.pt")   # 真实项目里通常是构建网络再 load_state_dict
+model.eval()                        # eval() 会关掉 Dropout、固定 BatchNorm，否则导出的图不对
+
+# 2) 造一个"假输入"，形状要和真实输入完全一致：1 张、RGB、640×640
+dummy = torch.randn(1, 3, 640, 640)
+
+# 3) 导出
+torch.onnx.export(
+    model, dummy, "yolov8n.onnx",
+    opset_version=12,                 # 选一个目标引擎认得、又够用的 opset（见 13.3）
+    input_names=["images"],           # 给输入起个名字，Rust/推理时按名字喂数据
+    output_names=["output0"],         # 给输出起名字，按名字取结果
+    dynamic_axes=None,                # 这里先固定 batch，动态 batch 下一节讲
+)
+print("导出完成：yolov8n.onnx")
+</code></pre>
+<p>三个关键参数，务必讲清楚（用一张表钉死）：</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>参数</th><th>作用</th><th>不设会怎样</th></tr>
+</thead>
+<tbody>
+<tr><td><code>opset_version</code></td><td>指定用 ONNX 的哪一版算子集导出（见 13.3）</td><td>用默认版本，可能和目标引擎对不上</td></tr>
+<tr><td><code>input_names</code> / <code>output_names</code></td><td>给输入/输出张量起<strong>人类可读的名字</strong></td><td>会得到 <code>input.1</code>、<code>188</code> 这种自动编号，喂数据/取结果时全靠猜</td></tr>
+<tr><td><code>dynamic_axes</code></td><td>声明哪些维度是“可变的“（下一节主角）</td><td>所有维度都被<strong>写死</strong>成 <code>dummy</code> 的形状</td></tr>
+</tbody>
+</table>
+</div>
+<p><code>input_names</code>/<code>output_names</code> 尤其重要：第 14 章用 Rust 推理时，是<strong>按名字</strong>把张量喂进去、按名字取出来的（本章末尾的冒烟测试就会用到 <code>"images"</code> 和 <code>"output0"</code>）。给个好名字，后面所有代码都清爽。</p>
+<blockquote>
+<p><strong>一个高频坑</strong>：忘了 <code>model.eval()</code>。训练模式下 BatchNorm 和 Dropout 的行为和推理时不同，导出的计算图会把训练态的行为固化进去，结果就是“ONNX 跑出来和 PyTorch 对不上“。导出前先 <code>eval()</code>，是雷打不动的第一步。</p>
+<p>顺便一提：像 Ultralytics 这类成熟项目已经封装好了导出命令，一行 <code>yolo export model=yolov8n.pt format=onnx opset=12</code> 就等价于上面这段脚本。但你得知道它背后在做什么，出问题才改得动。</p>
+</blockquote>
+<h2 id="135-batch-转换固定-batch-还是动态-batch"><a class="header" href="#135-batch-转换固定-batch-还是动态-batch">13.5 Batch 转换：固定 batch 还是动态 batch</a></h2>
+<p>这是本章第一个重点。<strong>batch（批大小）</strong> 就是张量 <code>[N, C, H, W]</code> 里那个 <code>N</code>——一次喂几张图（第 11 章讲过）。导出时，这个 <code>N</code> 有两种处理方式，直接影响性能和适配。</p>
+<p><strong>固定 batch</strong>：把 <code>N</code> 写死成一个具体数字（通常是 1）。上一节 <code>dynamic_axes=None</code> 导出的就是它，ONNX 里输入形状就是硬编码的 <code>[1, 3, 640, 640]</code>——只能一次喂 1 张，喂 2 张直接报形状错。</p>
+<p><strong>动态 batch</strong>：把 <code>N</code> 这一维声明成“可变“，ONNX 里记作 <code>[-1, 3, 640, 640]</code>（<code>-1</code> 或一个符号名表示“这维运行时才定“）。喂 1 张、8 张、16 张都行。做法是设 <code>dynamic_axes</code>：</p>
+<pre><code class="language-python">torch.onnx.export(
+    model, dummy, "yolov8n_dynamic.onnx",
+    opset_version=12,
+    input_names=["images"],
+    output_names=["output0"],
+    # 键是张量名，值是 {维度下标: 维度名}。这里把输入和输出的第 0 维都设成动态
+    dynamic_axes={
+        "images":  {0: "batch"},
+        "output0": {0: "batch"},   # 输出 [1,84,8400] → [batch,84,8400]，别忘了一起改
+    },
+)
+</code></pre>
+<p>注意：<strong>输入设了动态，输出对应的那一维也要一起设</strong>，否则输出的 batch 还是被写死，喂多张时会对不上。</p>
+<p>两者怎么选？看这张对比表：</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>维度</th><th>固定 batch（如 =1）</th><th>动态 batch（<code>-1</code>）</th></tr>
+</thead>
+<tbody>
+<tr><td>速度</td><td><strong>通常更快</strong>：引擎编译期就知道确切尺寸，能把内存和流水线排到最优</td><td>略慢：要么按最大尺寸预留、要么运行时反复适配</td></tr>
+<tr><td>显存/内存</td><td><strong>更省</strong>：按确定尺寸精确分配</td><td>偏多：常需按可能的最大 batch 预留</td></tr>
+<tr><td>NPU 友好度</td><td><strong>高</strong>：很多 NPU（含 RKNN）干脆只支持固定 <code>batch=1</code></td><td>低：不少端侧加速器不支持动态维</td></tr>
+<tr><td>灵活性</td><td>差：换 batch 要重新导出</td><td>好：一个模型应付各种 batch</td></tr>
+</tbody>
+</table>
+</div>
+<p>结论很实用：<strong>端侧/NPU 部署，优先固定 <code>batch=1</code></strong>——更快、更省、兼容性最好；只有在服务器上做吞吐优化、需要把多张图凑一批喂 GPU 时，动态 batch 才真正划算。</p>
+<h3 id="改已有-onnx-的-batch-维"><a class="header" href="#改已有-onnx-的-batch-维">改已有 ONNX 的 batch 维</a></h3>
+<p>有时你手上只有一个别人导出好的 ONNX（拿不到原始 <code>.pt</code>），batch 却不合适，得直接改这个 ONNX。两种办法：</p>
+<p>方法一，用 <code>onnx</code> 包<strong>直接编辑计算图</strong>的输入维度：</p>
+<pre><code class="language-python"># fix_batch.py —— 把 ONNX 输入的第 0 维从固定 1 改成动态
+import onnx
+
+m = onnx.load("yolov8n.onnx")
+dim0 = m.graph.input[0].type.tensor_type.shape.dim[0]
+dim0.dim_param = "batch"          # 用符号名表示动态；若要固定成 1 则设 dim0.dim_value = 1
+onnx.save(m, "yolov8n_fixed.onnx")
+</code></pre>
+<p>方法二，用下一节会讲的 <code>onnxsim</code>，一条命令顺手把输入形状覆盖成固定值：</p>
+<pre><code class="language-bash"># 把输入 images 固定成 1×3×640×640（同时化简）
+onnxsim in.onnx out.onnx --overwrite-input-shape images:1,3,640,640
+</code></pre>
+<blockquote>
+<p><strong>坑：光改输入维度往往不够。</strong> 计算图中间若有依赖 batch 的 <code>Reshape</code>、<code>Resize</code> 等算子（里面可能藏着写死的常量），只改输入头、不改这些常量，跑起来就会形状崩溃。所以<strong>能从源头（<code>.pt</code>）重新导出，就别在成品 ONNX 上硬改</strong>；实在只能改，改完一定要用 13.9 的方法验证一遍。</p>
+</blockquote>
+<h2 id="136-跨平台适配把-onnx-送上各家芯片"><a class="header" href="#136-跨平台适配把-onnx-送上各家芯片">13.6 跨平台适配：把 ONNX 送上各家芯片</a></h2>
+<p>第二个重点。模型汇入 ONNX 枢纽后，就该发散到目标硬件了。逐个过一遍常见目的地，都很简短——重点是记住工具名和“它吃什么、吐什么“。</p>
+<p><strong>TFLite（安卓/嵌入式）</strong>：用 <code>onnx2tf</code>。它把 ONNX 转成 TensorFlow Lite 的 <code>.tflite</code>，可直接跑在安卓和很多 MCU 上。</p>
+<pre><code class="language-bash">onnx2tf -i yolov8n.onnx        # 输出一个文件夹，含 float32/float16/int8 多个 .tflite
+</code></pre>
+<p><strong>NCNN（手机端，腾讯）</strong>：用 <code>onnx2ncnn</code>，产出 <code>.param</code>（结构）+ <code>.bin</code>（权重）两个文件。<strong>强烈建议先用 onnxsim 化简</strong>（见 13.8），否则常因碎算子转换失败。</p>
+<pre><code class="language-bash">onnx2ncnn yolov8n-sim.onnx yolov8n.param yolov8n.bin
+</code></pre>
+<p><strong>RKNN（瑞芯微 NPU）</strong>：用官方 <code>rknn-toolkit2</code>，四步走——载入、配置、构建、导出。这是端侧部署的高频场景，给出脚本骨架：</p>
+<pre><code class="language-python"># to_rknn.py —— ONNX 转 RKNN（瑞芯微 NPU）
+from rknn.api import RKNN
+
+rknn = RKNN(verbose=True)
+# 1) 配置：均值/标准差要和你的预处理对齐；目标平台要写对型号
+#    这里 std=255 表示"喂 0~255 的 uint8，由 NPU 内部帮你归一化到 0~1"
+rknn.config(mean_values=[[0, 0, 0]], std_values=[[255, 255, 255]],
+            target_platform="rk3588")
+# 2) 载入 ONNX
+rknn.load_onnx(model="yolov8n.onnx")
+# 3) 构建；do_quantization=True 走 INT8 量化，必须给校准集（见 13.7）
+rknn.build(do_quantization=True, dataset="calib_list.txt")
+# 4) 导出 .rknn，拷到板子上就能被 NPU 加载
+rknn.export_rknn("yolov8n.rknn")
+rknn.release()
+</code></pre>
+<p><strong>TensorRT（NVIDIA GPU / Jetson）</strong>：用自带的 <code>trtexec</code>，把 ONNX 编译成一个针对本机 GPU 优化的 <code>engine</code>。</p>
+<pre><code class="language-bash"># 基础：ONNX → engine
+trtexec --onnx=yolov8n.onnx --saveEngine=yolov8n.engine
+# 加 FP16 提速（见 13.7）
+trtexec --onnx=yolov8n.onnx --saveEngine=yolov8n_fp16.engine --fp16
+# 动态 batch：必须给出 最小/最优/最大 三档形状
+trtexec --onnx=yolov8n_dynamic.onnx --saveEngine=out.engine \
+        --minShapes=images:1x3x640x640 \
+        --optShapes=images:8x3x640x640 \
+        --maxShapes=images:16x3x640x640
+</code></pre>
+<p><strong>CoreML（苹果芯片）</strong>：用 <code>coremltools</code>。这条线略特殊——<strong>新版 coremltools 推荐直接从 PyTorch 转</strong>（对一个 traced 模型调 <code>ct.convert</code>），ONNX→CoreML 的老通道已经弃用。所以苹果这一路常常“绕过枢纽“，直接从 <code>.pt</code> 出（Ultralytics 的 <code>yolo export format=coreml</code> 也是这么干的）。</p>
+<p><strong>OpenVINO（Intel）</strong>：用 <code>ovc yolov8n.onnx</code>（或老工具 <code>mo</code>），产出 IR 格式的 <code>.xml</code>+<code>.bin</code>，跑在 Intel CPU/核显上。</p>
+<p>讲完这些工具，必须重重敲一下<strong>跨平台头号大坑</strong>：</p>
+<blockquote>
+<p><strong>算子不被目标平台支持。</strong> 每个目标平台（尤其 NPU）能实现的算子是<strong>子集</strong>——ONNX 有的算子，它不一定有。就像方言翻译：源语言里有个词，目标方言里没有对应的说法，翻不过去。表现有两种：转换时直接报 <code>unsupported op: XXX</code>；或者更阴险——<strong>转换“成功“了，但推理结果整个错乱</strong>。对策：① 换个 opset 试试（见 13.3）；② 先用 onnxsim 把怪算子化简掉（见 13.8）；③ 改网络结构，用等价的常见算子替换那个冷门算子；④ 让不支持的算子回退到 CPU 跑（NPU + CPU 混合推理）。无论如何——<strong>转完一定要按 13.9 验证</strong>，别信“没报错就是对了“。</p>
+</blockquote>
+<h2 id="137-量化给模型瘦身"><a class="header" href="#137-量化给模型瘦身">13.7 量化：给模型瘦身</a></h2>
+<p><strong>量化（quantization）</strong> 是转换时最常用的“瘦身+提速“手段，也是端侧部署几乎绕不开的一步。</p>
+<p>它做的事：把权重和计算从高精度的浮点数，换成低精度的表示。常见三档：</p>
+<pre><code class="language-text">FP32 (32 位浮点, 4 字节/个) ──► FP16 (16 位浮点, 2 字节) ──► INT8 (8 位整数, 1 字节)
+      基准精度                     体积减半, 几乎无损           体积 1/4, 要校准、会掉精度
+</code></pre>
+<p><strong>为什么要量化？</strong> 两个动机：</p>
+<ol>
+<li><strong>省</strong>：FP32 换成 INT8，模型体积和内存带宽直接降到 1/4——对内存紧张的边缘设备是刚需。</li>
+<li><strong>快</strong>：很多 NPU 只有<strong>定点（integer/fixed-point）</strong> 算力，或者定点运算比浮点快好几倍。用整数算，正好喂到它们的强项上。</li>
+</ol>
+<p>打个比方：FP32 像一张 4K 高清照片，INT8 像它的缩略图——小得多、加载快，细节略有损失但“看个大概“完全够用。又或者：记账时你不会写“3.14159926 元“，而是用“分“这个整数单位记成 314 分——<strong>用整数格子去近似连续的小数，就是量化的本质</strong>。</p>
+<h3 id="定点近似手算一遍"><a class="header" href="#定点近似手算一遍">定点近似，手算一遍</a></h3>
+<p>量化怎么把浮点塞进整数格子？以把一层数值映射到 <code>uint8</code>（0~255，共 256 格）为例。设这层数值范围是 <code>[min, max] = [-1.0, 3.0]</code>：</p>
+<pre><code class="language-text">每格步长  scale = (max - min) / 255 = (3.0 - (-1.0)) / 255 = 4.0 / 255 ≈ 0.0157
+
+量化   把 x = 1.0 塞进格子：q = round((1.0 - (-1.0)) / scale) = round(127.4) = 127
+反量化 再还原：x' = -1.0 + 127 × 0.0157 ≈ 0.994
+</code></pre>
+<p>还原回来是 <code>0.994</code>，和原值 <code>1.0</code> 差了约 <code>0.006</code>——<strong>这点误差就是量化“掉精度“的来源</strong>。单个数字看着无所谓，但一层层累积起来，就可能让检测框偏、置信度变，所以量化后必须评估（见本节末）。</p>
+<h3 id="ptq-还是-qat"><a class="header" href="#ptq-还是-qat">PTQ 还是 QAT</a></h3>
+<p>INT8 量化有两条路线，用一张表分清：</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th></th><th><strong>PTQ（训练后量化）</strong></th><th><strong>QAT（量化感知训练）</strong></th></tr>
+</thead>
+<tbody>
+<tr><td>全称</td><td>Post-Training Quantization</td><td>Quantization-Aware Training</td></tr>
+<tr><td>怎么做</td><td>拿训练好的模型 + 一小批<strong>校准数据</strong>，直接量化</td><td>训练时就模拟量化误差，边训边适应</td></tr>
+<tr><td>要重训吗</td><td>不用，几分钟搞定</td><td>要，得回到训练流程</td></tr>
+<tr><td>精度</td><td>一般，个别模型掉得多</td><td>更高，接近原始精度</td></tr>
+<tr><td>谁用</td><td><strong>部署工程师（你）最常用</strong></td><td>精度掉太多时，请训练组出手</td></tr>
+</tbody>
+</table>
+</div>
+<p>作为部署工程师，你 90% 的场景用 <strong>PTQ</strong>：简单、快、不碰训练。只有当 PTQ 后精度掉到不能接受，才需要训练组做 QAT。</p>
+<h3 id="校准数据集int8-的必需品"><a class="header" href="#校准数据集int8-的必需品">校准数据集：INT8 的必需品</a></h3>
+<p>PTQ 走 INT8 时，你会被要求提供一个<strong>校准数据集（calibration dataset）</strong>——这正是上面 RKNN 脚本里 <code>dataset="calib_list.txt"</code> 的东西。</p>
+<p>为什么需要它？回看手算：要把浮点塞进整数格子，得先知道<strong>每层数值的范围 <code>[min, max]</code></strong>，才能定出 <code>scale</code>。这个范围没法凭空猜，得拿一批<strong>有代表性的真实图</strong>喂进去跑一遍，统计出来。比喻成<strong>校准一杆秤</strong>：先放几个已知重量的砝码摸清刻度，之后称东西才准。</p>
+<p>用法很朴素：准备几百张覆盖典型场景的真实图片（不用标注），列成一个清单文件喂给量化工具即可。</p>
+<blockquote>
+<p><strong>坑：校准集不代表实际场景，量化后精度会崩。</strong> 如果你的现场是夜间红外，却拿白天彩色图去校准，统计出的数值范围完全对不上，量化后模型可能“整个瞎掉“。校准集要<strong>贴近真实部署分布</strong>。</p>
+<p><strong>铁律：量化后必须重新评估精度。</strong> 在验证集上重跑一遍，对比量化前后的 mAP/准确率掉了多少，掉幅能接受才上线。量化是拿精度换速度和体积的<strong>交易</strong>，你得知道自己付出了多少。</p>
+</blockquote>
+<h2 id="138-精简与算子问题"><a class="header" href="#138-精简与算子问题">13.8 精简与算子问题</a></h2>
+<p>转换失败或结果不对，八成栽在“算子“上。这一节讲两把常用的“钳子“。</p>
+<p><strong>onnx-simplifier（<code>onnxsim</code>）</strong>：ONNX 常常带一堆冗余——训练框架导出时会留下大量碎算子、可提前算好的常量、多余的 <code>Reshape</code>。<code>onnxsim</code> 做<strong>常量折叠</strong>（能提前算的先算掉）、去冗余、把碎算子合并成规整的一块。很多下游转换器（<code>onnx2ncnn</code>、<code>rknn-toolkit2</code> 等）都<strong>强烈建议先 simplify</strong>，否则容易转换失败。</p>
+<pre><code class="language-bash">pip install onnxsim
+onnxsim yolov8n.onnx yolov8n-sim.onnx     # 输入 → 化简后输出
+</code></pre>
+<p>化简既能提升转换成功率，也能让模型跑得更快——是转换流程里几乎“免费“的一步，养成习惯先过一遍。</p>
+<p><strong>opset 不匹配</strong>：13.3 讲过，这里再点一次——它是转换报错的常见根因。目标引擎报“不认识某算子“时，先想想是不是 opset 选高了/选低了，换个版本重新导出往往就通了。</p>
+<p><strong>自定义算子 / 不支持的算子</strong>：训练侧若用了某框架特有的、或研究性质的冷门算子，ONNX 里没有标准对应，导出时会变成一个“自定义算子“——ONNX 勉强收下，下游转换器却更不认识。这本质上是 13.6 那个“方言翻不过去“的坑在源头的版本。对策一致：换 opset、用 onnxsim 化简、或改网络结构避开它。<strong>转换出问题时，第一件事永远是定位到底是哪个算子在捣乱。</strong></p>
+<h2 id="139-验证转换正确性"><a class="header" href="#139-验证转换正确性">13.9 验证转换正确性</a></h2>
+<p>最后，也是最容易被跳过、却最不该跳过的一步。<strong>转换只是“翻译“，翻译完必须回译校对</strong>——同一份输入，分别喂给转换前后的两个模型，比对输出数值对不对得上。</p>
+<p>原则：<strong>同输入 → 两模型 → 比最大绝对误差</strong>。</p>
+<pre><code class="language-python"># verify.py —— 比对 PyTorch 原模型 与 导出的 ONNX 的输出
+import numpy as np
+import torch
+import onnxruntime as ort
+
+# 1) 同一份随机输入（真实项目里最好再补几张真实图）
+x = np.random.rand(1, 3, 640, 640).astype(np.float32)
+
+# 2) 原模型（PyTorch）跑一遍
+model.eval()
+with torch.no_grad():
+    ref = model(torch.from_numpy(x)).numpy()
+
+# 3) 转换后的 ONNX 跑一遍（按导出时起的输入名 "images" 喂）
+sess = ort.InferenceSession("yolov8n.onnx")
+out = sess.run(None, {"images": x})[0]
+
+# 4) 比对：最大绝对误差应当很小
+max_err = np.abs(ref - out).max()
+print(f"最大绝对误差 = {max_err:.6f}")
+assert max_err &lt; 1e-3, "误差过大，转换可能出错了！"
+</code></pre>
+<p>误差阈值怎么定，看你做了什么：</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>转换类型</th><th>期望的最大绝对误差</th><th>说明</th></tr>
+</thead>
+<tbody>
+<tr><td>FP32 → FP32（纯格式转换）</td><td><code>&lt; 1e-5</code>，近乎一致</td><td>只是换壳，数值应几乎不变</td></tr>
+<tr><td>经过 onnxsim / FP16</td><td><code>&lt; 1e-3</code> 量级</td><td>有精度损失，放宽一些</td></tr>
+<tr><td>INT8 量化</td><td><strong>别只看逐元素误差</strong></td><td>用任务指标（mAP/准确率）比，见 13.7</td></tr>
+</tbody>
+</table>
+</div>
+<blockquote>
+<p><strong>两个验证坑</strong>：① 别只用随机输入——随机数可能碰不到真实数据才会触发的分支，务必<strong>补几张真实图</strong>再比一遍。② 别忘了<strong>预处理要一致</strong>（第 10 章的 letterbox、归一化），输入都没对齐，比出来的误差没有意义。</p>
+</blockquote>
+<h3 id="rust-侧加载转换后-onnx-的冒烟测试"><a class="header" href="#rust-侧加载转换后-onnx-的冒烟测试">Rust 侧：加载转换后 ONNX 的冒烟测试</a></h3>
+<p>转换、验证都在 Python 里做完了，最后在 Rust 里确认一下——<strong>这个 ONNX 能被我们的推理引擎加载、能前向、输出形状对</strong>。用写作规范里的 <code>ort</code>（ONNX Runtime 的 Rust 绑定）写一个最小冒烟测试：</p>
+<pre class="playground"><code class="language-rust">use ndarray::Array4;
+use ort::{session::Session, value::Tensor};
+
+fn main() -&gt; ort::Result&lt;()&gt; {
+    // 1) 加载转换/导出好的 onnx
+    let session = Session::builder()?.commit_from_file("yolov8n.onnx")?;
+
+    // 2) 造一个假输入：全 0 的 [1,3,640,640]，只为验证"能跑通"，不关心结果对不对
+    let x = Array4::&lt;f32&gt;::zeros((1, 3, 640, 640));
+
+    // 3) 按导出时起的输入名 "images" 喂进去（怎么查输入名？第 12 章教过）
+    let outputs = session.run(ort::inputs!["images" =&gt; Tensor::from_array(x)?]?)?;
+
+    // 4) 取出名为 "output0" 的输出，打印形状，确认是我们期待的 [1, 84, 8400]
+    let (shape, _data) = outputs["output0"].try_extract_tensor::&lt;f32&gt;()?;
+    println!("跑通了！输出形状 = {shape:?}"); // 期望 [1, 84, 8400]
+    Ok(())
+}</code></pre>
+<p>跑通并打印出 <code>[1, 84, 8400]</code>，就说明这个转换后的模型<strong>能被 Rust 加载、能前向、形状符合预期</strong>——转换链路到此闭环。</p>
+<blockquote>
+<p><code>ort</code> 的 API 随版本略有出入（方法名以你 <code>cargo add ort</code> 拉到的版本为准）。这里只做一次“能加载、能前向、形状对“的冒烟测试；<strong>完整、可长期维护的推理代码，以及 CPU/GPU/NPU 性能优化，是第 14 章的主题</strong>。</p>
+</blockquote>
+<h2 id="1310-小结"><a class="header" href="#1310-小结">13.10 小结</a></h2>
+<ul>
+<li><strong>训练格式 ≠ 部署格式</strong>：<code>.pt</code> 和 Python/框架强绑定、笨重，而目标硬件只认自家格式——所以要转换，转换还能顺手做优化。</li>
+<li><strong>ONNX 是中转枢纽</strong>：几乎所有转换都“先汇入 ONNX，再发散到端侧格式“，把 <code>N×M</code> 个转换器省成 <code>N+M</code> 个；<code>opset</code> 是它的“词汇表版本“，选错是报错常见根因。</li>
+<li>用 <code>torch.onnx.export</code> 导出 ONNX，记牢 <code>model.eval()</code>、<code>opset_version</code>、<code>input_names/output_names</code>、<code>dynamic_axes</code> 四件事。</li>
+<li><strong>Batch</strong>：端侧/NPU 优先<strong>固定 <code>batch=1</code></strong>（更快、更省、兼容性好），服务器做吞吐才用<strong>动态 batch</strong>；改已有 ONNX 的 batch 维能改但有坑，最好从源头重导。</li>
+<li><strong>跨平台</strong>：TFLite/NCNN/RKNN/TensorRT/CoreML 各有工具链；头号大坑是“<strong>算子不被目标平台支持</strong>“，可能报错也可能悄悄算错。</li>
+<li><strong>量化</strong>：FP32→FP16→INT8 换体积和速度；INT8 走 PTQ 要<strong>校准数据集</strong>、且<strong>必须重新评估精度</strong>。</li>
+<li><strong>验证是必做项</strong>：同输入喂转换前后两模型，比最大绝对误差（FP32 应 <code>&lt;1e-5</code>，量化改用 mAP）；最后用 Rust 的 <code>ort</code> 加载做一次冒烟测试。</li>
+</ul>
+<h2 id="1311-练习"><a class="header" href="#1311-练习">13.11 练习</a></h2>
+<ol>
+<li><strong>动态 vs 固定</strong>：拿一个 <code>yolov8n.pt</code>（或任意 PyTorch 模型），分别导出“固定 batch=1“和“动态 batch“两个 ONNX。用第 12 章的方法读出两者的输入形状，确认一个是 <code>[1,3,640,640]</code>、另一个是 <code>[batch,3,640,640]</code>。再想想：如果目标是一块只支持 <code>batch=1</code> 的 RKNN NPU，你该选哪个？</li>
+<li><strong>手算量化</strong>：某一层数值范围是 <code>[min, max] = [-2.0, 6.0]</code>，量化到 <code>uint8</code>（256 格）。先算出 <code>scale</code>，再把 <code>x = 0.0</code> 和 <code>x = 3.5</code> 分别量化成整数、再反量化回来，算出各自的绝对误差。（提示：套 13.7 的两个公式。）</li>
+<li><strong>验证转换</strong>：用 13.9 的 <code>verify.py</code> 思路，比对“原始 ONNX“和“onnxsim 化简后的 ONNX“两者输出的最大绝对误差（都用 <code>onnxruntime</code> 跑即可，不必装 PyTorch）。误差应当在 <code>1e-3</code> 量级以内。想一想：如果误差大到 <code>0.5</code>，最可能是哪一步出了问题？</li>
+<li><strong>查算子支持</strong>：挑一个目标平台（如 TensorRT 或某型号 RKNN），上网找它的“支持算子列表“，再对照你的 ONNX 里用到的算子（可用 <code>onnx</code> 包遍历 <code>graph.node</code> 打印每个算子的 <code>op_type</code>），列出可能不被支持的算子。这一步就是 13.6 那个头号大坑的“提前排雷“。</li>
+</ol>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="ch12-model-io.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                            </a>
+
+                            <a rel="next prefetch" href="ch14-inference.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="ch12-model-io.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                    </a>
+
+                    <a rel="next prefetch" href="ch14-inference.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                    </a>
+            </nav>
+
+        </div>
+
+        <template id=fa-eye><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M288 32c-80.8 0-145.5 36.8-192.6 80.6C48.6 156 17.3 208 2.5 243.7c-3.3 7.9-3.3 16.7 0 24.6C17.3 304 48.6 356 95.4 399.4C142.5 443.2 207.2 480 288 480s145.5-36.8 192.6-80.6c46.8-43.5 78.1-95.4 93-131.1c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C433.5 68.8 368.8 32 288 32zM432 256c0 79.5-64.5 144-144 144s-144-64.5-144-144s64.5-144 144-144s144 64.5 144 144zM288 192c0 35.3-28.7 64-64 64c-11.5 0-22.3-3-31.6-8.4c-.2 2.8-.4 5.5-.4 8.4c0 53 43 96 96 96s96-43 96-96s-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6z"/></svg></span></template>
+        <template id=fa-eye-slash><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M38.8 5.1C28.4-3.1 13.3-1.2 5.1 9.2S-1.2 34.7 9.2 42.9l592 464c10.4 8.2 25.5 6.3 33.7-4.1s6.3-25.5-4.1-33.7L525.6 386.7c39.6-40.6 66.4-86.1 79.9-118.4c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C465.5 68.8 400.8 32 320 32c-68.2 0-125 26.3-169.3 60.8L38.8 5.1zM223.1 149.5C248.6 126.2 282.7 112 320 112c79.5 0 144 64.5 144 144c0 24.9-6.3 48.3-17.4 68.7L408 294.5c5.2-11.8 8-24.8 8-38.5c0-53-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6c0 10.2-2.4 19.8-6.6 28.3l-90.3-70.8zm223.1 298L373 389.9c-16.4 6.5-34.3 10.1-53 10.1c-79.5 0-144-64.5-144-144c0-6.9 .5-13.6 1.4-20.2L83.1 161.5C60.3 191.2 44 220.8 34.5 243.7c-3.3 7.9-3.3 16.7 0 24.6c14.9 35.7 46.2 87.7 93 131.1C174.5 443.2 239.2 480 320 480c47.8 0 89.9-12.9 126.2-32.5z"/></svg></span></template>
+        <template id=fa-copy><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M502.6 70.63l-61.25-61.25C435.4 3.371 427.2 0 418.7 0H255.1c-35.35 0-64 28.66-64 64l.0195 256C192 355.4 220.7 384 256 384h192c35.2 0 64-28.8 64-64V93.25C512 84.77 508.6 76.63 502.6 70.63zM464 320c0 8.836-7.164 16-16 16H255.1c-8.838 0-16-7.164-16-16L239.1 64.13c0-8.836 7.164-16 16-16h128L384 96c0 17.67 14.33 32 32 32h47.1V320zM272 448c0 8.836-7.164 16-16 16H63.1c-8.838 0-16-7.164-16-16L47.98 192.1c0-8.836 7.164-16 16-16H160V128H63.99c-35.35 0-64 28.65-64 64l.0098 256C.002 483.3 28.66 512 64 512h192c35.2 0 64-28.8 64-64v-32h-47.1L272 448z"/></svg></span></template>
+        <template id=fa-play><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M73 39c-14.8-9.1-33.4-9.4-48.5-.9S0 62.6 0 80V432c0 17.4 9.4 33.4 24.5 41.9s33.7 8.1 48.5-.9L361 297c14.3-8.7 23-24.2 23-41s-8.7-32.2-23-41L73 39z"/></svg></span></template>
+        <template id=fa-clock-rotate-left><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M75 75L41 41C25.9 25.9 0 36.6 0 57.9V168c0 13.3 10.7 24 24 24H134.1c21.4 0 32.1-25.9 17-41l-30.8-30.8C155 85.5 203 64 256 64c106 0 192 86 192 192s-86 192-192 192c-40.8 0-78.6-12.7-109.7-34.4c-14.5-10.1-34.4-6.6-44.6 7.9s-6.6 34.4 7.9 44.6C151.2 495 201.7 512 256 512c141.4 0 256-114.6 256-256S397.4 0 256 0C185.3 0 121.3 28.7 75 75zm181 53c-13.3 0-24 10.7-24 24V256c0 6.4 2.5 12.5 7 17l72 72c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9l-65-65V152c0-13.3-10.7-24-24-24z"/></svg></span></template>
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="elasticlunr-ef4e11c1.min.js"></script>
+        <script src="mark-09e88c2c.min.js"></script>
+        <script src="searcher-09f2665d.js"></script>
+
+        <script src="clipboard-1626706a.min.js"></script>
+        <script src="highlight-abc7f01d.js"></script>
+        <script src="book-609e4cb8.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+
+    </div>
+    </body>
+</html>

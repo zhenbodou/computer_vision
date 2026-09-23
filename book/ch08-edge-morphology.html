@@ -1,0 +1,577 @@
+<!DOCTYPE HTML>
+<html lang="zh" class="rust sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>第 8 章 · 边缘、形态学与轮廓 - 机器视觉工程实战：用 Rust 看懂图像与模型</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="一本面向零基础读者的机器视觉工程教程：从像素、编解码、预处理、推理、后处理到模型转换，全部用 Rust 动手实现。">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="favicon-de23e50b.svg">
+        <link rel="shortcut icon" href="favicon-8114d1fc.png">
+        <link rel="stylesheet" href="css/variables-8adf115d.css">
+        <link rel="stylesheet" href="css/general-e96d0476.css">
+        <link rel="stylesheet" href="css/chrome-d279d366.css">
+        <link rel="stylesheet" href="css/print-9e4910d8.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="fonts/fonts-9644e21d.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="mdbook-highlight-css" href="highlight-493f70e1.css">
+        <link rel="stylesheet" id="mdbook-tomorrow-night-css" href="tomorrow-night-4c0ae647.css">
+        <link rel="stylesheet" id="mdbook-ayu-highlight-css" href="ayu-highlight-3fdfc3ac.css">
+
+        <!-- Custom theme stylesheets -->
+
+        <!-- MathJax -->
+        <script async src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "";
+            const default_light_theme = "rust";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "searchindex-4d8e5ec0.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="toc-c1d54236.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="mdbook-body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('rust')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="mdbook-sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("mdbook-sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="mdbook-sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="toc.html"></iframe>
+            </noscript>
+            <div id="mdbook-sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="mdbook-page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="mdbook-menu-bar-hover-placeholder"></div>
+                <div id="mdbook-menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="mdbook-sidebar-toggle" class="icon-button" for="mdbook-sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="mdbook-sidebar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M0 96C0 78.3 14.3 64 32 64H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H416c17.7 0 32 14.3 32 32z"/></svg></span>
+                        </label>
+                        <button id="mdbook-theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="mdbook-theme-list">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M371.3 367.1c27.3-3.9 51.9-19.4 67.2-42.9L600.2 74.1c12.6-19.5 9.4-45.3-7.6-61.2S549.7-4.4 531.1 9.6L294.4 187.2c-24 18-38.2 46.1-38.4 76.1L371.3 367.1zm-19.6 25.4l-116-104.4C175.9 290.3 128 339.6 128 400c0 3.9 .2 7.8 .6 11.6c1.8 17.5-10.2 36.4-27.8 36.4H96c-17.7 0-32 14.3-32 32s14.3 32 32 32H240c61.9 0 112-50.1 112-112c0-2.5-.1-5-.2-7.5z"/></svg></span>
+                        </button>
+                        <ul id="mdbook-theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-ayu">Ayu</button></li>
+                        </ul>
+                        <button id="mdbook-search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="mdbook-searchbar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352c79.5 0 144-64.5 144-144s-64.5-144-144-144S64 128.5 64 208s64.5 144 144 144z"/></svg></span>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">机器视觉工程实战：用 Rust 看懂图像与模型</h1>
+
+                    <div class="right-buttons">
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <span class=fa-svg id="print-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M128 0C92.7 0 64 28.7 64 64v96h64V64H354.7L384 93.3V160h64V93.3c0-17-6.7-33.3-18.7-45.3L400 18.7C388 6.7 371.7 0 354.7 0H128zM384 352v32 64H128V384 368 352H384zm64 32h32c17.7 0 32-14.3 32-32V256c0-35.3-28.7-64-64-64H64c-35.3 0-64 28.7-64 64v96c0 17.7 14.3 32 32 32H64v64c0 35.3 28.7 64 64 64H384c35.3 0 64-28.7 64-64V384zm-16-88c-13.3 0-24-10.7-24-24s10.7-24 24-24s24 10.7 24 24s-10.7 24-24 24z"/></svg></span>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="mdbook-search-wrapper" class="hidden">
+                    <form id="mdbook-searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="mdbook-searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="mdbook-searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <span class=fa-svg id="fa-spin"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M304 48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zm0 416c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM48 304c26.5 0 48-21.5 48-48s-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48zm464-48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM142.9 437c18.7-18.7 18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zm0-294.2c18.7-18.7 18.7-49.1 0-67.9S93.7 56.2 75 75s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zM369.1 437c18.7 18.7 49.1 18.7 67.9 0s18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9z"/></svg></span>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="mdbook-searchresults-outer" class="searchresults-outer hidden">
+                        <div id="mdbook-searchresults-header" class="searchresults-header"></div>
+                        <ul id="mdbook-searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('mdbook-sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('mdbook-sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#mdbook-sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="mdbook-content" class="content">
+                    <main>
+                        <h1 id="第-8-章--边缘形态学与轮廓"><a class="header" href="#第-8-章--边缘形态学与轮廓">第 8 章 · 边缘、形态学与轮廓</a></h1>
+<blockquote>
+<p><strong>本章导读</strong>：上一章（第 7 章）我们学会了给图像降噪、模糊、锐化——那更像是给图像“美颜“。本章要更进一步：从像素里<strong>提取结构</strong>。我们会先找出物体的<strong>边缘</strong>（Sobel、Canny），再把灰度图<strong>二值化</strong>（阈值、Otsu），然后用<strong>形态学</strong>（腐蚀、膨胀、开、闭）把二值图修干净，最后用<strong>连通域和轮廓</strong>把散落的白色像素聚成一个个“物体“，量出它的<strong>外接框（BBox）<strong>和面积。读完你能亲手搭出一条</strong>不需要训练、每一步都看得见</strong>的传统目标检测流水线——这正是第 1 章提到的“传统算法“那一派的看家本领。</p>
+</blockquote>
+<h2 id="81-边缘是什么"><a class="header" href="#81-边缘是什么">8.1 边缘是什么</a></h2>
+<p>先问一个问题：你怎么一眼看出照片里“物体的轮廓“？</p>
+<p>答案是<strong>亮度突变</strong>。一只黑猫趴在白墙前，猫身和墙交界的地方，亮度从“很亮“骤降到“很暗“——这条“骤变线“就是<strong>边缘（edge）</strong>。图像里绝大多数有意义的结构（物体外形、文字笔画、零件棱角）都出现在亮度剧烈变化的地方。</p>
+<p>怎么量化“变化剧烈“？用<strong>梯度（gradient）</strong>。</p>
+<p>打个比方：把灰度图想象成一片高低起伏的地形，像素越亮地势越高。<strong>梯度就是地面的陡峭程度</strong>——平地梯度为 0（走一步高度不变），悬崖梯度巨大（走一步掉下去几十米）。图像里，平坦的墙面梯度接近 0，物体边缘就是那道“悬崖“，梯度很大。</p>
+<p><strong>先看最简单的一维例子</strong>。取一行像素，从左到右扫过一条边缘：</p>
+<pre><code class="language-text">像素值：  10   10   10   90   90   90
+相邻差：     0    0   80    0    0        ← 相邻像素相减 = 一维"梯度"
+                    ↑
+                这里有一条边缘（值突然从 10 跳到 90）
+</code></pre>
+<p>相邻相减，平坦处得 0，突变处得 80——<strong>梯度大的地方就是边缘</strong>。二维图像无非是把这件事沿水平和垂直两个方向各做一遍，再合起来。至于“相减“背后的滑窗卷积机制，第 7 章已经讲透，本章直接拿来用。</p>
+<h2 id="82-sobel-算子两个方向的探针"><a class="header" href="#82-sobel-算子两个方向的探针">8.2 Sobel 算子：两个方向的探针</a></h2>
+<p>一维只有“左右“一个方向，二维要同时看“水平变化“和“垂直变化“。<strong>Sobel 算子</strong>用两个 3×3 卷积核分别探测这两个方向：</p>
+<pre><code class="language-text">Gx（水平方向梯度，检测竖直边缘）：   Gy（垂直方向梯度，检测水平边缘）：
+
+  -1   0  +1                          -1  -2  -1
+  -2   0  +2                           0   0   0
+  -1   0  +1                          +1  +2  +1
+</code></pre>
+<p>直觉：<code>Gx</code> 核左边是负、右边是正，它算的是“右边一列减左边一列“——左右差得越多，<code>Gx</code> 越大，说明这里有一条<strong>竖直边缘</strong>。<code>Gy</code> 同理，上下相减，管<strong>水平边缘</strong>。中间一行/一列权重加倍（是 2 不是 1），因为正对着中心的邻居比斜角更值得信任（这和第 7 章高斯核“中心权重大“是一个道理）。</p>
+<h3 id="手算一个像素的-gxgy-和幅值"><a class="header" href="#手算一个像素的-gxgy-和幅值">手算一个像素的 Gx、Gy 和幅值</a></h3>
+<p>想象图像上一小块区域，亮度从左上往右下平滑变亮（一个倾斜的亮度斜坡），中心像素周围的 3×3 是这样：</p>
+<pre><code class="language-text"> 20   35   50
+ 40   55   70
+ 60   75   90
+</code></pre>
+<p><strong>先算 Gx</strong>（每个像素 × <code>Gx</code> 核对应位置，再全部相加）：</p>
+<pre><code class="language-text">Gx = (-1)·20 + 0·35 + (+1)·50      → 第一行：-20 + 0 + 50 = 30
+   + (-2)·40 + 0·55 + (+2)·70      → 第二行：-80 + 0 +140 = 60
+   + (-1)·60 + 0·75 + (+1)·90      → 第三行：-60 + 0 + 90 = 30
+   = 30 + 60 + 30 = 120
+</code></pre>
+<p><strong>再算 Gy</strong>（同一块像素，换成 <code>Gy</code> 核）：</p>
+<pre><code class="language-text">Gy = (-1)·20 + (-2)·35 + (-1)·50   → 第一行：-20 -70 -50 = -140
+   +   0·40 +   0·55 +   0·70      → 第二行：0
+   + (+1)·60 + (+2)·75 + (+1)·90   → 第三行：+60 +150 +90 = +300
+   = -140 + 0 + 300 = 160
+</code></pre>
+<p><code>Gx = 120</code>、<code>Gy = 160</code>：这一点水平和垂直方向都在快速变亮。<strong>合成梯度幅值</strong>（把两个方向像勾股定理一样合起来）：</p>
+<p>$$G = \sqrt{G_x^2 + G_y^2} = \sqrt{120^2 + 160^2} = \sqrt{14400 + 25600} = \sqrt{40000} = 200$$</p>
+<p>幅值 200（接近 255 上限）说明这是一条很强的边缘。工程上开方较慢，实时场景常用近似 $|G_x| + |G_y| = 120 + 160 = 280$ 代替（快，略微偏大，够用）。</p>
+<p>梯度还有个<strong>方向</strong> $\theta = \arctan(G_y / G_x)$，指向“变化最快的方向“（垂直于边缘走向），Canny 的第 3 步要用到它。</p>
+<h3 id="提一下-scharr"><a class="header" href="#提一下-scharr">提一下 Scharr</a></h3>
+<p><code>Sobel</code> 的 3×3 核在斜方向不够精确。<strong>Scharr</strong> 是它的加强版，系数放大、比例更优，对细弱边缘更敏感：</p>
+<pre><code class="language-text">Scharr Gx：             Scharr Gy：
+ -3   0  +3            -3  -10  -3
+-10   0 +10             0    0   0
+ -3   0  +3            +3  +10  +3
+</code></pre>
+<p>用法和 Sobel 一样，只是换了核里的数字——记住第 7 章那句话：<strong>设计一个算子，就是设计核里的那几个数</strong>。</p>
+<h3 id="用-imageproc-求-sobel"><a class="header" href="#用-imageproc-求-sobel">用 imageproc 求 Sobel</a></h3>
+<pre class="playground"><code class="language-rust">use image::{GrayImage, Luma};
+use imageproc::gradients::{horizontal_sobel, vertical_sobel, sobel_gradients};
+
+fn main() -&gt; anyhow::Result&lt;()&gt; {
+    let gray = image::open("test.jpg")?.to_luma8();
+
+    // Gx、Gy 可能为负，所以每个像素用 i16 存（不是 u8）
+    let gx = horizontal_sobel(&amp;gray); // Image&lt;Luma&lt;i16&gt;&gt;
+    let gy = vertical_sobel(&amp;gray);   // Image&lt;Luma&lt;i16&gt;&gt;
+
+    // imageproc 直接给合成好的幅值图；幅值可能 &gt;255，故用 u16
+    let _mag = sobel_gradients(&amp;gray); // Image&lt;Luma&lt;u16&gt;&gt;
+
+    // 手动合成一遍，和上面等价，方便存成能看的灰度图
+    let (w, h) = gray.dimensions();
+    let mut edge = GrayImage::new(w, h);
+    for y in 0..h {
+        for x in 0..w {
+            let dx = gx.get_pixel(x, y)[0] as f32;
+            let dy = gy.get_pixel(x, y)[0] as f32;
+            let m = (dx * dx + dy * dy).sqrt(); // 就是本节手算的那个幅值
+            edge.put_pixel(x, y, Luma([m.min(255.0) as u8]));
+        }
+    }
+    edge.save("sobel.png")?;
+    Ok(())
+}</code></pre>
+<p>跑出来的 <code>sobel.png</code> 里，物体轮廓是亮线，平坦区域是黑的——但你会发现边缘又粗又毛糙。把它变成干净的单像素线，就是下面 Canny 要干的事。</p>
+<h2 id="83-canny业界标准的边缘提取"><a class="header" href="#83-canny业界标准的边缘提取">8.3 Canny：业界标准的边缘提取</a></h2>
+<p>实际项目里说“提边缘“，九成指的是 <strong>Canny 边缘检测</strong>。它不是一个新算子，而是把前面的思想串成一条<strong>四步流水线</strong>，产出又细又连续、噪声又少的边缘：</p>
+<pre><code class="language-text">① 高斯降噪      先把噪点抹平，免得把噪声也当成边缘（详见第 7 章）
+② 求梯度        对降噪后的图跑 Sobel，得到每个像素的幅值 G 和方向 θ
+③ 非极大值抑制   沿梯度方向只保留"最陡的那一个"像素，把粗边细化成单像素线
+④ 双阈值 + 滞后连接  用高低两条阈值分出强/弱边缘，再把弱边缘"择优录取"
+</code></pre>
+<p>**第 ③ 步（非极大值抑制，NMS）**是 Canny 精髓。Sobel 算出来的边缘往往有好几像素宽（像一道斜坡），但真正的边缘只有斜坡最陡处那一像素。这一步沿着梯度方向左右比一比：“我是不是这一小段里梯度最大的？“不是就归零。于是一条“胖边“被削成“一根线”。</p>
+<p><strong>第 ④ 步</strong>先用两条阈值给每个边缘像素分类：</p>
+<ul>
+<li>幅值 &gt; <strong>高阈值</strong>：<strong>强边缘</strong>，铁定是真边缘，直接保留。</li>
+<li>幅值 &lt; <strong>低阈值</strong>：直接扔掉，是噪声。</li>
+<li>介于两者之间：<strong>弱边缘</strong>，暂时存疑。</li>
+</ul>
+<p>然后<strong>滞后连接（hysteresis）</strong>：弱边缘如果和某个强边缘连在一起，就“沾光“晋升为真边缘（它多半是真轮廓被噪点打断的一截）；孤零零、谁也不挨着的弱边缘则丢弃。这样既能接上断续的真实轮廓，又不放过孤立噪点。</p>
+<p><strong>高低阈值怎么影响结果</strong>（这是项目里对着样图调参的地方）：</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>调法</th><th>效果</th><th>场景</th></tr>
+</thead>
+<tbody>
+<tr><td>两个都调高</td><td>边缘稀疏但可靠，只留最强的轮廓</td><td>只想要主体大轮廓</td></tr>
+<tr><td>两个都调低</td><td>边缘密密麻麻，噪声也混进来</td><td>怕漏细节，但要忍受杂线</td></tr>
+<tr><td>高低差距大（如 1:3）</td><td>主干可靠 + 尽量把断线接上</td><td>通用推荐起点</td></tr>
+</tbody>
+</table>
+</div>
+<p>经验比值：高阈值 ≈ 低阈值的 2~3 倍。</p>
+<pre class="playground"><code class="language-rust">use imageproc::edges::canny;
+
+fn main() -&gt; anyhow::Result&lt;()&gt; {
+    let gray = image::open("test.jpg")?.to_luma8();
+    // canny(图, 低阈值, 高阈值)；内部已含高斯降噪，无需自己先模糊
+    let edges = canny(&amp;gray, 50.0, 150.0); // 输出：单像素宽的黑白边缘图
+    edges.save("canny.png")?;
+    Ok(())
+}</code></pre>
+<h2 id="84-阈值化从灰度到黑白"><a class="header" href="#84-阈值化从灰度到黑白">8.4 阈值化：从灰度到黑白</a></h2>
+<p>边缘检测把“轮廓“抠了出来，但很多传统流水线更需要的是把<strong>整个物体区域</strong>变成一整块白色，好让后面数它、量它。这一步叫<strong>阈值化（threshold）</strong>，也叫<strong>二值化</strong>：给一条分界线，比它亮的像素涂白（255），比它暗的涂黑（0）。</p>
+<pre><code class="language-text">灰度值：  30   90   130   200        阈值 = 128
+         ↓    ↓     ↓     ↓
+二值化：   0    0    255   255        （&gt; 128 变白，否则变黑）
+</code></pre>
+<p>结果只剩黑白两色，图像被“抽象“成了“前景 vs 背景“。难点只有一个：<strong>阈值定多少？</strong> 定高了物体被啃掉，定低了背景混进来。手动试很累，于是有了 <strong>Otsu 自动阈值</strong>。</p>
+<p><strong>Otsu 原理一句话</strong>：把整张图的灰度直方图看成两堆（前景堆 + 背景堆），自动挑一条分界线，让分出来的两堆各自最“抱团“（组内方差最小、等价于组间方差最大）。它替你把最费劲的调参自动化了，光照稳定的场景一用一个准。</p>
+<pre class="playground"><code class="language-rust">use imageproc::contrast::{threshold, otsu_level, ThresholdType};
+
+fn main() -&gt; anyhow::Result&lt;()&gt; {
+    let gray = image::open("test.jpg")?.to_luma8();
+
+    // 固定阈值：亮度 &gt; 128 变白，其余变黑
+    let bin = threshold(&amp;gray, 128, ThresholdType::Binary);
+    bin.save("bin_fixed.png")?;
+
+    // Otsu 自动阈值：让算法自己找那条最佳分界线
+    let level = otsu_level(&amp;gray);
+    println!("Otsu 选出的阈值 = {level}");
+    let bin_auto = threshold(&amp;gray, level, ThresholdType::Binary);
+    bin_auto.save("bin_otsu.png")?;
+    Ok(())
+}</code></pre>
+<p><code>ThresholdType</code> 还有 <code>BinaryInverted</code>（反过来：暗的变白）等变体。<strong>若目标比背景暗</strong>（白纸上的黑字、亮传送带上的深色零件），就用 <code>BinaryInverted</code>，让目标变成白色——因为后面形态学和轮廓都默认“白色是前景“。</p>
+<h2 id="85-形态学二值图的整形手术"><a class="header" href="#85-形态学二值图的整形手术">8.5 形态学：二值图的“整形手术“</a></h2>
+<p>二值化出来的图很少是完美的：物体边上挂着毛刺、背景里散着零星白点、主体里破着小黑洞。<strong>形态学（morphology）<strong>就是对黑白图做的“整形手术“，工具是一个小小的</strong>结构元素（kernel，也叫结构元）</strong>——通常是 3×3 的方块或十字，你可以理解成一枚“印章“，拿它在图上盖来盖去。两个最基本的操作：</p>
+<p><strong>腐蚀（erode，缩）</strong>：印章扫过每个白点，只有当印章盖住的范围<strong>全是白</strong>时，中心才保留白，否则变黑。效果是白色区域从边界往里<strong>缩一圈</strong>。打比方：拿橡皮沿着白块边缘<strong>啃一圈</strong>——细毛刺被啃没了，主体变瘦。</p>
+<pre><code class="language-text">腐蚀（3×3 方块结构元，白块被啃掉最外一圈）：
+
+   原图                   腐蚀后
+ . . . . . .            . . . . . .
+ . # # # # .            . . . . . .
+ . # # # # .    ──▶     . . # # . .
+ . # # # # .            . . # # . .
+ . # # # # .            . . . . . .
+ . . . . . .            . . . . . .
+   （4×4 白块）           （缩成 2×2）
+</code></pre>
+<p><strong>膨胀（dilate，胀）</strong>：反过来，印章盖住的范围<strong>只要有一个白</strong>，中心就变白。效果是白色区域向外<strong>长一圈</strong>。打比方：拿记号笔沿边缘<strong>描粗</strong>——白块<strong>长胖</strong>了，小黑洞被填掉。</p>
+<pre><code class="language-text">膨胀（3×3 方块结构元，白块向外长一圈）：
+
+   原图                   膨胀后
+ . . . . . .            . . . . . .
+ . . . . . .            . # # # # .
+ . . # # . .    ──▶     . # # # # .
+ . . # # . .            . # # # # .
+ . . . . . .            . # # # # .
+ . . . . . .            . . . . . .
+   （2×2 白块）           （胀成 4×4）
+</code></pre>
+<p>单独用“缩“或“胀“会改变物体大小，实用的是把它们<strong>组合</strong>起来——先缩后胀、或先胀后缩，物体大小基本还原，但噪声被清掉了：</p>
+<pre><code class="language-text">开运算（open）= 先腐蚀，后膨胀  → 去掉小白点（噪声毛刺），主体保持
+闭运算（close）= 先膨胀，后腐蚀  → 填掉小黑洞（缝隙裂纹），主体保持
+</code></pre>
+<p>为什么开运算能去小白点？孤立的小白点在<strong>腐蚀</strong>那一步就被啃光了（它太小，撑不过一圈啃），后面膨胀无从恢复；而大主体啃掉一圈后还在，膨胀又长回原样。闭运算反过来：膨胀先把小黑洞填平，腐蚀再把主体缩回原大小。看图：</p>
+<pre><code class="language-text">开运算去小白点：                        闭运算填小黑洞：
+
+  原二值图        开运算后               原二值图        闭运算后
+. . . . . . .   . . . . . . .          . . . . . .    . . . . . .
+. # # # # . .   . # # # # . .          . # # # # .    . # # # # .
+. # # # # . #   . # # # # . .   ←孤立   . # . # # .    . # # # # .  ←黑洞
+. # # # # . .   . # # # # . .   白点消失 . # # # # .    . # # # # .   被填上
+. . . # . . .   . . . . . . .   ←噪点    . . . . . .    . . . . . .
+. . . . . . .   . . . . . . .   消失
+</code></pre>
+<p>工程上“二值化 + 开运算去噪“几乎是绑定出现的固定套路。imageproc 的调用：</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use imageproc::morphology::{erode, dilate, open, close};
+use imageproc::distance_transform::Norm;
+
+// 参数 k = "啃/长几圈"的距离；Norm 决定结构元形状：
+//   Norm::LInf → 3×3 方块，   Norm::L1 → 3×3 十字（只算上下左右）
+let eroded  = erode(&amp;bin,  Norm::LInf, 1); // 缩 1 圈
+let dilated = dilate(&amp;bin, Norm::LInf, 1); // 胀 1 圈
+let opened  = open(&amp;bin,   Norm::LInf, 1); // 开：先腐后胀，去小白点
+let closed  = close(&amp;bin,  Norm::LInf, 1); // 闭：先胀后腐，填小黑洞
+<span class="boring">}</span></code></pre>
+<h2 id="86-连通域与轮廓把白块变成物体"><a class="header" href="#86-连通域与轮廓把白块变成物体">8.6 连通域与轮廓：把白块变成“物体“</a></h2>
+<p>形态学修干净后，图上剩几坨白色区域。但对程序来说这还只是一堆 255，它并不知道“哪些白像素属于同一个物体“。把<strong>连成一片的白色像素</strong>认定为一个整体，就是<strong>连通域（connected components）</strong>。</p>
+<p>打比方：一张地图上几块不相连的陆地，我们给每块岛屿编个号——1 号岛、2 号岛……<strong>连通域标记</strong>就是给图上每一坨白色区域染上一个编号（0 号留给背景）。</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use image::Luma;
+use imageproc::region_labelling::{connected_components, Connectivity};
+
+// 返回一张"标签图"：每个像素的值 = 它所属连通域的编号（0 = 背景）
+// Connectivity::Eight 表示斜对角也算相连；Four 只算上下左右
+let labels = connected_components(&amp;bin, Connectivity::Eight, Luma([0u8]));
+
+// 最大编号 = 连通域个数（编号从 1 连续排到 N）
+let count = labels.pixels().map(|p| p[0]).max().unwrap_or(0);
+println!("找到 {count} 个连通域");
+<span class="boring">}</span></code></pre>
+<p>知道“有几个物体“还不够，我们通常想要每个物体的<strong>外轮廓（contour）</strong>——沿着白块的边界描一圈得到的点序列，以及由它派生的<strong>外接矩形（bounding box）<strong>和</strong>面积</strong>。<code>find_contours</code> 用经典的 Suzuki 边界跟踪算法把每条边界描出来：</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use imageproc::contours::{find_contours, Contour, BorderType};
+
+// 每条 Contour 有三样东西：
+//   points: Vec&lt;Point&lt;i32&gt;&gt;   边界上的像素坐标序列
+//   border_type: BorderType   Outer（物体外轮廓）还是 Hole（内部空洞的边）
+//   parent: Option&lt;usize&gt;     父轮廓编号（用于表达"洞在谁里面"）
+let contours: Vec&lt;Contour&lt;i32&gt;&gt; = find_contours(&amp;bin);
+println!("描出 {} 条轮廓", contours.len());
+<span class="boring">}</span></code></pre>
+<p>有了轮廓上的点，外接矩形就是这些点的 x、y 最小/最大值围成的框。我们用<strong>全书统一的 <code>BBox</code> 类型</strong>（见写作规范，左上-右下像素坐标）来表达它：</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use imageproc::contours::Contour;
+
+/// 边界框：左上-右下像素坐标（全书统一类型，后续检测章节复用）
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct BBox {
+    pub x1: f32,
+    pub y1: f32,
+    pub x2: f32,
+    pub y2: f32,
+}
+
+impl BBox {
+    pub fn width(&amp;self) -&gt; f32 { self.x2 - self.x1 }
+    pub fn height(&amp;self) -&gt; f32 { self.y2 - self.y1 }
+    pub fn area(&amp;self) -&gt; f32 { self.width() * self.height() } // 外接矩形面积
+}
+
+/// 从一条轮廓的边界点算出外接矩形
+fn bbox_of_contour(c: &amp;Contour&lt;i32&gt;) -&gt; BBox {
+    let (mut x1, mut y1) = (i32::MAX, i32::MAX);
+    let (mut x2, mut y2) = (i32::MIN, i32::MIN);
+    for p in &amp;c.points {           // 扫一遍所有边界点，取 x/y 的极值
+        x1 = x1.min(p.x); y1 = y1.min(p.y);
+        x2 = x2.max(p.x); y2 = y2.max(p.y);
+    }
+    BBox { x1: x1 as f32, y1: y1 as f32, x2: x2 as f32, y2: y2 as f32 }
+}
+<span class="boring">}</span></code></pre>
+<blockquote>
+<p>小提醒：<code>BBox::area()</code> 算的是<strong>外接矩形</strong>面积。物体<strong>真实像素面积</strong>（形状占了多少个白点）要去数连通域里该编号的像素个数，二者对细长或弯曲的物体差别很大——筛选时按需选用。</p>
+</blockquote>
+<h2 id="87-一条完整的传统检测流水线"><a class="header" href="#87-一条完整的传统检测流水线">8.7 一条完整的传统检测流水线</a></h2>
+<p>把本章零件串起来，就是一条<strong>不用训练、每步可视、可解释</strong>的目标检测流水线——正好呼应第 1 章讲的“传统算法“那一派。任务举例：一条传送带上散落着零件，我们要框出每一个。</p>
+<pre><code class="language-text">灰度  →  阈值(Otsu)  →  形态学去噪(开运算)  →  找轮廓  →  按面积/长宽比筛选  →  目标框 BBox
+─────    ───────────    ──────────────────     ────────    ──────────────────    ──────────
+去颜色    分前景/背景      清掉零星噪点            描出每块      淘汰噪声块和奇形怪状     输出结果
+</code></pre>
+<pre class="playground"><code class="language-rust">use image::{GrayImage, Luma};
+use imageproc::contrast::{otsu_level, threshold, ThresholdType};
+use imageproc::morphology::open;
+use imageproc::distance_transform::Norm;
+use imageproc::contours::{find_contours, Contour, BorderType};
+
+// BBox / bbox_of_contour 沿用 8.6 节的定义，这里省略
+
+/// 传统检测流水线：输入灰度图，输出一组目标框
+fn detect_blobs(gray: &amp;GrayImage) -&gt; Vec&lt;BBox&gt; {
+    // ① 阈值化：Otsu 自动定阈值，灰度图 → 黑白（目标比背景亮时用 Binary）
+    let level = otsu_level(gray);
+    let bin = threshold(gray, level, ThresholdType::Binary);
+
+    // ② 形态学去噪：开运算干掉零星白点（先腐后胀），保住主体
+    let clean = open(&amp;bin, Norm::LInf, 1);
+
+    // ③ 找轮廓：把每一块连通白色区域的边界描出来
+    let contours: Vec&lt;Contour&lt;i32&gt;&gt; = find_contours(&amp;clean);
+
+    // ④ 按规则筛选，转成目标框
+    let mut boxes = Vec::new();
+    for c in &amp;contours {
+        // 只要物体外轮廓，内部空洞的边(Hole)不算一个目标
+        if c.border_type != BorderType::Outer { continue; }
+
+        let b = bbox_of_contour(c);
+        let area = b.area();
+        let aspect = b.width() / b.height().max(1.0); // 长宽比，防除 0
+
+        if area &lt; 100.0 { continue; }                 // 太小 → 残留噪声，丢
+        if aspect &lt; 0.2 || aspect &gt; 5.0 { continue; }  // 太细太长 → 不是目标，丢
+        boxes.push(b);
+    }
+    boxes
+}
+
+fn main() -&gt; anyhow::Result&lt;()&gt; {
+    let gray = image::open("parts.jpg")?.to_luma8();
+    let boxes = detect_blobs(&amp;gray);
+    println!("检测到 {} 个目标：", boxes.len());
+    for (i, b) in boxes.iter().enumerate() {
+        println!(
+            "  #{i}: ({:.0},{:.0})-({:.0},{:.0}) 面积={:.0}",
+            b.x1, b.y1, b.x2, b.y2, b.area()
+        );
+    }
+    Ok(())
+}</code></pre>
+<p>这套流水线的每一个中间产物——二值图、去噪图、轮廓图——都能存成图片肉眼检查。哪一步出了错，逐张看过去就能定位，不用对着神经网络黑盒抓瞎。这就是<strong>传统算法的工程优势：快、省、可解释、零训练成本</strong>。它的软肋是“规则写死“：换个光照、目标外观一变，阈值和筛选条件就得重调。所以它最适合<strong>固定场景</strong>——工业质检、传送带计数、稳定光照下的定位测量。</p>
+<p>一旦场景变得开放多变（大街上认车认人、任意角度任意光照），手写规则就撑不住了，得请出深度学习检测器（YOLO 家族、NMS 后处理，详见第 16 章）。工业界的常态是<strong>两者混用</strong>：传统算法做预处理、粗定位、ROI 裁剪，深度模型做最终识别。而框的表达方式——本章的 <code>BBox</code>——从传统流水线到深度模型输出，全书自始至终是同一个。</p>
+<h2 id="88-小结"><a class="header" href="#88-小结">8.8 小结</a></h2>
+<ul>
+<li><strong>边缘 = 亮度突变 = 梯度大</strong>。梯度是“地形陡峭程度“，平地为 0，物体轮廓这道“悬崖“梯度最大。</li>
+<li><strong>Sobel</strong> 用两个 3×3 核分别求水平/垂直梯度 <code>Gx</code>、<code>Gy</code>，合成幅值 $\sqrt{G_x^2+G_y^2}$；本章手算得 <code>Gx=120, Gy=160, 幅值=200</code>。Scharr 是它的加强版。</li>
+<li><strong>Canny</strong> 四步：高斯降噪 → 求梯度 → 非极大值抑制（削成单像素线）→ 双阈值 + 滞后连接。高阈值管“边缘多可靠“，低阈值管“边缘多密“。</li>
+<li><strong>阈值化</strong>把灰度图二值化；<strong>Otsu</strong> 自动挑分界线让前景/背景两堆各自最抱团。</li>
+<li><strong>形态学</strong>：腐蚀（啃边、缩）、膨胀（长胖、胀）；开运算（先腐后胀）去小白点，闭运算（先胀后腐）填小黑洞。</li>
+<li><strong>连通域</strong>给每坨白块编号，<strong>轮廓</strong>描出边界，进而得到外接框 <code>BBox</code> 和面积；串成“灰度→阈值→形态学→轮廓→筛选“就是一条零训练、可解释的传统检测流水线。</li>
+</ul>
+<h2 id="89-练习"><a class="header" href="#89-练习">8.9 练习</a></h2>
+<ol>
+<li>用 8.2 节的手算方法，对下面这块像素分别算出 <code>Gx</code>、<code>Gy</code> 和幅值（用 Sobel 核），并判断它是竖边还是横边为主：
+<pre><code class="language-text">10  10  10
+10  10  10
+90  90  90
+</code></pre>
+</li>
+<li>对同一张 <code>test.jpg</code>，把 Canny 的双阈值依次设成 <code>(30,90)</code>、<code>(50,150)</code>、<code>(100,300)</code>，各存一张图对比，找出对你这张图边缘最干净的一组，并解释为什么。</li>
+<li>给一张二值图人为加噪（随机把 1% 的黑像素改成白点），先直接 <code>find_contours</code> 数出轮廓条数，再先做一次开运算 <code>open(&amp;bin, Norm::LInf, 1)</code> 后重数，对比两次数量，验证“开运算去小白点“的效果。</li>
+<li>扩展 8.7 的 <code>detect_blobs</code>：给 <code>BBox</code> 加一个 <code>center() -&gt; (f32, f32)</code> 方法（返回框中心），在 <code>main</code> 里把每个目标的中心点也打印出来——这是第 21 章做跟踪时要用的信息。</li>
+</ol>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="ch07-spatial-filters.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                            </a>
+
+                            <a rel="next prefetch" href="ch09-geometry.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="ch07-spatial-filters.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                    </a>
+
+                    <a rel="next prefetch" href="ch09-geometry.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                    </a>
+            </nav>
+
+        </div>
+
+        <template id=fa-eye><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M288 32c-80.8 0-145.5 36.8-192.6 80.6C48.6 156 17.3 208 2.5 243.7c-3.3 7.9-3.3 16.7 0 24.6C17.3 304 48.6 356 95.4 399.4C142.5 443.2 207.2 480 288 480s145.5-36.8 192.6-80.6c46.8-43.5 78.1-95.4 93-131.1c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C433.5 68.8 368.8 32 288 32zM432 256c0 79.5-64.5 144-144 144s-144-64.5-144-144s64.5-144 144-144s144 64.5 144 144zM288 192c0 35.3-28.7 64-64 64c-11.5 0-22.3-3-31.6-8.4c-.2 2.8-.4 5.5-.4 8.4c0 53 43 96 96 96s96-43 96-96s-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6z"/></svg></span></template>
+        <template id=fa-eye-slash><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M38.8 5.1C28.4-3.1 13.3-1.2 5.1 9.2S-1.2 34.7 9.2 42.9l592 464c10.4 8.2 25.5 6.3 33.7-4.1s6.3-25.5-4.1-33.7L525.6 386.7c39.6-40.6 66.4-86.1 79.9-118.4c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C465.5 68.8 400.8 32 320 32c-68.2 0-125 26.3-169.3 60.8L38.8 5.1zM223.1 149.5C248.6 126.2 282.7 112 320 112c79.5 0 144 64.5 144 144c0 24.9-6.3 48.3-17.4 68.7L408 294.5c5.2-11.8 8-24.8 8-38.5c0-53-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6c0 10.2-2.4 19.8-6.6 28.3l-90.3-70.8zm223.1 298L373 389.9c-16.4 6.5-34.3 10.1-53 10.1c-79.5 0-144-64.5-144-144c0-6.9 .5-13.6 1.4-20.2L83.1 161.5C60.3 191.2 44 220.8 34.5 243.7c-3.3 7.9-3.3 16.7 0 24.6c14.9 35.7 46.2 87.7 93 131.1C174.5 443.2 239.2 480 320 480c47.8 0 89.9-12.9 126.2-32.5z"/></svg></span></template>
+        <template id=fa-copy><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M502.6 70.63l-61.25-61.25C435.4 3.371 427.2 0 418.7 0H255.1c-35.35 0-64 28.66-64 64l.0195 256C192 355.4 220.7 384 256 384h192c35.2 0 64-28.8 64-64V93.25C512 84.77 508.6 76.63 502.6 70.63zM464 320c0 8.836-7.164 16-16 16H255.1c-8.838 0-16-7.164-16-16L239.1 64.13c0-8.836 7.164-16 16-16h128L384 96c0 17.67 14.33 32 32 32h47.1V320zM272 448c0 8.836-7.164 16-16 16H63.1c-8.838 0-16-7.164-16-16L47.98 192.1c0-8.836 7.164-16 16-16H160V128H63.99c-35.35 0-64 28.65-64 64l.0098 256C.002 483.3 28.66 512 64 512h192c35.2 0 64-28.8 64-64v-32h-47.1L272 448z"/></svg></span></template>
+        <template id=fa-play><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M73 39c-14.8-9.1-33.4-9.4-48.5-.9S0 62.6 0 80V432c0 17.4 9.4 33.4 24.5 41.9s33.7 8.1 48.5-.9L361 297c14.3-8.7 23-24.2 23-41s-8.7-32.2-23-41L73 39z"/></svg></span></template>
+        <template id=fa-clock-rotate-left><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M75 75L41 41C25.9 25.9 0 36.6 0 57.9V168c0 13.3 10.7 24 24 24H134.1c21.4 0 32.1-25.9 17-41l-30.8-30.8C155 85.5 203 64 256 64c106 0 192 86 192 192s-86 192-192 192c-40.8 0-78.6-12.7-109.7-34.4c-14.5-10.1-34.4-6.6-44.6 7.9s-6.6 34.4 7.9 44.6C151.2 495 201.7 512 256 512c141.4 0 256-114.6 256-256S397.4 0 256 0C185.3 0 121.3 28.7 75 75zm181 53c-13.3 0-24 10.7-24 24V256c0 6.4 2.5 12.5 7 17l72 72c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9l-65-65V152c0-13.3-10.7-24-24-24z"/></svg></span></template>
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="elasticlunr-ef4e11c1.min.js"></script>
+        <script src="mark-09e88c2c.min.js"></script>
+        <script src="searcher-09f2665d.js"></script>
+
+        <script src="clipboard-1626706a.min.js"></script>
+        <script src="highlight-abc7f01d.js"></script>
+        <script src="book-609e4cb8.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+
+    </div>
+    </body>
+</html>

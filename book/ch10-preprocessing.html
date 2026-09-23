@@ -1,0 +1,594 @@
+<!DOCTYPE HTML>
+<html lang="zh" class="rust sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>第 10 章 · 模型预处理全解：letterbox、归一化与张量布局 - 机器视觉工程实战：用 Rust 看懂图像与模型</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="一本面向零基础读者的机器视觉工程教程：从像素、编解码、预处理、推理、后处理到模型转换，全部用 Rust 动手实现。">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="favicon-de23e50b.svg">
+        <link rel="shortcut icon" href="favicon-8114d1fc.png">
+        <link rel="stylesheet" href="css/variables-8adf115d.css">
+        <link rel="stylesheet" href="css/general-e96d0476.css">
+        <link rel="stylesheet" href="css/chrome-d279d366.css">
+        <link rel="stylesheet" href="css/print-9e4910d8.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="fonts/fonts-9644e21d.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="mdbook-highlight-css" href="highlight-493f70e1.css">
+        <link rel="stylesheet" id="mdbook-tomorrow-night-css" href="tomorrow-night-4c0ae647.css">
+        <link rel="stylesheet" id="mdbook-ayu-highlight-css" href="ayu-highlight-3fdfc3ac.css">
+
+        <!-- Custom theme stylesheets -->
+
+        <!-- MathJax -->
+        <script async src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "";
+            const default_light_theme = "rust";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "searchindex-4d8e5ec0.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="toc-c1d54236.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="mdbook-body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('rust')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="mdbook-sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("mdbook-sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="mdbook-sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="toc.html"></iframe>
+            </noscript>
+            <div id="mdbook-sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="mdbook-page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="mdbook-menu-bar-hover-placeholder"></div>
+                <div id="mdbook-menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="mdbook-sidebar-toggle" class="icon-button" for="mdbook-sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="mdbook-sidebar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M0 96C0 78.3 14.3 64 32 64H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H416c17.7 0 32 14.3 32 32z"/></svg></span>
+                        </label>
+                        <button id="mdbook-theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="mdbook-theme-list">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M371.3 367.1c27.3-3.9 51.9-19.4 67.2-42.9L600.2 74.1c12.6-19.5 9.4-45.3-7.6-61.2S549.7-4.4 531.1 9.6L294.4 187.2c-24 18-38.2 46.1-38.4 76.1L371.3 367.1zm-19.6 25.4l-116-104.4C175.9 290.3 128 339.6 128 400c0 3.9 .2 7.8 .6 11.6c1.8 17.5-10.2 36.4-27.8 36.4H96c-17.7 0-32 14.3-32 32s14.3 32 32 32H240c61.9 0 112-50.1 112-112c0-2.5-.1-5-.2-7.5z"/></svg></span>
+                        </button>
+                        <ul id="mdbook-theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-ayu">Ayu</button></li>
+                        </ul>
+                        <button id="mdbook-search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="mdbook-searchbar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352c79.5 0 144-64.5 144-144s-64.5-144-144-144S64 128.5 64 208s64.5 144 144 144z"/></svg></span>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">机器视觉工程实战：用 Rust 看懂图像与模型</h1>
+
+                    <div class="right-buttons">
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <span class=fa-svg id="print-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M128 0C92.7 0 64 28.7 64 64v96h64V64H354.7L384 93.3V160h64V93.3c0-17-6.7-33.3-18.7-45.3L400 18.7C388 6.7 371.7 0 354.7 0H128zM384 352v32 64H128V384 368 352H384zm64 32h32c17.7 0 32-14.3 32-32V256c0-35.3-28.7-64-64-64H64c-35.3 0-64 28.7-64 64v96c0 17.7 14.3 32 32 32H64v64c0 35.3 28.7 64 64 64H384c35.3 0 64-28.7 64-64V384zm-16-88c-13.3 0-24-10.7-24-24s10.7-24 24-24s24 10.7 24 24s-10.7 24-24 24z"/></svg></span>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="mdbook-search-wrapper" class="hidden">
+                    <form id="mdbook-searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="mdbook-searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="mdbook-searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <span class=fa-svg id="fa-spin"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M304 48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zm0 416c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM48 304c26.5 0 48-21.5 48-48s-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48zm464-48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM142.9 437c18.7-18.7 18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zm0-294.2c18.7-18.7 18.7-49.1 0-67.9S93.7 56.2 75 75s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zM369.1 437c18.7 18.7 49.1 18.7 67.9 0s18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9z"/></svg></span>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="mdbook-searchresults-outer" class="searchresults-outer hidden">
+                        <div id="mdbook-searchresults-header" class="searchresults-header"></div>
+                        <ul id="mdbook-searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('mdbook-sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('mdbook-sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#mdbook-sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="mdbook-content" class="content">
+                    <main>
+                        <h1 id="第-10-章--模型预处理全解letterbox归一化与张量布局"><a class="header" href="#第-10-章--模型预处理全解letterbox归一化与张量布局">第 10 章 · 模型预处理全解：letterbox、归一化与张量布局</a></h1>
+<blockquote>
+<p><strong>本章导读</strong>：第 3 到第 9 章，我们学会了读图、认识色彩空间、做滤波和几何变换——我们已经能把一张图像“玩“得很熟。但模型不吃图像，它只吃<strong>张量</strong>（tensor，多维数字数组）。本章就是从“图像世界“通往“模型世界“的那道闸门：把一张任意尺寸的照片，变成 YOLOv8 张口就认的 <code>1×3×640×640</code>、RGB、归一化到 <code>0~1</code> 的 f32 连续张量。读完这一章，你会写出一个可复用的 <code>preprocess</code> 函数（第 14、16、26 章会反复调用它），并且深刻理解一件事——<strong>预处理只要有一步和训练时不一样，模型精度就会悄悄崩掉，而且不报错</strong>。这也是新手最难查的坑之一。</p>
+</blockquote>
+<hr>
+<h2 id="101-预处理是什么为什么必须和训练时分毫不差"><a class="header" href="#101-预处理是什么为什么必须和训练时分毫不差">10.1 预处理是什么，为什么必须和训练时“分毫不差“</a></h2>
+<p>先打个比方。模型就像一台<strong>极其挑食、又不会说话的自动贩卖机</strong>：它只认一种硬币——直径必须是 640、材质必须是 RGB、面值必须缩到 <code>0~1</code>。你塞一枚差不多大小、差不多材质的硬币进去，它不会“报错弹出来“，而是<strong>照收不误，然后给你一瓶过期饮料</strong>。这就是预处理最可怕的地方：<strong>做错了不会崩，只会让结果悄悄变差</strong>。</p>
+<p><strong>预处理（preprocessing）</strong>，就是把你手上的原始图像，一步步改造成模型训练时“见过的那个样子“。模型在训练阶段，喂进去的每一张图都经过了一套固定的加工流水线：缩放到固定尺寸、固定的颜色通道顺序、固定的归一化方式、固定的内存布局。模型学到的所有“知识“，都是建立在<strong>这套流水线的输出</strong>之上的。推理（inference，用训练好的模型做预测）时，你必须用<strong>一模一样</strong>的流水线，模型才认得。</p>
+<p>哪些地方错了会翻车？我们列个表，感受一下“错一个就完蛋“的严重性：</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>环节</th><th>训练时</th><th>你推理时（错误示范）</th><th>后果</th></tr>
+</thead>
+<tbody>
+<tr><td>尺寸</td><td>letterbox 到 640×640</td><td>直接拉伸到 640×640</td><td>物体被压扁，框全偏</td></tr>
+<tr><td>颜色顺序</td><td>RGB</td><td>喂了 BGR</td><td>红蓝互换，置信度暴跌、漏检</td></tr>
+<tr><td>归一化</td><td>像素 <code>/255</code> 到 <code>0~1</code></td><td>忘了除、还是 <code>0~255</code></td><td>数值大 255 倍，输出全是垃圾</td></tr>
+<tr><td>归一化</td><td>只 <code>/255</code></td><td>又减了 ImageNet 均值</td><td>数值整体偏移，精度下降</td></tr>
+<tr><td>布局</td><td>CHW</td><td>喂了 HWC</td><td>引擎按错误维度解读，结果乱套</td></tr>
+</tbody>
+</table>
+</div>
+<p>注意最阴险的一点：<strong>这些错误全都不会让程序崩溃</strong>。张量形状可能还是对的（比如 HWC 和 CHW 元素个数一样多），<code>/255</code> 忘了也只是数值大一点——程序照跑，只是<strong>检测框莫名其妙地偏、漏、乱</strong>。很多新手对着后处理代码查一整天，其实错在预处理第一步。</p>
+<blockquote>
+<p><strong>工程铁律</strong>：拿到一个模型，第一件事不是写推理，而是<strong>问清楚它的预处理要求</strong>——输入尺寸、是 RGB 还是 BGR、怎么归一化、要不要减均值。这些信息在模型的文档、导出脚本，或元数据里（第 12 章会讲怎么读模型元数据）。<strong>宁可多问一句，不要瞎猜一次。</strong></p>
+</blockquote>
+<p>本书的主模型 YOLOv8，预处理要求非常明确，本章后面都围绕它展开：</p>
+<ul>
+<li><strong>尺寸</strong>：letterbox 到 <code>640×640</code>（等比缩放 + 灰边填充，不拉伸）；</li>
+<li><strong>颜色</strong>：RGB；</li>
+<li><strong>归一化</strong>：像素值 <code>/255</code>，缩到 <code>0~1</code>（<strong>不减</strong> ImageNet 均值方差）；</li>
+<li><strong>布局</strong>：CHW，最外面再加一个 batch 维，最终 <code>1×3×640×640</code>，f32。</li>
+</ul>
+<hr>
+<h2 id="102-完整预处理链概览"><a class="header" href="#102-完整预处理链概览">10.2 完整预处理链概览</a></h2>
+<p>先看全景。一张原图要经过下面这条流水线，才能变成模型的输入张量：</p>
+<pre><code class="language-text">┌───────────────────┐
+│   原图             │  任意尺寸(如 1920×1080)，HWC 布局，u8，RGB 或 BGR
+└─────────┬─────────┘
+          │  ① letterbox：等比缩放 + 灰边(114)填充
+          ▼
+┌───────────────────┐
+│  方形图 640×640    │  仍是 HWC / u8
+│  记下 (scale,     │  ★ 这三个数一定要存下来，
+│   pad_x, pad_y)   │    第 16 章把框还原回原图全靠它
+└─────────┬─────────┘
+          │  ② 颜色顺序：调成模型要的 RGB(YOLOv8 用 RGB)
+          ▼
+┌───────────────────┐
+│  RGB 640×640 u8   │
+└─────────┬─────────┘
+          │  ③ 归一化：每个像素值 /255 → 0~1(变成 f32)
+          ▼
+┌───────────────────┐
+│  f32 640×640 HWC  │  值域 0~1
+└─────────┬─────────┘
+          │  ④ 布局转换：HWC → CHW(把三个通道拆成三张平面)
+          ▼
+┌───────────────────┐
+│  f32 3×640×640    │  CHW / planar
+└─────────┬─────────┘
+          │  ⑤ 加 batch 维：最前面补一个 N=1
+          ▼
+┌───────────────────┐
+│ f32 1×3×640×640   │  NCHW，行主序连续内存 → 交给推理引擎(第 14 章)
+└───────────────────┘
+</code></pre>
+<p>五步：<strong>缩放 → 颜色 → 归一化 → 布局 → 加 batch</strong>。下面逐个拆解。真正写代码时（10.8 节）这几步会揉在一起、一次遍历完成，但<strong>思路上</strong>要分得清清楚楚。</p>
+<hr>
+<h2 id="103-尺寸直接-resize-会变形letterbox-不变形"><a class="header" href="#103-尺寸直接-resize-会变形letterbox-不变形">10.3 尺寸：直接 resize 会变形，letterbox 不变形</a></h2>
+<p>模型的输入尺寸是<strong>固定死的</strong>（YOLOv8 是 640×640）。可现实里的图什么比例都有：1920×1080 的监控、竖着拍的手机照、正方形的头像。怎么把它们统一塞进 640×640？有两条路。</p>
+<h3 id="直接-resize简单但会压扁"><a class="header" href="#直接-resize简单但会压扁">直接 resize：简单，但会“压扁“</a></h3>
+<p>最省事的做法是直接把图拉伸到 640×640。问题是：原图 1920×1080 是 16:9 的宽扁形，硬塞进 1:1 的正方形，等于把它<strong>在竖直方向拉高</strong>——人会变胖、车会变短。</p>
+<p>打个比方：这就像把一张 A4 纸横过来、硬塞进一个正方形相框，图案必然扭曲。模型训练时如果没见过这种扭曲（YOLOv8 训练用的正是 letterbox），推理时喂扭曲图，它对形状的判断就全乱了，框的长宽比也跟着错。<strong>所以检测任务几乎从不用直接 resize。</strong></p>
+<h3 id="letterbox等比缩放--灰边填充"><a class="header" href="#letterbox等比缩放--灰边填充">letterbox：等比缩放 + 灰边填充</a></h3>
+<p><strong>letterbox</strong>（意为“信箱“，等比缩放后用灰边把剩余空间填满到目标尺寸）是检测任务的标准做法。名字来自宽电影在 4:3 电视上播放时，上下加的黑边——形状没变，只是补了边。</p>
+<p>它分两步：</p>
+<ol>
+<li><strong>等比缩放</strong>：宽、高用<strong>同一个</strong>缩放系数，保证不变形。系数取“宽方向能缩多少“和“高方向能缩多少“里<strong>较小</strong>的那个，这样缩放后长边刚好贴到 640，短边还留有空间。</li>
+<li><strong>灰边填充</strong>：短边留下的空隙，用<strong>灰色 114</strong> 填满，凑成 640×640 的正方形。</li>
+</ol>
+<blockquote>
+<p>为什么是 114？这是 YOLO 系列约定俗成的填充值（灰色，<code>(114,114,114)</code>）。训练时用的就是它，推理必须一致。灰色是“中性“的，不像纯黑纯白那样容易被模型误当成物体边缘。</p>
+</blockquote>
+<h3 id="手算一遍19201080--640640"><a class="header" href="#手算一遍19201080--640640">手算一遍：1920×1080 → 640×640</a></h3>
+<p>光说不练假把式，我们把这条最常见的监控分辨率算到底。设原图<strong>宽 1920、高 1080</strong>，目标 640×640。</p>
+<p><strong>第一步，算缩放系数 <code>scale</code></strong>：</p>
+<p>$$
+\text{scale} = \min\left(\frac{640}{1920},; \frac{640}{1080}\right) = \min(0.3333,; 0.5926) = 0.3333
+$$</p>
+<p>取较小的 0.3333（因为宽是长边，它更“吃紧“，得听它的）。</p>
+<p><strong>第二步，算缩放后尺寸</strong>：</p>
+<ul>
+<li>新宽 = 1920 × 0.3333 ≈ <strong>640</strong></li>
+<li>新高 = 1080 × 0.3333 ≈ <strong>360</strong></li>
+</ul>
+<p>所以先把图缩成 <strong>640×360</strong>（还是 16:9，没变形）。</p>
+<p><strong>第三步，算填充（pad）</strong>：</p>
+<ul>
+<li>宽方向：640 − 640 = 0，左右各填 <strong>pad_x = 0</strong>；</li>
+<li>高方向：640 − 360 = 280，上下平分，各填 <strong>pad_y = 140</strong>。</li>
+</ul>
+<p>也就是：640×360 的图<strong>居中</strong>放进 640×640 的画布，<strong>上面 140 行、下面 140 行</strong>是灰边。示意：</p>
+<pre><code class="language-text">     0 ────────────── 640 (x)
+   0 ┌────────────────┐
+     │  灰边 pad_y=140 │   ← 顶部 140 行灰色(114)
+ 140 ├────────────────┤
+     │                │
+     │  真实图像       │   ← 640×360 的缩放图放这儿
+     │  640×360       │
+ 500 ├────────────────┤
+     │  灰边 pad_y=140 │   ← 底部 140 行灰色(114)
+ 640 └────────────────┘
+     (y)
+</code></pre>
+<p><strong>★ 最关键的一句话</strong>：<code>scale = 0.3333</code>、<code>pad_x = 0</code>、<code>pad_y = 140</code> 这三个数，<strong>必须存下来</strong>。因为模型吐出来的检测框坐标，是在这张 640×640 的画布里的；要还原回原图 1920×1080 的真实坐标，就得反着算一遍：</p>
+<p>$$
+x_{\text{原图}} = \frac{x_{\text{模型}} - \text{pad_x}}{\text{scale}}, \qquad y_{\text{原图}} = \frac{y_{\text{模型}} - \text{pad_y}}{\text{scale}}
+$$</p>
+<p>比如模型说某个框的左上角在 (100, 240)，还原回原图就是 $((100-0)/0.3333,\ (240-140)/0.3333) = (300,\ 300)$。这套还原逻辑第 16 章会详细展开，本章你只需要记住：<strong>letterbox 参数是预处理留给后处理的“回执“，一定要存</strong>。我们稍后用 <code>LetterboxInfo</code> 结构体把它打包。</p>
+<p>（等比缩放里“新的像素值怎么由旧像素插值算出来“，属于几何变换的插值原理，详见第 9 章；本章只关心缩放到多大、怎么填边。）</p>
+<hr>
+<h2 id="104-颜色顺序rgb-还是-bgr必须对上模型"><a class="header" href="#104-颜色顺序rgb-还是-bgr必须对上模型">10.4 颜色顺序：RGB 还是 BGR，必须对上模型</a></h2>
+<p>图像的三个颜色通道，排列顺序有两种主流约定：<strong>RGB</strong>（红绿蓝）和 <strong>BGR</strong>（蓝绿红）。这俩的区别、以及各种色彩空间的内存细节，第 4 章讲透了，这里只强调<strong>预处理必须对上模型</strong>这一点。</p>
+<p>坑在哪？两个常见来源：</p>
+<ul>
+<li><strong><code>image</code> crate</strong>：读进来的 <code>RgbImage</code> 本来就是 <strong>RGB</strong> 顺序——和 YOLOv8 要的一致，省心。本书 <code>preprocess</code> 的入参就是 <code>&amp;RgbImage</code>，天然对齐。</li>
+<li><strong>OpenCV</strong>：<code>imread</code> 读出来是 <strong>BGR</strong> 顺序（历史原因）。如果你从 OpenCV 那边拿数据喂 YOLOv8，<strong>必须先把 B 和 R 换回来</strong>，否则红蓝颠倒——消防车会变成蓝色的怪东西，模型置信度直接崩、大面积漏检。</li>
+</ul>
+<p>判断依据很简单：<strong>看模型训练时用了什么</strong>。YOLOv8 官方用 RGB，所以我们全程 RGB。有的老模型（尤其从 Caffe/OpenCV 生态出来的）要 BGR，就得换。换法无非是把三个通道的第 0 和第 2 调个位置，很便宜，但<strong>不能忘</strong>。</p>
+<blockquote>
+<p><strong>一句话记忆</strong>：<code>image</code> 给你 RGB，OpenCV 给你 BGR；喂模型前先确认它要哪个。本书统一 RGB。</p>
+</blockquote>
+<hr>
+<h2 id="105-归一化把像素缩到模型认识的范围"><a class="header" href="#105-归一化把像素缩到模型认识的范围">10.5 归一化：把像素缩到模型认识的范围</a></h2>
+<p>原始像素值是 <code>0~255</code> 的整数（u8）。但神经网络内部做的是浮点乘加，<strong>喜欢小而集中的数</strong>。如果直接把 <code>0~255</code> 灌进去，数值太大，容易让网络内部的计算“爆表“。所以训练时都会做<strong>归一化（normalization）</strong>，把像素缩到一个小范围。有两种主流方式。</p>
+<h3 id="方式一255缩到-01yolov8-用这个"><a class="header" href="#方式一255缩到-01yolov8-用这个">方式一：<code>/255</code>，缩到 <code>0~1</code>（YOLOv8 用这个）</a></h3>
+<p>最简单：每个像素值除以 255。</p>
+<p>$$
+x’ = \frac{x}{255}
+$$</p>
+<p>一个亮红像素 R=200，归一化后就是 $200/255 \approx 0.784$。全部落在 <code>0~1</code> 之间，干净利落。<strong>YOLOv8 用的就是这一种</strong>，没有额外的减均值操作。本书的 <code>preprocess</code> 也只做这一步。</p>
+<h3 id="方式二x255--meanstd均值方差标准化"><a class="header" href="#方式二x255--meanstd均值方差标准化">方式二：<code>(x/255 − mean)/std</code>，均值方差标准化</a></h3>
+<p>很多分类模型（ResNet 等，第 15 章会用到）走得更远：在 <code>/255</code> 之后，再逐通道<strong>减去均值、除以标准差</strong>，让每个通道的数值大致“以 0 为中心“。</p>
+<p>$$
+x’ = \frac{x/255 - \text{mean}}{\text{std}}
+$$</p>
+<p>最常见的是 <strong>ImageNet</strong>（一个百万级图像数据集）统计出来的均值方差，几乎成了行业默认值（顺序为 RGB）：</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>通道</th><th>mean</th><th>std</th></tr>
+</thead>
+<tbody>
+<tr><td>R</td><td>0.485</td><td>0.229</td></tr>
+<tr><td>G</td><td>0.456</td><td>0.224</td></tr>
+<tr><td>B</td><td>0.406</td><td>0.225</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="手算一遍一个像素两种归一化"><a class="header" href="#手算一遍一个像素两种归一化">手算一遍：一个像素，两种归一化</a></h3>
+<p>取一个像素 RGB = <strong>(200, 128, 50)</strong>，分别用两种方式算。</p>
+<p><strong>方式一（<code>/255</code>）</strong>：</p>
+<ul>
+<li>R: 200 / 255 ≈ <strong>0.784</strong></li>
+<li>G: 128 / 255 ≈ <strong>0.502</strong></li>
+<li>B: 50 / 255 ≈ <strong>0.196</strong></li>
+</ul>
+<p><strong>方式二（ImageNet 标准化，在方式一基础上继续算）</strong>：</p>
+<ul>
+<li>R: (0.784 − 0.485) / 0.229 = 0.299 / 0.229 ≈ <strong>1.306</strong></li>
+<li>G: (0.502 − 0.456) / 0.224 = 0.046 / 0.224 ≈ <strong>0.205</strong></li>
+<li>B: (0.196 − 0.406) / 0.225 = −0.210 / 0.225 ≈ <strong>−0.933</strong></li>
+</ul>
+<p>对比一下就明白差别了：方式一永远落在 <code>0~1</code>；方式二可以<strong>大于 1、也可以是负数</strong>（因为它是“以 0 为中心“的分布）。</p>
+<p><strong>这正是最坑的地方</strong>：如果你的模型训练时用的是方式二，你却只做了方式一（忘了减均值除方差），数值整体偏了一大截，模型精度悄悄下滑——<strong>它不会报错</strong>。反过来同理。所以<strong>归一化方式必须逐字对上模型要求</strong>：几个数、减不减均值、mean/std 具体是多少、通道顺序对不对。查清楚，别猜。</p>
+<blockquote>
+<p>记住本书的设定：<strong>YOLOv8 = 只 <code>/255</code></strong>。下面的代码就这么写。</p>
+</blockquote>
+<hr>
+<h2 id="106-布局转换hwc--chw模型要三张平面"><a class="header" href="#106-布局转换hwc--chw模型要三张平面">10.6 布局转换：HWC → CHW，模型要“三张平面“</a></h2>
+<p>现在数值对了，还差最后一道形状上的改造：<strong>内存布局</strong>。</p>
+<p>图像在内存里最自然的排法是 <strong>HWC</strong>（Height×Width×Channel）：一个像素的 R、G、B 三个值<strong>挨在一起</strong>存，一个像素接一个像素。第 4 章把这个“交错存储“讲得很细。</p>
+<p>而模型（以及绝大多数推理引擎）要的是 <strong>CHW</strong>（Channel×Height×Width），也叫 <strong>planar（平面式）</strong>：把红色通道所有像素<strong>单独存成一张平面</strong>，绿色一张，蓝色一张，三张平面叠起来。示意：</p>
+<pre><code class="language-text">HWC（交错，像素为单位）        CHW（平面，通道为单位）
+R G B  R G B  R G B ...        R R R R ... (整张红平面)
+└像素0┘└像素1┘└像素2┘          G G G G ... (整张绿平面)
+                               B B B B ... (整张蓝平面)
+</code></pre>
+<p><strong>为什么模型要 CHW？</strong> 因为卷积（神经网络的核心运算，第 11 章讲）是<strong>逐通道</strong>在整张平面上滑动计算的，把同一通道的像素连续摆好，内存访问更规整、缓存更友好、也方便 SIMD/GPU 并行。这是深度学习框架的历史约定，我们照做即可（HWC 与 CHW 的内存细节详见第 4 章）。</p>
+<p>所以要做一次 <strong>HWC → CHW</strong> 的重排：把原来交错的 R/G/B，拆开、按通道归拢。代码里可以显式遍历着写（10.8 节就是这么干的，一次循环里顺便完成），也可以用 <code>ndarray</code> 的轴重排 <code>permuted_axes</code> ——但后者有个坑，下一节讲。</p>
+<hr>
+<h2 id="107-batch-维数据类型与内存连续"><a class="header" href="#107-batch-维数据类型与内存连续">10.7 batch 维、数据类型与内存连续</a></h2>
+<h3 id="加一个-batch-维nchw"><a class="header" href="#加一个-batch-维nchw">加一个 batch 维：NCHW</a></h3>
+<p>CHW 之上，模型输入最外层还要再套一个维度 <strong>N（batch，一批几张图）</strong>，凑成 <strong>NCHW</strong>。因为模型天生支持“一次推理一批图“，第 0 维就是这一批的张数。</p>
+<p>本书全程 <strong>N = 1</strong>（一次处理一张图/一帧），所以最终形状是 <code>1×3×640×640</code>。加 batch 维在代码里就是把 CHW 的 <code>[3,640,640]</code> 变成 <code>[1,3,640,640]</code>——形状最前面多个 1，数据一个不变。</p>
+<blockquote>
+<p>一次喂多张图（N&gt;1）能显著提高吞吐（GPU 尤其明显），这叫 <strong>batch 推理</strong>，第 13 章讲模型转换和 batch 适配时会展开。本章知道“有这么个维度、我们取 1“就够了。</p>
+</blockquote>
+<h3 id="数据类型f32"><a class="header" href="#数据类型f32">数据类型：f32</a></h3>
+<p>模型的输入类型基本都是 <strong>f32（32 位浮点）</strong>。我们归一化时把 u8 除以 255，结果天然就是浮点，用 <code>f32</code> 存正好。（少数量化模型吃 int8，那是另一套流程，本书主线不涉及。）</p>
+<h3 id="内存连续行主序--as_standard_layout"><a class="header" href="#内存连续行主序--as_standard_layout">内存连续：行主序 + <code>as_standard_layout</code></a></h3>
+<p>最后一个容易被忽略、但一旦踩到就很懵的点：<strong>内存必须连续</strong>。</p>
+<p>推理引擎（第 14 章的 <code>tract</code> / <code>ort</code>）拿到张量后，往往直接把它当成<strong>一段连续的内存</strong>来读。它默认这段内存是<strong>行主序（row-major，C 顺序）连续排列</strong>的：最后一个维度变化最快，一行接一行铺下去。</p>
+<p>如果你用 <code>ndarray</code> 的 <code>permuted_axes</code> 来做 HWC→CHW，会有个陷阱——<strong>它只是换了“看数据的角度“，底层内存一个字节都没动</strong>，得到的是一个<strong>非连续视图</strong>：</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use ndarray::Array3;
+
+// 假设已有一个 HWC 的 f32 数组，形状 [640, 640, 3]
+let hwc: Array3&lt;f32&gt; = /* ... */;
+
+// 轴重排成 CHW —— 注意：这只是逻辑上换轴，内存还是原来的交错排列，非连续！
+let chw_view = hwc.permuted_axes([2, 0, 1]); // 形状变成 [3, 640, 640]，但不连续
+
+// 引擎要的是连续内存，所以要真正拷贝、整理成标准行主序布局
+let chw = chw_view.as_standard_layout();     // 现在内存是连续的 CHW，可以放心喂了
+<span class="boring">}</span></code></pre>
+<p><code>as_standard_layout()</code> 会在需要时把数据<strong>真正拷贝</strong>成标准行主序连续布局（已经连续就零成本返回）。如果跳过这一步，直接把非连续视图的内存交给引擎，引擎按“连续“去读，读到的就是<strong>乱序的字节</strong>——结果全错，还是那句话：<strong>不报错</strong>。</p>
+<p>好在，本书 10.8 节的 <code>preprocess</code> 采用另一种写法：直接 <code>Array4::from_elem</code> 建好 <code>[1,3,640,640]</code> 的连续张量，再<strong>按 CHW 的位置逐个写入</strong>。这样建出来的数组<strong>天生就是标准连续布局</strong>，压根不需要 <code>as_standard_layout</code>。两种思路都对，但显式写入更省一次拷贝，也更不容易踩连续性的坑。</p>
+<hr>
+<h2 id="108-完整代码一个可复用的-preprocess-函数"><a class="header" href="#108-完整代码一个可复用的-preprocess-函数">10.8 完整代码：一个可复用的 <code>preprocess</code> 函数</a></h2>
+<p>把前面所有步骤合起来。下面这个函数就是本书的<strong>预处理主力</strong>，第 14 章推理、第 16 章后处理、第 26 章实战都会调用它。接口设计得尽量干净：进去一张 <code>RgbImage</code>，出来一个 <code>[1,3,640,640]</code> 的张量，<strong>外加一份 <code>LetterboxInfo</code></strong>（后处理还原坐标的“回执“）。</p>
+<p>先添加依赖：</p>
+<pre><code class="language-bash">cargo add image ndarray
+</code></pre>
+<p>然后是完整实现（可编译）：</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use image::{imageops::FilterType, RgbImage};
+use ndarray::Array4;
+
+/// letterbox 变换的"回执"：预处理时怎么缩放、怎么填边，都记在这里。
+/// 第 16 章后处理靠它把模型输出的框坐标还原回原图，一个字段都不能少。
+#[derive(Clone, Copy, Debug)]
+pub struct LetterboxInfo {
+    pub scale: f32,   // 原图 → 缩放后的等比系数(1920×1080→640 时约 0.333)
+    pub pad_x: f32,   // 左侧灰边宽度(像素，在 640×640 坐标系里)
+    pub pad_y: f32,   // 顶部灰边高度(像素)
+    pub orig_w: u32,  // 原图宽，还原时用来把框裁进图内边界
+    pub orig_h: u32,  // 原图高
+}
+
+/// 把任意尺寸的 RGB 原图，处理成 YOLOv8 要的 [1,3,640,640] f32 张量。
+/// 返回：(输入张量, letterbox 参数)。后者请务必保存到后处理阶段。
+///
+/// - `img`    : 第 3 章读进来的 RgbImage(已经是 RGB 顺序，无需换通道)
+/// - `target` : 目标边长，本书恒为 640
+pub fn preprocess(img: &amp;RgbImage, target: u32) -&gt; (Array4&lt;f32&gt;, LetterboxInfo) {
+    let (orig_w, orig_h) = img.dimensions(); // (宽, 高)
+
+    // ① 等比缩放系数：宽、高各自能缩多少，取"较小"的那个，
+    //    保证缩放后长边刚好贴到 target，短边留空(之后用灰边补)。
+    let scale = (target as f32 / orig_w as f32).min(target as f32 / orig_h as f32);
+
+    // ② 缩放后的实际尺寸(四舍五入到整像素)
+    let new_w = (orig_w as f32 * scale).round() as u32;
+    let new_h = (orig_h as f32 * scale).round() as u32;
+
+    // ③ 居中放置：左右/上下各留多少灰边
+    let pad_x = (target as f32 - new_w as f32) / 2.0;
+    let pad_y = (target as f32 - new_h as f32) / 2.0;
+
+    // ④ 等比缩放(插值算法原理见第 9 章；这里用双线性 Triangle，和 YOLO 默认一致)
+    let resized = image::imageops::resize(img, new_w, new_h, FilterType::Triangle);
+
+    // ⑤ 先把整块画布填成"灰色 114"归一化后的值：114/255 ≈ 0.447。
+    //    这样没被图像覆盖的区域天然就是灰边，省去单独一步填充。
+    let mut tensor =
+        Array4::&lt;f32&gt;::from_elem((1, 3, target as usize, target as usize), 114.0 / 255.0);
+
+    // ⑥ 把缩放后的像素写入张量：一次遍历同时完成
+    //    HWC→CHW 布局转换、u8→f32、/255 归一化、以及居中平移。
+    let off_x = pad_x.round() as usize;
+    let off_y = pad_y.round() as usize;
+    for y in 0..new_h as usize {
+        for x in 0..new_w as usize {
+            let px = resized.get_pixel(x as u32, y as u32); // &amp;Rgb&lt;u8&gt;
+            // 三个通道分别落到第 0/1/2 张平面(planar / CHW)
+            tensor[[0, 0, y + off_y, x + off_x]] = px[0] as f32 / 255.0; // R
+            tensor[[0, 1, y + off_y, x + off_x]] = px[1] as f32 / 255.0; // G
+            tensor[[0, 2, y + off_y, x + off_x]] = px[2] as f32 / 255.0; // B
+        }
+    }
+
+    let info = LetterboxInfo { scale, pad_x, pad_y, orig_w, orig_h };
+    (tensor, info)
+}
+<span class="boring">}</span></code></pre>
+<p>怎么用它：</p>
+<pre class="playground"><code class="language-rust">fn main() -&gt; Result&lt;(), Box&lt;dyn std::error::Error&gt;&gt; {
+    // 第 3 章：读图并转成 RGB(RgbImage)
+    let img = image::open("street.jpg")?.to_rgb8();
+
+    let (input, lb) = preprocess(&amp;img, 640);
+
+    // 形状正是 YOLOv8 要的 [1, 3, 640, 640]
+    assert_eq!(input.shape(), &amp;[1, 3, 640, 640]);
+
+    // input 交给推理引擎(第 14 章)；lb 一定要收好，第 16 章还原坐标要用
+    println!("scale={:.4}, pad=({:.1}, {:.1})", lb.scale, lb.pad_x, lb.pad_y);
+    Ok(())
+}</code></pre>
+<p>对 1920×1080 的输入，会打印出 <code>scale=0.3333, pad=(0.0, 140.0)</code>——和我们 10.3 节手算的一模一样。</p>
+<p>几点工程说明：</p>
+<ul>
+<li><strong>为什么用逐像素写入而不是 <code>permuted_axes</code>？</strong> 因为 <code>from_elem</code> 建出来的张量天生是<strong>连续的标准布局</strong>，逐个写入后可以直接喂引擎，省掉一次 <code>as_standard_layout</code> 的拷贝，也不会踩非连续的坑（见 10.7 节）。</li>
+<li><strong>灰边一步到位</strong>：先把整块填成 <code>114/255</code>，再覆盖真实图像区域，省去单独填充边框的代码。</li>
+<li><strong>性能</strong>：逐像素 <code>tensor[[...]]</code> 索引可读性好，但每次都做边界检查，热点路径上偏慢。<strong>工程上通常会</strong>改用 <code>fast_image_resize</code>（SIMD 加速缩放）配合按行 <code>ndarray</code> 切片批量写入，或直接操作底层 <code>Vec&lt;f32&gt;</code>，能快好几倍。本书先求“看得懂、跑得对“，性能优化留到第 29 章。</li>
+<li><strong>健壮性</strong>：真实项目里 <code>preprocess</code> 一般返回 <code>Result</code>，对空图、异常尺寸做校验。这里为聚焦主线省略了错误处理。</li>
+</ul>
+<hr>
+<h2 id="109-预处理与后处理一对必须对称的镜像"><a class="header" href="#109-预处理与后处理一对必须对称的镜像">10.9 预处理与后处理：一对必须对称的镜像</a></h2>
+<p>最后强调贯穿本书的一个核心思想：<strong>预处理和后处理是一对镜像</strong>。你在预处理里对图像做的每一次几何变换，后处理都要<strong>反着做一遍</strong>，才能把模型在 640×640 世界里给出的结果，翻译回你原图的真实世界。</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>预处理(正向：原图 → 模型)</th><th>后处理(逆向：模型 → 原图，第 16 章)</th></tr>
+</thead>
+<tbody>
+<tr><td>等比缩放 ×scale</td><td>坐标 ÷scale</td></tr>
+<tr><td>加灰边 +pad_x / +pad_y</td><td>坐标 −pad_x / −pad_y</td></tr>
+<tr><td>HWC → CHW</td><td>无需逆(后处理直接读输出张量)</td></tr>
+<tr><td>/255 归一化</td><td>无需逆(后处理处理的是坐标和分数)</td></tr>
+</tbody>
+</table>
+</div>
+<p>其中真正需要逆运算的，就是 <strong>letterbox 的缩放和填充</strong>。所以 <code>LetterboxInfo</code> 是这对镜像之间传递的“密钥“。回顾 10.3 的还原公式：</p>
+<p>$$
+x_{\text{原图}} = \frac{x_{\text{模型}} - \text{pad_x}}{\text{scale}}, \qquad y_{\text{原图}} = \frac{y_{\text{模型}} - \text{pad_y}}{\text{scale}}
+$$</p>
+<p>模型输出的框坐标，先减去 pad、再除以 scale，就回到了原图像素坐标系——正好还原成本书统一约定的 <code>BBox { x1, y1, x2, y2 }</code>（左上-右下，原图像素）。<strong>如果预处理时忘了保存 <code>LetterboxInfo</code>，或者后处理时逆运算写错，框就会整体偏移或缩放错位</strong>。这套还原、以及 YOLOv8 <code>[1,84,8400]</code> 输出的解析和 NMS，都在第 16 章。本章你只需牢记：<strong>在这里，把 <code>scale / pad_x / pad_y</code> 稳稳存进 <code>LetterboxInfo</code>。</strong></p>
+<hr>
+<h2 id="1010-小结"><a class="header" href="#1010-小结">10.10 小结</a></h2>
+<ul>
+<li><strong>预处理 = 把原图改造成模型训练时见过的样子</strong>，尺寸、颜色顺序、归一化、布局四件事<strong>必须和训练时分毫不差</strong>；错一个精度就崩，且<strong>不报错</strong>，是最难查的坑。</li>
+<li>完整链条：<strong>原图 → letterbox 缩放 → 颜色顺序 → 归一化 → HWC→CHW → 加 batch 维 → f32 连续张量</strong>，最终 YOLOv8 得到 <code>1×3×640×640</code>。</li>
+<li><strong>尺寸用 letterbox</strong>（等比缩放 + 灰边 114 填充）而非直接 resize，避免物体变形；<code>scale / pad_x / pad_y</code> <strong>务必保存</strong>，第 16 章还原坐标全靠它。1920×1080→640×640 手算得 <code>scale=0.333, pad_x=0, pad_y=140</code>。</li>
+<li><strong>归一化分两派</strong>：YOLOv8 只 <code>/255</code> 到 <code>0~1</code>；很多分类模型还要按 ImageNet mean/std 做标准化(值可为负、可大于 1)。用哪派<strong>查模型要求，别猜</strong>。</li>
+<li><strong>布局要 CHW（planar）</strong>，最外再加 N=1 成 NCHW；数据类型 f32，且内存必须<strong>行主序连续</strong>——用 <code>permuted_axes</code> 换轴后记得 <code>as_standard_layout</code>，或像本章直接写入连续张量。</li>
+<li><strong>预处理与后处理是一对镜像</strong>：这里怎么缩放、填充，后处理就怎么逆回去。<code>LetterboxInfo</code> 是两者之间的密钥。</li>
+</ul>
+<h2 id="1011-练习"><a class="header" href="#1011-练习">10.11 练习</a></h2>
+<ol>
+<li>
+<p><strong>手算 letterbox</strong>：一张竖拍的手机照 <strong>1080×1920</strong>（宽 1080、高 1920），letterbox 到 640×640。算出 <code>scale</code>、缩放后尺寸、<code>pad_x</code>、<code>pad_y</code>。（提示：这次是高比宽长，谁当“长边“变了。）然后假设模型输出一个框左上角在 (200, 100)，用还原公式算出它在原图的坐标。</p>
+</li>
+<li>
+<p><strong>验证归一化</strong>：取像素 RGB = <strong>(0, 255, 114)</strong>，分别用“仅 <code>/255</code>“和“ImageNet 标准化“算出三个通道的结果，观察哪些值超出了 <code>0~1</code>。再想一想：如果模型要 <code>/255</code> 你却做了标准化，R 通道(原本 0)会从 0 变成多少？这偏差有多大？</p>
+</li>
+<li>
+<p><strong>改造 <code>preprocess</code> 支持标准化</strong>：给 10.8 的函数加一个可选参数（比如传入 <code>Option&lt;([f32;3],[f32;3])&gt;</code> 表示 mean/std），当提供时在 <code>/255</code> 之后再逐通道做 <code>(x-mean)/std</code>。保证不传时行为和原来完全一致（YOLOv8 路径不变）。</p>
+</li>
+<li>
+<p><strong>踩一次坑再爬出来</strong>：故意把 <code>preprocess</code> 里的通道写反（把 R 写到第 2 个平面、B 写到第 0 个平面，模拟 RGB/BGR 搞反），跑一遍真实图片的检测（等你学完第 14、16 章后回来做），观察置信度和框会烂成什么样。这能让你<strong>亲身体会</strong>为什么本章反复强调“分毫不差“。</p>
+</li>
+</ol>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="ch09-geometry.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                            </a>
+
+                            <a rel="next prefetch" href="ch11-dl-basics.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="ch09-geometry.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                    </a>
+
+                    <a rel="next prefetch" href="ch11-dl-basics.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                    </a>
+            </nav>
+
+        </div>
+
+        <template id=fa-eye><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M288 32c-80.8 0-145.5 36.8-192.6 80.6C48.6 156 17.3 208 2.5 243.7c-3.3 7.9-3.3 16.7 0 24.6C17.3 304 48.6 356 95.4 399.4C142.5 443.2 207.2 480 288 480s145.5-36.8 192.6-80.6c46.8-43.5 78.1-95.4 93-131.1c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C433.5 68.8 368.8 32 288 32zM432 256c0 79.5-64.5 144-144 144s-144-64.5-144-144s64.5-144 144-144s144 64.5 144 144zM288 192c0 35.3-28.7 64-64 64c-11.5 0-22.3-3-31.6-8.4c-.2 2.8-.4 5.5-.4 8.4c0 53 43 96 96 96s96-43 96-96s-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6z"/></svg></span></template>
+        <template id=fa-eye-slash><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M38.8 5.1C28.4-3.1 13.3-1.2 5.1 9.2S-1.2 34.7 9.2 42.9l592 464c10.4 8.2 25.5 6.3 33.7-4.1s6.3-25.5-4.1-33.7L525.6 386.7c39.6-40.6 66.4-86.1 79.9-118.4c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C465.5 68.8 400.8 32 320 32c-68.2 0-125 26.3-169.3 60.8L38.8 5.1zM223.1 149.5C248.6 126.2 282.7 112 320 112c79.5 0 144 64.5 144 144c0 24.9-6.3 48.3-17.4 68.7L408 294.5c5.2-11.8 8-24.8 8-38.5c0-53-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6c0 10.2-2.4 19.8-6.6 28.3l-90.3-70.8zm223.1 298L373 389.9c-16.4 6.5-34.3 10.1-53 10.1c-79.5 0-144-64.5-144-144c0-6.9 .5-13.6 1.4-20.2L83.1 161.5C60.3 191.2 44 220.8 34.5 243.7c-3.3 7.9-3.3 16.7 0 24.6c14.9 35.7 46.2 87.7 93 131.1C174.5 443.2 239.2 480 320 480c47.8 0 89.9-12.9 126.2-32.5z"/></svg></span></template>
+        <template id=fa-copy><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M502.6 70.63l-61.25-61.25C435.4 3.371 427.2 0 418.7 0H255.1c-35.35 0-64 28.66-64 64l.0195 256C192 355.4 220.7 384 256 384h192c35.2 0 64-28.8 64-64V93.25C512 84.77 508.6 76.63 502.6 70.63zM464 320c0 8.836-7.164 16-16 16H255.1c-8.838 0-16-7.164-16-16L239.1 64.13c0-8.836 7.164-16 16-16h128L384 96c0 17.67 14.33 32 32 32h47.1V320zM272 448c0 8.836-7.164 16-16 16H63.1c-8.838 0-16-7.164-16-16L47.98 192.1c0-8.836 7.164-16 16-16H160V128H63.99c-35.35 0-64 28.65-64 64l.0098 256C.002 483.3 28.66 512 64 512h192c35.2 0 64-28.8 64-64v-32h-47.1L272 448z"/></svg></span></template>
+        <template id=fa-play><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M73 39c-14.8-9.1-33.4-9.4-48.5-.9S0 62.6 0 80V432c0 17.4 9.4 33.4 24.5 41.9s33.7 8.1 48.5-.9L361 297c14.3-8.7 23-24.2 23-41s-8.7-32.2-23-41L73 39z"/></svg></span></template>
+        <template id=fa-clock-rotate-left><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M75 75L41 41C25.9 25.9 0 36.6 0 57.9V168c0 13.3 10.7 24 24 24H134.1c21.4 0 32.1-25.9 17-41l-30.8-30.8C155 85.5 203 64 256 64c106 0 192 86 192 192s-86 192-192 192c-40.8 0-78.6-12.7-109.7-34.4c-14.5-10.1-34.4-6.6-44.6 7.9s-6.6 34.4 7.9 44.6C151.2 495 201.7 512 256 512c141.4 0 256-114.6 256-256S397.4 0 256 0C185.3 0 121.3 28.7 75 75zm181 53c-13.3 0-24 10.7-24 24V256c0 6.4 2.5 12.5 7 17l72 72c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9l-65-65V152c0-13.3-10.7-24-24-24z"/></svg></span></template>
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="elasticlunr-ef4e11c1.min.js"></script>
+        <script src="mark-09e88c2c.min.js"></script>
+        <script src="searcher-09f2665d.js"></script>
+
+        <script src="clipboard-1626706a.min.js"></script>
+        <script src="highlight-abc7f01d.js"></script>
+        <script src="book-609e4cb8.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+
+    </div>
+    </body>
+</html>

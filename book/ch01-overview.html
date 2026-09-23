@@ -1,0 +1,368 @@
+<!DOCTYPE HTML>
+<html lang="zh" class="rust sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>第 1 章 · 机器视觉到底是什么 - 机器视觉工程实战：用 Rust 看懂图像与模型</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="一本面向零基础读者的机器视觉工程教程：从像素、编解码、预处理、推理、后处理到模型转换，全部用 Rust 动手实现。">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="favicon-de23e50b.svg">
+        <link rel="shortcut icon" href="favicon-8114d1fc.png">
+        <link rel="stylesheet" href="css/variables-8adf115d.css">
+        <link rel="stylesheet" href="css/general-e96d0476.css">
+        <link rel="stylesheet" href="css/chrome-d279d366.css">
+        <link rel="stylesheet" href="css/print-9e4910d8.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="fonts/fonts-9644e21d.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="mdbook-highlight-css" href="highlight-493f70e1.css">
+        <link rel="stylesheet" id="mdbook-tomorrow-night-css" href="tomorrow-night-4c0ae647.css">
+        <link rel="stylesheet" id="mdbook-ayu-highlight-css" href="ayu-highlight-3fdfc3ac.css">
+
+        <!-- Custom theme stylesheets -->
+
+        <!-- MathJax -->
+        <script async src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "";
+            const default_light_theme = "rust";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "searchindex-4d8e5ec0.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="toc-c1d54236.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="mdbook-body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('rust')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="mdbook-sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("mdbook-sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="mdbook-sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="toc.html"></iframe>
+            </noscript>
+            <div id="mdbook-sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="mdbook-page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="mdbook-menu-bar-hover-placeholder"></div>
+                <div id="mdbook-menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="mdbook-sidebar-toggle" class="icon-button" for="mdbook-sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="mdbook-sidebar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M0 96C0 78.3 14.3 64 32 64H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H416c17.7 0 32 14.3 32 32z"/></svg></span>
+                        </label>
+                        <button id="mdbook-theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="mdbook-theme-list">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M371.3 367.1c27.3-3.9 51.9-19.4 67.2-42.9L600.2 74.1c12.6-19.5 9.4-45.3-7.6-61.2S549.7-4.4 531.1 9.6L294.4 187.2c-24 18-38.2 46.1-38.4 76.1L371.3 367.1zm-19.6 25.4l-116-104.4C175.9 290.3 128 339.6 128 400c0 3.9 .2 7.8 .6 11.6c1.8 17.5-10.2 36.4-27.8 36.4H96c-17.7 0-32 14.3-32 32s14.3 32 32 32H240c61.9 0 112-50.1 112-112c0-2.5-.1-5-.2-7.5z"/></svg></span>
+                        </button>
+                        <ul id="mdbook-theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-ayu">Ayu</button></li>
+                        </ul>
+                        <button id="mdbook-search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="mdbook-searchbar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352c79.5 0 144-64.5 144-144s-64.5-144-144-144S64 128.5 64 208s64.5 144 144 144z"/></svg></span>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">机器视觉工程实战：用 Rust 看懂图像与模型</h1>
+
+                    <div class="right-buttons">
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <span class=fa-svg id="print-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M128 0C92.7 0 64 28.7 64 64v96h64V64H354.7L384 93.3V160h64V93.3c0-17-6.7-33.3-18.7-45.3L400 18.7C388 6.7 371.7 0 354.7 0H128zM384 352v32 64H128V384 368 352H384zm64 32h32c17.7 0 32-14.3 32-32V256c0-35.3-28.7-64-64-64H64c-35.3 0-64 28.7-64 64v96c0 17.7 14.3 32 32 32H64v64c0 35.3 28.7 64 64 64H384c35.3 0 64-28.7 64-64V384zm-16-88c-13.3 0-24-10.7-24-24s10.7-24 24-24s24 10.7 24 24s-10.7 24-24 24z"/></svg></span>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="mdbook-search-wrapper" class="hidden">
+                    <form id="mdbook-searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="mdbook-searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="mdbook-searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <span class=fa-svg id="fa-spin"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M304 48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zm0 416c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM48 304c26.5 0 48-21.5 48-48s-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48zm464-48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM142.9 437c18.7-18.7 18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zm0-294.2c18.7-18.7 18.7-49.1 0-67.9S93.7 56.2 75 75s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zM369.1 437c18.7 18.7 49.1 18.7 67.9 0s18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9z"/></svg></span>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="mdbook-searchresults-outer" class="searchresults-outer hidden">
+                        <div id="mdbook-searchresults-header" class="searchresults-header"></div>
+                        <ul id="mdbook-searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('mdbook-sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('mdbook-sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#mdbook-sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="mdbook-content" class="content">
+                    <main>
+                        <h1 id="第-1-章--机器视觉到底是什么"><a class="header" href="#第-1-章--机器视觉到底是什么">第 1 章 · 机器视觉到底是什么</a></h1>
+<blockquote>
+<p><strong>本章导读</strong>：在写任何代码之前，我们先建立一个整体地图。看完本章你会知道：机器视觉在解决什么问题、一个机器视觉系统由哪些硬件和软件组成、传统算法和深度学习算法有什么区别，以及为什么这本书选择 Rust。</p>
+</blockquote>
+<h2 id="11-从人的眼睛说起"><a class="header" href="#11-从人的眼睛说起">1.1 从人的眼睛说起</a></h2>
+<p>想一想你自己是怎么“看“东西的？</p>
+<p>光线照在一只猫身上，反射进你的眼睛，眼睛把光信号转换成神经电信号，传给大脑。大脑不是收到一堆“像素“然后愣住——它直接告诉你：“这是一只猫，在沙发上，大约两米远。”</p>
+<p><strong>机器视觉要做的就是这件事的仿生版：</strong></p>
+<pre><code class="language-text">        人：光线 → 眼睛 → 视神经 → 大脑 → "有只猫"
+  机器：光线 → 相机 → 数据线缆 → 算法 → "cat, 位置(x,y,w,h), 置信度92%"
+</code></pre>
+<p>相机相当于眼睛，算法（运行在 CPU/GPU/NPU 上）相当于大脑。这本书讲的就是“算法“那一部分——从拿到相机的原始数据开始，到输出“看懂了什么“为止。</p>
+<blockquote>
+<p>顺便说一个常见的词：<strong>CV（Computer Vision，计算机视觉）</strong>。日常交流中“机器视觉“和“计算机视觉“基本混用。严格来讲，“机器视觉”（Machine Vision）更多指工业场景里的视觉系统（质检、测量、定位），“计算机视觉“范围更广（含人脸识别、自动驾驶等）。本书不区分这两个词。</p>
+</blockquote>
+<h2 id="12-机器视觉能干什么"><a class="header" href="#12-机器视觉能干什么">1.2 机器视觉能干什么</a></h2>
+<p>先建立直觉，看几个真实场景：</p>
+<p><strong>场景一：手机人脸解锁。</strong> 摄像头拍一张你的脸 → 算法从画面里找到脸的位置 → 把脸“编码“成一串数字 → 和手机里存的你的人脸数字比对 → 相似度够高就解锁。整个过程 0.5 秒内完成。</p>
+<p><strong>场景二：工厂质检。</strong> 传送带上流过一个个零件，相机每秒拍几十张 → 算法检查有没有划痕、缺角、尺寸偏差 → 发现不良品立刻通知机械臂剔除。一个现代工厂靠这个能代替几十个人工质检员，而且是 7×24 小时不疲倦的。</p>
+<p><strong>场景三：自动驾驶。</strong> 车载相机、激光雷达持续采集周围环境 → 算法实时识别出“前面的车、左边的行人、右边的车道线“ → 规划模块据此决定加速还是刹车。这里对速度的要求极端苛刻：从拍照到出结果通常只有几十毫秒。</p>
+<p><strong>场景四：扫码支付。</strong> 这个你可能没想到也是 CV——从摄像头画面里找出二维码的位置、纠正透视变形、解码出字符串。背后是另一套经典算法（不是深度学习）。</p>
+<p>这四个场景代表了机器视觉的几大类任务：</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>任务类型</th><th>干什么</th><th>例子</th><th>本书对应章节</th></tr>
+</thead>
+<tbody>
+<tr><td>分类（Classification）</td><td>这张图里主要是什么？</td><td>猫还是狗</td><td>第 15 章</td></tr>
+<tr><td>检测（Detection）</td><td>图里有哪些物体、在什么位置？</td><td>人脸检测、车辆检测</td><td>第 16 章（主线）</td></tr>
+<tr><td>分割（Segmentation）</td><td>每个像素分别属于什么？</td><td>医学影像抠肿瘤、自动驾驶车道线</td><td>第 18 章</td></tr>
+<tr><td>关键点（Keypoint）</td><td>目标上的关键位置在哪？</td><td>人体骨架、人脸五官</td><td>第 17 章</td></tr>
+<tr><td>特征识别（OCR/二维码等）</td><td>从图里读出结构化信息</td><td>扫码、车牌识别、文字识别</td><td>第 1 章提到，不展开</td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="13-一个机器视觉系统由什么组成"><a class="header" href="#13-一个机器视觉系统由什么组成">1.3 一个机器视觉系统由什么组成</a></h2>
+<p>很多同学以为机器视觉就是“调模型“，其实工程上一个完整的系统是这样的：</p>
+<pre><code class="language-text">┌─────────────────────────────────────────────────────────┐
+│                    机器视觉系统                          │
+│                                                          │
+│  【硬件层】                                              │
+│    相机 + 镜头 + 光源   ← 光源极其重要！打光不好全白搭   │
+│         │                                                │
+│  【采集层】                                              │
+│    相机驱动 / 视频流读取（USB、GigE、RTSP 摄像头）       │
+│         │  原始数据（MJPG / H.264 码流 / RAW）           │
+│  【算法层】← 本书 90% 的内容在这里                       │
+│    解码 → 预处理 → 推理 → 后处理                         │
+│         │  结果（坐标、类别、置信度）                    │
+│  【应用层】                                              │
+│    画框显示 / 触发机械臂 / 存数据库 / 报警               │
+└─────────────────────────────────────────────────────────┘
+</code></pre>
+<p>几个对初学者重要的认知：</p>
+<p><strong>1. 光源比算法重要。</strong> 工业界有句老话：“打光解决 80% 的问题。“同样的算法，光打得好（明暗均匀、目标突出）识别率 99%，光打得差（反光、阴影）可能不到 50%。这就是为什么你去工厂看视觉检测设备，都有专门的打光罩。</p>
+<p><strong>2. 相机不是只有“像素“一个参数。</strong> 帧率（每秒拍多少张）、快门方式（全局快门不会拍变形，卷帘快门会“果冻效应“）、接口带宽、传感器尺寸，都是选型的关键。这些属于硬件知识，本书不深入，但你要知道它们的存在。</p>
+<p><strong>3. 算法层是一条流水线，推理只是其中一环。</strong> 这是本书最想纠正的一个误解。一个真实项目里，“调模型“往往只占工作量的 20%，剩下 80% 是：把各种来源的图像数据稳定地解码出来、预处理做对、后处理调对、边界情况处理干净。这也是我们把解码、预处理、后处理各自用一整章来讲的原因。</p>
+<h2 id="14-传统算法-vs-深度学习"><a class="header" href="#14-传统算法-vs-深度学习">1.4 传统算法 vs 深度学习</a></h2>
+<p>机器视觉算法分两大流派，现在工业界是<strong>混用</strong>的，你要知道两者的区别：</p>
+<p><strong>传统算法：人工设计规则。</strong> 比如“要检测画面里的瑕疵，就先用 Canny 边缘检测找出所有边缘，再筛选形状异常的连通域“。规则是人写的，人能解释每一步为什么这么做。优点是：不需要训练数据、在小而明确的场景里又快又准、结果可解释。缺点是：场景一复杂、目标一多变，人工规则就写不动了——你没法写一条规则描述“什么是猫“。</p>
+<p><strong>深度学习算法：从数据里学规则。</strong> 你给它看一万张标注了“猫在哪里“的照片，它自己总结出“什么是猫“。这就是“训练“。训练出来的产物叫<strong>模型</strong>（一个存了上亿个数字的文件），使用模型做预测叫<strong>推理</strong>。优点是：泛化能力强，能处理“什么是猫“这种说不清规则的问题。缺点是：需要大量标注数据、需要算力训练、结果不如传统算法好解释。</p>
+<p>对应关系大概是这样的：</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th></th><th>传统算法</th><th>深度学习</th></tr>
+</thead>
+<tbody>
+<tr><td>规则谁定</td><td>工程师手写</td><td>从数据中学</td></tr>
+<tr><td>典型工具</td><td>OpenCV、自写算法</td><td>PyTorch/TensorFlow 训练的模型</td></tr>
+<tr><td>适合场景</td><td>定位、测量、固定外观检测</td><td>复杂识别、开放类别检测</td></tr>
+<tr><td>部署开销</td><td>极小</td><td>需要推理引擎和模型文件</td></tr>
+<tr><td>本书对应章节</td><td>第 3、7~9 章</td><td>第 11~20 章</td></tr>
+</tbody>
+</table>
+</div>
+<p>一个现代工业项目里典型的做法是<strong>混合</strong>：用传统算法做图像增强（第 7~9 章的滤波器），用深度学习模型做识别，再用传统几何算法做定位测量——各取所长。</p>
+<h2 id="15-全流程预览一张图片的奇幻漂流"><a class="header" href="#15-全流程预览一张图片的奇幻漂流">1.5 全流程预览：一张图片的“奇幻漂流“</a></h2>
+<p>把前面所有内容串起来，看看一张照片在机器视觉系统里会经历什么。这就是本书后半部分每一章要展开讲的一步：</p>
+<pre><code class="language-text">1. 相机拍下照片，存成 JPG 文件（或视频流里的一帧）
+        │
+2. 【解码】JPG 是压缩格式，先解压成"每个像素的颜色"（第 5、6 章）
+        │  得到：W×H×3 的原始像素数据
+3. 【预处理】模型要求 640×640 的图，原图是 1920×1080——
+   │         缩放、转色彩空间、归一化、排好内存布局（第 10 章）
+   │  得到：符合模型输入要求的张量
+4. 【推理】把张量喂给模型（第 13 章转换、第 14 章执行）
+   │  得到：一组抽象的数字（张量）
+5. 【后处理】把数字翻译成"有 3 个物体：猫(92%)在(100,50)，狗(88%)……"（第 16 章）
+        │
+6. 【应用】在原图上画框、保存、或触发后续动作（第 26 章起）
+</code></pre>
+<p>注意第 4 步的输出<strong>不是</strong>一张标好框的图片，而是<strong>一堆数字</strong>。把数字变成“几个框、什么类别、多大概率“是后处理的工作。很多初学者第一次跑模型，看到输出是 <code>float32[1,84,8400]</code> 这样的张量会一头雾水——别担心，第 16 章会把它解剖得明明白白。</p>
+<h2 id="16-为什么用-rust-学机器视觉"><a class="header" href="#16-为什么用-rust-学机器视觉">1.6 为什么用 Rust 学机器视觉</a></h2>
+<p>机器视觉的教程 99% 是 Python 写的，为什么这本书用 Rust？</p>
+<p><strong>1. 工业部署端本来就不是 Python 的天下。</strong> 训练模型确实用 Python（PyTorch/TensorFlow），但真正部署到设备上——工控机、嵌入式板子、边缘盒子——跑的多半是 C++、Rust、或者厂商的 C SDK。用 Rust 学，你学的就是“最后一公里“的真实工程。</p>
+<p><strong>2. Rust 的性能和内存可控性正是视觉任务需要的。</strong> 一张 4K 图就是 2400 万个字节，一秒钟 30 帧就是 7 亿字节的数据流过内存。Rust 没有 GC 停顿，内存布局完全由你掌控，这对毫秒级响应的视觉系统很关键。</p>
+<p><strong>3. Rust 的机器视觉生态已经足够入门。</strong> <code>image</code>/<code>imageproc</code> 处理图像，<code>ndarray</code> 操作张量，<code>tract-onnx</code>/<code>ort</code> 做推理，OpenCV 也有官方维护的 Rust 绑定。学完本书，这些你都能用。</p>
+<p><strong>4. 顺带练习 Rust。</strong> 图像数据天然是“大块字节 + 严格布局“，用 Rust 处理它，所有权、借用、unsafe 这些概念会自然而然地变熟练。</p>
+<p>要承认的短板：Python 在“训练模型、数据分析“上生态无敌，这部分你不用 Rust（也几乎没人用）。本书涉及的模型转换工具（第 13 章）有不少只有 Python 版，到时候我们会把 Python 当“命令行工具“来用——你只负责跑命令，不需要会写 Python。</p>
+<h2 id="17-环境准备"><a class="header" href="#17-环境准备">1.7 环境准备</a></h2>
+<p>工欲善其事，必先装环境。请确认你的机器上有：</p>
+<pre><code class="language-bash"># 1. Rust 工具链（应该已经有了）
+rustc --version    # 期望 1.75+
+
+# 2. mdbook（用于阅读本书，可选）
+mdbook --version
+
+# 3. Python 3（第 13 章模型转换用，只当命令行工具用）
+python3 --version
+</code></pre>
+<p>每章的代码示例建议新建独立项目练习：</p>
+<pre><code class="language-bash">cargo new ch10_practice
+cd ch10_practice
+cargo add image ndarray imageproc fast_image_resize
+</code></pre>
+<p>另外准备一张测试图片（随便拍一张有猫/狗/车的照片存成 <code>test.jpg</code>），后面的章节会反复用到它。</p>
+<h2 id="18-小结"><a class="header" href="#18-小结">1.8 小结</a></h2>
+<ul>
+<li>机器视觉 = 让计算机从图片/视频中提取信息，仿生学结构是“相机当眼睛、算法当大脑“。</li>
+<li>主要任务分几类：分类、检测、分割、关键点、特征识别；本书主线是<strong>目标检测</strong>，并会逐个讲解各类模型（第六部分）。</li>
+<li>完整系统 = 硬件（相机/镜头/光源）+ 采集 + 算法流水线（解码→预处理→推理→后处理）+ 应用。算法层每一环都是工作量，不是只有推理。</li>
+<li>算法分传统（手写规则）和深度学习（数据训练）两派，工业界混用。</li>
+<li>选 Rust 是因为它贴近真实部署场景、性能可控、生态够用。</li>
+</ul>
+<h2 id="19-练习"><a class="header" href="#19-练习">1.9 练习</a></h2>
+<ol>
+<li>打开你的手机相册，挑三张照片，尝试判断每张照片用机器视觉能完成上面表格里的哪类任务（分类/检测/分割/关键点/特征识别）。</li>
+<li>在搜索引擎里搜“机器视觉 打光“，找两张工业打光设备的图片，理解“光源为什么比算法重要“。</li>
+<li>想一个你工作/生活中能用到机器视觉的场景，试着画出它的流水线（模仿 1.5 节的图），后面的章节你会逐步把它实现出来。</li>
+</ol>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="preface.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                            </a>
+
+                            <a rel="next prefetch" href="ch02-image-basics.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="preface.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                    </a>
+
+                    <a rel="next prefetch" href="ch02-image-basics.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                    </a>
+            </nav>
+
+        </div>
+
+        <template id=fa-eye><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M288 32c-80.8 0-145.5 36.8-192.6 80.6C48.6 156 17.3 208 2.5 243.7c-3.3 7.9-3.3 16.7 0 24.6C17.3 304 48.6 356 95.4 399.4C142.5 443.2 207.2 480 288 480s145.5-36.8 192.6-80.6c46.8-43.5 78.1-95.4 93-131.1c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C433.5 68.8 368.8 32 288 32zM432 256c0 79.5-64.5 144-144 144s-144-64.5-144-144s64.5-144 144-144s144 64.5 144 144zM288 192c0 35.3-28.7 64-64 64c-11.5 0-22.3-3-31.6-8.4c-.2 2.8-.4 5.5-.4 8.4c0 53 43 96 96 96s96-43 96-96s-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6z"/></svg></span></template>
+        <template id=fa-eye-slash><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M38.8 5.1C28.4-3.1 13.3-1.2 5.1 9.2S-1.2 34.7 9.2 42.9l592 464c10.4 8.2 25.5 6.3 33.7-4.1s6.3-25.5-4.1-33.7L525.6 386.7c39.6-40.6 66.4-86.1 79.9-118.4c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C465.5 68.8 400.8 32 320 32c-68.2 0-125 26.3-169.3 60.8L38.8 5.1zM223.1 149.5C248.6 126.2 282.7 112 320 112c79.5 0 144 64.5 144 144c0 24.9-6.3 48.3-17.4 68.7L408 294.5c5.2-11.8 8-24.8 8-38.5c0-53-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6c0 10.2-2.4 19.8-6.6 28.3l-90.3-70.8zm223.1 298L373 389.9c-16.4 6.5-34.3 10.1-53 10.1c-79.5 0-144-64.5-144-144c0-6.9 .5-13.6 1.4-20.2L83.1 161.5C60.3 191.2 44 220.8 34.5 243.7c-3.3 7.9-3.3 16.7 0 24.6c14.9 35.7 46.2 87.7 93 131.1C174.5 443.2 239.2 480 320 480c47.8 0 89.9-12.9 126.2-32.5z"/></svg></span></template>
+        <template id=fa-copy><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M502.6 70.63l-61.25-61.25C435.4 3.371 427.2 0 418.7 0H255.1c-35.35 0-64 28.66-64 64l.0195 256C192 355.4 220.7 384 256 384h192c35.2 0 64-28.8 64-64V93.25C512 84.77 508.6 76.63 502.6 70.63zM464 320c0 8.836-7.164 16-16 16H255.1c-8.838 0-16-7.164-16-16L239.1 64.13c0-8.836 7.164-16 16-16h128L384 96c0 17.67 14.33 32 32 32h47.1V320zM272 448c0 8.836-7.164 16-16 16H63.1c-8.838 0-16-7.164-16-16L47.98 192.1c0-8.836 7.164-16 16-16H160V128H63.99c-35.35 0-64 28.65-64 64l.0098 256C.002 483.3 28.66 512 64 512h192c35.2 0 64-28.8 64-64v-32h-47.1L272 448z"/></svg></span></template>
+        <template id=fa-play><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M73 39c-14.8-9.1-33.4-9.4-48.5-.9S0 62.6 0 80V432c0 17.4 9.4 33.4 24.5 41.9s33.7 8.1 48.5-.9L361 297c14.3-8.7 23-24.2 23-41s-8.7-32.2-23-41L73 39z"/></svg></span></template>
+        <template id=fa-clock-rotate-left><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M75 75L41 41C25.9 25.9 0 36.6 0 57.9V168c0 13.3 10.7 24 24 24H134.1c21.4 0 32.1-25.9 17-41l-30.8-30.8C155 85.5 203 64 256 64c106 0 192 86 192 192s-86 192-192 192c-40.8 0-78.6-12.7-109.7-34.4c-14.5-10.1-34.4-6.6-44.6 7.9s-6.6 34.4 7.9 44.6C151.2 495 201.7 512 256 512c141.4 0 256-114.6 256-256S397.4 0 256 0C185.3 0 121.3 28.7 75 75zm181 53c-13.3 0-24 10.7-24 24V256c0 6.4 2.5 12.5 7 17l72 72c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9l-65-65V152c0-13.3-10.7-24-24-24z"/></svg></span></template>
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="elasticlunr-ef4e11c1.min.js"></script>
+        <script src="mark-09e88c2c.min.js"></script>
+        <script src="searcher-09f2665d.js"></script>
+
+        <script src="clipboard-1626706a.min.js"></script>
+        <script src="highlight-abc7f01d.js"></script>
+        <script src="book-609e4cb8.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+
+    </div>
+    </body>
+</html>

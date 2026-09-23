@@ -1,0 +1,556 @@
+<!DOCTYPE HTML>
+<html lang="zh" class="rust sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>第 20 章 · 人脸识别：检测、对齐、特征与比对 - 机器视觉工程实战：用 Rust 看懂图像与模型</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="一本面向零基础读者的机器视觉工程教程：从像素、编解码、预处理、推理、后处理到模型转换，全部用 Rust 动手实现。">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="favicon-de23e50b.svg">
+        <link rel="shortcut icon" href="favicon-8114d1fc.png">
+        <link rel="stylesheet" href="css/variables-8adf115d.css">
+        <link rel="stylesheet" href="css/general-e96d0476.css">
+        <link rel="stylesheet" href="css/chrome-d279d366.css">
+        <link rel="stylesheet" href="css/print-9e4910d8.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="fonts/fonts-9644e21d.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="mdbook-highlight-css" href="highlight-493f70e1.css">
+        <link rel="stylesheet" id="mdbook-tomorrow-night-css" href="tomorrow-night-4c0ae647.css">
+        <link rel="stylesheet" id="mdbook-ayu-highlight-css" href="ayu-highlight-3fdfc3ac.css">
+
+        <!-- Custom theme stylesheets -->
+
+        <!-- MathJax -->
+        <script async src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "";
+            const default_light_theme = "rust";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "searchindex-4d8e5ec0.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="toc-c1d54236.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="mdbook-body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('rust')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="mdbook-sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("mdbook-sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="mdbook-sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="toc.html"></iframe>
+            </noscript>
+            <div id="mdbook-sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="mdbook-page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="mdbook-menu-bar-hover-placeholder"></div>
+                <div id="mdbook-menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="mdbook-sidebar-toggle" class="icon-button" for="mdbook-sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="mdbook-sidebar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M0 96C0 78.3 14.3 64 32 64H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H416c17.7 0 32 14.3 32 32z"/></svg></span>
+                        </label>
+                        <button id="mdbook-theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="mdbook-theme-list">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M371.3 367.1c27.3-3.9 51.9-19.4 67.2-42.9L600.2 74.1c12.6-19.5 9.4-45.3-7.6-61.2S549.7-4.4 531.1 9.6L294.4 187.2c-24 18-38.2 46.1-38.4 76.1L371.3 367.1zm-19.6 25.4l-116-104.4C175.9 290.3 128 339.6 128 400c0 3.9 .2 7.8 .6 11.6c1.8 17.5-10.2 36.4-27.8 36.4H96c-17.7 0-32 14.3-32 32s14.3 32 32 32H240c61.9 0 112-50.1 112-112c0-2.5-.1-5-.2-7.5z"/></svg></span>
+                        </button>
+                        <ul id="mdbook-theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-ayu">Ayu</button></li>
+                        </ul>
+                        <button id="mdbook-search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="mdbook-searchbar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352c79.5 0 144-64.5 144-144s-64.5-144-144-144S64 128.5 64 208s64.5 144 144 144z"/></svg></span>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">机器视觉工程实战：用 Rust 看懂图像与模型</h1>
+
+                    <div class="right-buttons">
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <span class=fa-svg id="print-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M128 0C92.7 0 64 28.7 64 64v96h64V64H354.7L384 93.3V160h64V93.3c0-17-6.7-33.3-18.7-45.3L400 18.7C388 6.7 371.7 0 354.7 0H128zM384 352v32 64H128V384 368 352H384zm64 32h32c17.7 0 32-14.3 32-32V256c0-35.3-28.7-64-64-64H64c-35.3 0-64 28.7-64 64v96c0 17.7 14.3 32 32 32H64v64c0 35.3 28.7 64 64 64H384c35.3 0 64-28.7 64-64V384zm-16-88c-13.3 0-24-10.7-24-24s10.7-24 24-24s24 10.7 24 24s-10.7 24-24 24z"/></svg></span>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="mdbook-search-wrapper" class="hidden">
+                    <form id="mdbook-searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="mdbook-searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="mdbook-searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <span class=fa-svg id="fa-spin"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M304 48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zm0 416c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM48 304c26.5 0 48-21.5 48-48s-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48zm464-48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM142.9 437c18.7-18.7 18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zm0-294.2c18.7-18.7 18.7-49.1 0-67.9S93.7 56.2 75 75s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zM369.1 437c18.7 18.7 49.1 18.7 67.9 0s18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9z"/></svg></span>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="mdbook-searchresults-outer" class="searchresults-outer hidden">
+                        <div id="mdbook-searchresults-header" class="searchresults-header"></div>
+                        <ul id="mdbook-searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('mdbook-sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('mdbook-sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#mdbook-sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="mdbook-content" class="content">
+                    <main>
+                        <h1 id="第-20-章--人脸识别检测对齐特征与比对"><a class="header" href="#第-20-章--人脸识别检测对齐特征与比对">第 20 章 · 人脸识别：检测、对齐、特征与比对</a></h1>
+<blockquote>
+<p><strong>本章导读</strong>：前几章我们已经能“找到并框出“图像里的物体（第 16 章），也能定位人脸上的关键点（第 17 章）。本章把这些能力串成一件日常又硬核的事——<strong>人脸识别</strong>。我们先分清“人脸检测“和“人脸识别“根本是两回事，再走完完整的四步流水线：<strong>检测人脸 → 对齐 → 提取特征向量 → 比对</strong>。你会亲手把一张脸“变成一串数字“（embedding），用<strong>余弦相似度</strong>判断“这是不是同一个人“，最后搭一个能注册、能检索的<strong>人脸库</strong>。这条流水线也是第 25 章“脸人绑定“的地基。</p>
+</blockquote>
+<hr>
+<h2 id="201-先分清人脸检测-vs-人脸识别"><a class="header" href="#201-先分清人脸检测-vs-人脸识别">20.1 先分清：人脸检测 vs 人脸识别</a></h2>
+<p>新手最容易把这两个词混着用，但它们在工程里是完全不同的两步。打个生活比喻：<strong>小区门禁的保安</strong>做两件事——</p>
+<ol>
+<li>先<strong>看到“有人来了“</strong>，注意力落到那张脸上：这是<strong>人脸检测（face detection）</strong>，只回答“脸在画面哪个位置“，不关心是谁。</li>
+<li>再<strong>认出“这是 3 号楼的张三，放行“</strong>：这是<strong>人脸识别（face recognition）</strong>，回答“这张脸是谁 / 这两张脸是不是同一个人“。</li>
+</ol>
+<p>用一张表把它们钉死：</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>维度</th><th>人脸<strong>检测</strong></th><th>人脸<strong>识别</strong></th></tr>
+</thead>
+<tbody>
+<tr><td>回答的问题</td><td>脸在哪？有几张？</td><td>这是谁？是不是同一人？</td></tr>
+<tr><td>本质</td><td>目标检测的一个特例（第 16 章）</td><td>特征比对</td></tr>
+<tr><td>输入</td><td>整幅图像</td><td>一张裁好、摆正的脸</td></tr>
+<tr><td>输出</td><td>人脸框 + 关键点</td><td>特征向量 / 一个人名</td></tr>
+<tr><td>典型模型</td><td>RetinaFace、SCRFD</td><td>ArcFace</td></tr>
+</tbody>
+</table>
+</div>
+<p>请记住：<strong>人脸检测就是“只检测’脸’这一个类别“的检测器</strong>——第 16 章讲的框、置信度、NMS（非极大值抑制）在这里原封不动地适用，只是类别从 COCO 80 类缩成了“脸 / 不是脸“。而<strong>识别</strong>是本章的新东西，它要把“脸“这个图像块，变成能互相比较的“一串数字“。</p>
+<h2 id="202-完整流水线从一张脸到这是谁"><a class="header" href="#202-完整流水线从一张脸到这是谁">20.2 完整流水线：从“一张脸“到“这是谁“</a></h2>
+<p>工程上的人脸识别不是一个模型搞定，而是一条<strong>级联流水线</strong>：前一步的输出，正好是后一步的输入。四步如下：</p>
+<pre><code class="language-text">        原始图像（可能有好几张脸）
+              │
+              ▼
+   ┌──────────────────────────┐
+   │ ① 人脸检测（RetinaFace）    │  找出每张脸在哪
+   └──────────────────────────┘
+              │  每张脸：BBox + 5 个关键点
+              ▼
+   ┌──────────────────────────┐
+   │ ② 人脸对齐（仿射变换）       │  把歪脸摆正成 112×112 标准脸
+   └──────────────────────────┘
+              │  对齐后的"正脸"小图
+              ▼
+   ┌──────────────────────────┐
+   │ ③ 特征提取（ArcFace）       │  编码成 512 维向量
+   └──────────────────────────┘
+              │  embedding: [f32; 512]
+              ▼
+   ┌──────────────────────────┐
+   │ ④ 比对（余弦相似度）         │  和人脸库逐个比，取最像的
+   └──────────────────────────┘
+              │
+              ▼
+        "这是小王，相似度 0.87"
+</code></pre>
+<p>四步各司其职：<strong>检测</strong>负责“框出脸并给 5 个关键点“，<strong>对齐</strong>负责“把姿态各异的脸摆成统一的正脸“，<strong>特征提取</strong>负责“把正脸编码成向量“，<strong>比对</strong>负责“算两个向量像不像“。少了任何一步，精度都会明显掉——尤其是<strong>对齐</strong>，新手最容易漏，后面会专门讲它的威力。下面逐步拆开。</p>
+<h2 id="203-第一步--人脸检测框--5-个关键点"><a class="header" href="#203-第一步--人脸检测框--5-个关键点">20.3 第一步 · 人脸检测：框 + 5 个关键点</a></h2>
+<p>人脸检测常用 <strong>RetinaFace</strong> 或更轻快的 <strong>SCRFD</strong>。和普通检测器相比，它多输出一样东西：每张脸的 <strong>5 个关键点（landmarks）</strong>——<strong>左眼、右眼、鼻尖、左嘴角、右嘴角</strong>。</p>
+<p>为什么检测器要顺手吐出这 5 个点？因为下一步“对齐“正需要它们当“锚点“。这也呼应第 17 章：那里讲关键点模型的原理（热力图、坐标还原），这里我们只当<strong>使用方</strong>，直接拿它给的坐标。</p>
+<p>框的部分我们<strong>复用全书统一的 <code>BBox</code></strong>（左上-右下像素坐标，见写作规范第 6 节），只是外面再包一层带关键点的结构：</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use crate::BBox; // 复用第 16 章的统一边界框：{ x1, y1, x2, y2 }
+
+/// 人脸检测结果：框 + 置信度 + 5 个关键点
+#[derive(Clone, Debug)]
+pub struct FaceDetection {
+    pub bbox: BBox,                  // 复用统一 BBox，坐标已还原到原图像素
+    pub score: f32,                  // "是一张脸"的置信度 0~1
+    pub landmarks: [(f32, f32); 5],  // 顺序：左眼、右眼、鼻尖、左嘴角、右嘴角
+}
+<span class="boring">}</span></code></pre>
+<blockquote>
+<p><strong>和第 16 章的关系</strong>：人脸检测器的后处理（框还原、按置信度过滤、NMS 去重叠框）和第 16 章完全一致，这里不再重复。关键点坐标同样要跟着框一起从模型输入尺寸<strong>还原到原图像素坐标</strong>（letterbox 逆变换见第 10 章），否则后面对齐会全歪。</p>
+</blockquote>
+<p>拿到 <code>FaceDetection</code> 后，一张图里的每张脸都独立走后面三步。</p>
+<h2 id="204-第二步--人脸对齐把歪脸摆正"><a class="header" href="#204-第二步--人脸对齐把歪脸摆正">20.4 第二步 · 人脸对齐：把歪脸摆正</a></h2>
+<h3 id="为什么必须对齐"><a class="header" href="#为什么必须对齐">为什么必须对齐</a></h3>
+<p>同一个人，<strong>正脸、侧头 15°、仰头、离镜头远近不同</strong>，在像素层面差别巨大。如果直接把这些“原始裁剪“喂给识别模型，模型得同时操心“这是谁“和“这脸怎么摆的“，负担太重，精度会<strong>暴跌</strong>。</p>
+<p><strong>对齐（alignment）</strong> 就是先把姿态这个干扰因素消掉：用几何变换把每张脸都“摆正“到<strong>统一的姿态、统一的大小、五官落在统一的位置</strong>。这样识别模型每次看到的都是规规矩矩的“标准正脸“，只需专心回答“这是谁“。</p>
+<p>打个比方：证件照要求“正脸、平视、居中“，就是为了让审核的人只比对长相，不被姿势干扰。对齐就是给每张脸自动拍一张“标准证件照“。</p>
+<h3 id="怎么对齐5-个关键点--相似变换"><a class="header" href="#怎么对齐5-个关键点--相似变换">怎么对齐：5 个关键点 + 相似变换</a></h3>
+<p>做法呼应第 9 章的<strong>几何变换</strong>：我们定义一张 112×112 的“标准脸模板“，规定 5 个关键点<strong>应该</strong>落在哪里；再用检测得到的 5 个<strong>实际</strong>关键点，求一个<strong>相似变换（similarity transform：只含旋转、等比缩放、平移，不改变脸的长宽比）</strong>，把实际的 5 个点搬到模板位置上，整张脸也就跟着被摆正了。</p>
+<p>标准模板点（insightface 约定的 112×112 坐标）如下：</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>/// 对齐后，5 个关键点在 112×112 图上"应该"落在的位置（业界通用模板）
+const TEMPLATE_112: [(f32, f32); 5] = [
+    (38.2946, 51.6963), // 左眼
+    (73.5318, 51.5014), // 右眼
+    (56.0252, 71.7366), // 鼻尖
+    (41.5493, 92.3655), // 左嘴角
+    (70.7299, 92.2041), // 右嘴角
+];
+<span class="boring">}</span></code></pre>
+<p>有了“实际 5 点“和“目标 5 点“两组对应，就是解一个<strong>超定方程组</strong>（5 对点、未知数只有 4 个：旋转+缩放合成的 2 个参数 + 2 个平移），用<strong>最小二乘</strong>求出那个 2×3 仿射矩阵。思路骨架：</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>/// 由检测到的 5 个关键点，估计"把这张脸对齐到模板"的 2×3 仿射矩阵（骨架）
+/// 返回 [[a, b, tx], [c, d, ty]]，含义见第 9 章：新点 = M · (x, y, 1)^T
+fn estimate_align_matrix(src: &amp;[(f32, f32); 5]) -&gt; [[f32; 3]; 2] {
+    // 目标：找相似变换 M，使 M · src[i] ≈ TEMPLATE_112[i]，误差平方和最小。
+    // 数学上是经典的 Umeyama / least-squares similarity 求解：
+    //   1) 分别算 src 和模板的质心，去中心化；
+    //   2) 由两组去中心点算出旋转与统一缩放；
+    //   3) 用质心反推平移量 tx, ty。
+    // 工程上通常直接调现成实现：
+    //   - OpenCV: cv::estimateAffinePartial2D(src, template)
+    //   - 或用 nalgebra 自己实现上面三步（矩阵运算 &lt;10 行）。
+    todo!("解最小二乘相似变换，返回 2×3 矩阵")
+}
+
+/// 拿到矩阵后，把原图按仿射变换 warp 到 112×112 的对齐脸
+fn align_face(image: &amp;image::RgbImage, det: &amp;FaceDetection) -&gt; image::RgbImage {
+    let m = estimate_align_matrix(&amp;det.landmarks);
+    // warp_affine 的实现见第 9 章：对目标图每个像素做逆映射 + 双线性采样
+    warp_affine(image, &amp;m, 112, 112) // 输出固定 112×112，正好喂给 ArcFace
+}
+<span class="boring">}</span></code></pre>
+<p>关键点在于：<strong>对齐用的是关键点，不是那个人脸框</strong>。框只告诉你“脸大概在这块区域“，而 5 个关键点精确到“眼睛在哪、嘴在哪“，才能把脸真正摆正。对齐后所有脸都是 112×112 的标准正脸，尺寸和五官位置统一，这正是识别模型想要的输入。</p>
+<h2 id="205-第三步--特征提取把脸变成一串数字"><a class="header" href="#205-第三步--特征提取把脸变成一串数字">20.5 第三步 · 特征提取：把脸变成一串数字</a></h2>
+<p>对齐好的 112×112 正脸，喂给<strong>识别模型（如 ArcFace）</strong>，它不输出类别、不输出框，而是吐出一个<strong>定长特征向量（embedding，人脸嵌入）</strong>——通常是 <strong>512 维的 <code>f32</code></strong>。</p>
+<p>这是整章的<strong>核心思想</strong>，务必理解透：<strong>把“一张脸“压缩成“一串数字“</strong>。而且这串数字有个神奇性质，是训练时刻意学出来的：</p>
+<ul>
+<li><strong>同一个人</strong>的不同照片（不同光照、表情、角度）→ 得到的向量<strong>方向很接近</strong>；</li>
+<li><strong>不同人</strong>的照片 → 得到的向量<strong>方向差很远</strong>。</li>
+</ul>
+<p>于是“判断是不是同一个人“这个模糊的视觉问题，被翻译成了一个<strong>精确的数学问题</strong>：“两个向量的方向像不像”。张量形状上：</p>
+<pre><code class="language-text">输入:  [1, 3, 112, 112]   对齐后的正脸（RGB、归一化，见第 10 章）
+输出:  [1, 512]           这张脸的 embedding（512 个 f32）
+</code></pre>
+<p>推理这一步和别的模型没区别（第 14 章）：预处理成张量 → <code>tract-onnx</code>/<code>ort</code> 前向 → 拿到 512 维输出。真正的门道全在“拿到向量之后怎么用“，也就是下一步的<strong>比对</strong>。</p>
+<h2 id="206-第四步--比对余弦相似度与阈值判定"><a class="header" href="#206-第四步--比对余弦相似度与阈值判定">20.6 第四步 · 比对：余弦相似度与阈值判定</a></h2>
+<h3 id="余弦相似度比方向不比长短"><a class="header" href="#余弦相似度比方向不比长短">余弦相似度：比“方向“，不比“长短“</a></h3>
+<p>现在每张脸都是一个 512 维向量。怎么衡量两个向量“像不像“？最常用的是<strong>余弦相似度（cosine similarity）</strong>。</p>
+<p>先打比方：把每个向量想成从原点射出的一支<strong>箭</strong>。我们<strong>不关心箭有多长，只关心两支箭的方向夹角</strong>——夹角越小（越同向），两张脸越像。余弦相似度就是这个夹角的余弦值：<strong>同向 = 1，垂直 = 0，反向 = −1</strong>。</p>
+<p>它的公式是“点积除以两个模长之积“：</p>
+<p>$$
+\cos(\mathbf{a}, \mathbf{b}) = \frac{\mathbf{a}\cdot\mathbf{b}}{|\mathbf{a}|,|\mathbf{b}|}
+= \frac{\sum_i a_i b_i}{\sqrt{\sum_i a_i^2},\sqrt{\sum_i b_i^2}}
+$$</p>
+<p>别被公式吓到，用一组 3 维小向量<strong>手算一遍</strong>就懂了（真实是 512 维，道理一模一样）。设小王的脸编码为 <code>a = [1, 2, 2]</code>，来比三张脸：</p>
+<p><strong>① 另一张小王的照片 <code>b = [2, 4, 4]</code></strong>（正好是 a 的 2 倍，完全同向）</p>
+<ul>
+<li>点积：<code>1×2 + 2×4 + 2×4 = 2 + 8 + 8 = 18</code></li>
+<li>模长：<code>‖a‖ = √(1+4+4) = √9 = 3</code>，<code>‖b‖ = √(4+16+16) = √36 = 6</code></li>
+<li>相似度：<code>18 / (3 × 6) = 18 / 18 = 1.0</code> → <strong>完全同向，判定同一人</strong></li>
+</ul>
+<p><strong>② 小王换了角度/光照 <code>d = [2, 2, 1]</code></strong>（方向接近但不完全一样）</p>
+<ul>
+<li>点积：<code>1×2 + 2×2 + 2×1 = 2 + 4 + 2 = 8</code></li>
+<li>模长：<code>‖d‖ = √(4+4+1) = √9 = 3</code></li>
+<li>相似度：<code>8 / (3 × 3) = 8 / 9 ≈ 0.889</code> → <strong>很接近，仍判同一人</strong></li>
+</ul>
+<p><strong>③ 陌生人 <code>c = [2, -1, 0]</code></strong></p>
+<ul>
+<li>点积：<code>1×2 + 2×(−1) + 2×0 = 2 − 2 + 0 = 0</code></li>
+<li>相似度：<code>0 / (3 × √5) = 0</code> → <strong>方向无关，判不同人</strong></li>
+</ul>
+<p>看到没：同一个人不管长短怎么变，方向都稳在高位（0.89、1.0），陌生人直接掉到 0。翻成 Rust：</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>/// 余弦相似度：两个等长向量方向的接近程度，范围 -1~1
+pub fn cosine_similarity(a: &amp;[f32], b: &amp;[f32]) -&gt; f32 {
+    assert_eq!(a.len(), b.len(), "两个向量维度必须相同");
+    let (mut dot, mut na, mut nb) = (0.0f32, 0.0f32, 0.0f32);
+    for i in 0..a.len() {
+        dot += a[i] * b[i]; // 点积
+        na += a[i] * a[i];  // a 的模长平方
+        nb += b[i] * b[i];  // b 的模长平方
+    }
+    dot / (na.sqrt() * nb.sqrt() + 1e-8) // +1e-8 防止除以 0
+}
+<span class="boring">}</span></code></pre>
+<h3 id="顺带一提欧氏距离"><a class="header" href="#顺带一提欧氏距离">顺带一提：欧氏距离</a></h3>
+<p>除了余弦，也有人用<strong>欧氏距离（Euclidean distance）</strong>——就是两个向量端点之间的直线距离 $\sqrt{\sum_i (a_i-b_i)^2}$，<strong>越小越像</strong>（和余弦“越大越像“方向相反）。有个好用的关系：若两个向量都做了 L2 归一化（模长为 1），则 $|\mathbf{a}-\mathbf{b}|^2 = 2 - 2\cos(\mathbf{a},\mathbf{b})$，两者本质等价。工程里余弦更常见，因为它天然落在 −1~1，阈值好设。</p>
+<h3 id="阈值判定11-验证-vs-1n-检索"><a class="header" href="#阈值判定11-验证-vs-1n-检索">阈值判定：1:1 验证 vs 1:N 检索</a></h3>
+<p>有了相似度分数，还需要一条<strong>阈值线</strong>来做判决：</p>
+<blockquote>
+<p><strong>相似度 &gt; 阈值 → 判为同一人；否则判为不同人。</strong></p>
+</blockquote>
+<p>由此分出两种任务：</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>任务</th><th>问的问题</th><th>怎么算</th><th>例子</th></tr>
+</thead>
+<tbody>
+<tr><td><strong>1:1 验证</strong></td><td>“你是不是你声称的那个人？”</td><td>拿当前脸和<strong>指定 1 个</strong>存档比一次</td><td>刷脸支付、刷脸解锁</td></tr>
+<tr><td><strong>1:N 检索</strong></td><td>“你是库里的哪一个？”</td><td>拿当前脸和<strong>库里 N 个</strong>逐一比，取最像</td><td>门禁认人、名单布控</td></tr>
+</tbody>
+</table>
+</div>
+<p>阈值不是拍脑袋定的，而是拿验证集扫出来的经验值（余弦常见落在 0.4~0.6，随模型和场景变）。<strong>阈值调高</strong>→更严格，宁可认错为陌生人也不放错人（安防偏这边）；<strong>阈值调低</strong>→更宽松，宁可多放行也别拦住本人（考勤偏这边）。</p>
+<h2 id="207-人脸库注册与-1n-检索"><a class="header" href="#207-人脸库注册与-1n-检索">20.7 人脸库：注册与 1:N 检索</a></h2>
+<p>1:N 检索需要一个<strong>人脸库（feature gallery，特征底库）</strong>：注册时把每个人的 id 和 embedding 存进去，识别时把当前脸的向量和库里<strong>所有</strong>向量算相似度，<strong>取最大的那个</strong>，再和阈值比。</p>
+<p>数据结构就是最朴素的 <strong><code>id → Vec&lt;f32&gt;</code></strong> 映射。这里再补一个关键的工程细节：<strong>入库前把向量做 L2 归一化</strong>（缩放到模长 1）。归一化之后，余弦相似度就退化成简单的<strong>点积</strong>，检索时省一半算力；更重要的是，它避免了“忘了归一化导致相似度乱套“这个高频坑。</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>/// L2 归一化：把向量缩放到模长为 1；之后余弦相似度 == 点积
+pub fn l2_normalize(v: &amp;mut [f32]) {
+    let norm: f32 = v.iter().map(|x| x * x).sum::&lt;f32&gt;().sqrt();
+    if norm &gt; 1e-8 {
+        for x in v.iter_mut() {
+            *x /= norm; // 每个分量同比例缩小
+        }
+    }
+}
+
+/// 人脸库：id -&gt; 归一化后的特征向量
+pub struct FaceGallery {
+    entries: Vec&lt;(String, Vec&lt;f32&gt;)&gt;,
+}
+
+impl FaceGallery {
+    pub fn new() -&gt; Self {
+        Self { entries: Vec::new() }
+    }
+
+    /// 注册：存入一个人的 id 和特征向量（入库前先归一化）
+    pub fn register(&amp;mut self, id: &amp;str, mut embedding: Vec&lt;f32&gt;) {
+        l2_normalize(&amp;mut embedding);
+        self.entries.push((id.to_string(), embedding));
+    }
+
+    /// 1:N 检索：返回库里最相似的 (id, 相似度)；库为空则 None
+    pub fn search(&amp;self, query: &amp;[f32]) -&gt; Option&lt;(String, f32)&gt; {
+        let mut q = query.to_vec();
+        l2_normalize(&amp;mut q); // 查询向量也要归一化
+        self.entries
+            .iter()
+            .map(|(id, emb)| (id.clone(), cosine_similarity(&amp;q, emb)))
+            .max_by(|a, b| a.1.partial_cmp(&amp;b.1).unwrap()) // 取相似度最大的
+    }
+}
+<span class="boring">}</span></code></pre>
+<p>调用时再套上阈值，就是一个完整的识别判决：</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let threshold = 0.45; // 经验阈值，需按你的模型和场景实测微调
+match gallery.search(&amp;query_embedding) {
+    Some((id, sim)) if sim &gt; threshold =&gt; {
+        println!("识别为：{}（相似度 {:.3}）", id, sim);
+    }
+    Some((_, sim)) =&gt; {
+        println!("陌生人（最高相似度 {:.3}，未过阈值 {}）", sim, threshold);
+    }
+    None =&gt; println!("人脸库为空"),
+}
+<span class="boring">}</span></code></pre>
+<blockquote>
+<p><strong>工程上通常会</strong>在库很大（几十万人）时，把逐一点积换成向量检索引擎（如 faiss、hnsw 的近似最近邻）来提速；小库直接线性扫足够快。这里保持“看得懂“优先。第 25 章会把这套检索接到“脸人绑定“上，让每个人体目标关联上一个身份。</p>
+</blockquote>
+<h3 id="串起来一次完整识别的代码"><a class="header" href="#串起来一次完整识别的代码">串起来：一次完整识别的代码</a></h3>
+<p>把前面四步拼成一个函数，你就能看清整条流水线的数据是怎么流动的。一张图里可能有多张脸，所以外层是个循环，每张脸独立走“对齐 → 提特征 → 检索“：</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>/// 对一整幅图做人脸识别，返回每张脸的 (框, 识别结果)
+pub fn recognize_image(
+    image: &amp;image::RgbImage,
+    gallery: &amp;FaceGallery,
+    threshold: f32,
+) -&gt; Vec&lt;(BBox, String)&gt; {
+    let mut results = Vec::new();
+
+    // ① 检测：一次拿到图里所有脸的框 + 5 关键点（内部含 NMS，见第 16 章）
+    let faces: Vec&lt;FaceDetection&gt; = detect_faces(image);
+
+    for det in &amp;faces {
+        // ② 对齐：用 5 关键点把这张脸摆正成 112×112
+        let aligned = align_face(image, det);
+
+        // ③ 提特征：对齐脸 -&gt; 512 维 embedding（推理见第 14 章）
+        let embedding: Vec&lt;f32&gt; = extract_embedding(&amp;aligned);
+
+        // ④ 比对：在人脸库里 1:N 检索，套阈值得出身份
+        let name = match gallery.search(&amp;embedding) {
+            Some((id, sim)) if sim &gt; threshold =&gt; id,
+            _ =&gt; "陌生人".to_string(),
+        };
+
+        results.push((det.bbox, name)); // bbox 用于后续在原图上画标注
+    }
+    results
+}
+<span class="boring">}</span></code></pre>
+<p><code>detect_faces</code> 和 <code>extract_embedding</code> 内部都是“预处理 → ONNX 推理 → 后处理“的老套路（第 14 章），本章不再展开；重点是看清<strong>四步如何交接</strong>：检测给出框和关键点，关键点喂给对齐，对齐结果喂给特征提取，特征向量喂给库检索——每一步的输出都恰好是下一步的输入。</p>
+<h2 id="208-活体检测与工程避坑"><a class="header" href="#208-活体检测与工程避坑">20.8 活体检测与工程避坑</a></h2>
+<p><strong>活体检测（liveness）</strong> 这里一句话带过：光有识别还不够，得防着有人拿<strong>照片、屏幕视频、面具</strong>冒充本人——活体检测就是判断“镜头前是不是一个活人“。它在真实门禁/支付里是<strong>必配</strong>的一环，缺了它，一张打印照片就能骗过整套系统。</p>
+<p>最后把新手最常踩的坑集中列一遍：</p>
+<ul>
+<li><strong>不对齐直接比对，精度暴跌</strong>：这是头号坑。省掉 20.4 的对齐，同一个人换个角度相似度就可能跌破阈值。对齐的收益远比想象中大。</li>
+<li><strong>embedding 忘了 L2 归一化</strong>：相似度分布乱掉，阈值怎么调都不对。注册和查询<strong>两头都要归一化</strong>。</li>
+<li><strong>阈值照搬别人的数值</strong>：0.45 只是示例。换模型、换摄像头、换光照环境，都应该拿自己的验证集重新扫阈值。</li>
+<li><strong>光照 / 口罩 / 大角度 / 遮挡</strong>：戴口罩、逆光、侧脸超过一定角度，embedding 质量会下降，识别变难。工程上常靠“多帧取质量最好的一帧再识别““检测阶段过滤掉太小/太侧的脸“来缓解。</li>
+<li><strong>坐标没还原</strong>：关键点若没跟着框一起还原到原图像素坐标（第 10 章 letterbox 逆变换），对齐会整体偏移。</li>
+</ul>
+<h2 id="209-小结"><a class="header" href="#209-小结">20.9 小结</a></h2>
+<ul>
+<li><strong>人脸检测 ≠ 人脸识别</strong>：检测是“脸在哪“（第 16 章检测器的特例，输出框 + 5 关键点），识别是“这是谁“（特征比对）。</li>
+<li>完整流水线是四步级联：<strong>检测 → 对齐 → 特征提取 → 比对</strong>，前一步的输出是后一步的输入，缺一步精度都掉。</li>
+<li><strong>对齐</strong>用 5 个关键点求相似/仿射变换（第 9 章），把姿态各异的脸摆正到 112×112 标准模板，是新手最容易漏、收益最大的一步。</li>
+<li><strong>特征提取</strong>（ArcFace）把正脸编码成定长 <strong>512 维 embedding</strong>——把“脸“变成“一串数字“，让“像不像“变成可计算的数学问题。</li>
+<li>比对用<strong>余弦相似度</strong>（比方向，不比长短），配一条<strong>阈值</strong>判决：1:1 是验证、1:N 是库内检索；embedding 入库和查询都要 <strong>L2 归一化</strong>。</li>
+<li>工程上还要配<strong>活体检测</strong>防伪，并留意光照/口罩/角度/阈值随场景漂移这些坑。这套能力将在第 25 章接到脸人绑定。</li>
+</ul>
+<h2 id="2010-练习"><a class="header" href="#2010-练习">20.10 练习</a></h2>
+<ol>
+<li>
+<p><strong>手算 + 代码对照</strong>：给定 <code>a = [3, 0, 4]</code>、<code>b = [4, 0, 3]</code>，先手算它们的余弦相似度（提示：两个模长都是 5，点积是 24，答案 0.96），再用本章的 <code>cosine_similarity</code> 跑一遍，确认结果一致。然后把 <code>b</code> 换成 <code>[-3, 0, -4]</code>，看相似度变成多少，解释它的几何含义。</p>
+</li>
+<li>
+<p><strong>归一化的影响</strong>：把 <code>a = [1, 2, 2]</code> 和 <code>b = [2, 4, 4]</code> 分别做 <code>l2_normalize</code> 后再点积，验证结果就等于它们的余弦相似度 1.0；再故意<strong>跳过</strong>归一化直接点积，观察数值差异，体会“忘了归一化“为什么会让阈值失灵。</p>
+</li>
+<li>
+<p><strong>搭一个迷你人脸库</strong>：用 <code>FaceGallery</code> 注册三个人（可以先用手写的 512 维随机向量假装 embedding），实现一个函数：输入一个查询向量和阈值，返回“识别为某人“或“陌生人“。再把阈值从 0.3 调到 0.7，观察判决结果怎么随阈值变化，理解“调高更严、调低更松“。</p>
+</li>
+<li>
+<p><strong>对齐的必要性（思考 + 可选实现）</strong>：假设一张脸整体旋转了 30°，用 <code>estimate_align_matrix</code> 的思路说明：为什么先对齐再提特征，会比直接把旋转的脸喂给识别模型得到更稳的相似度？如果有 ArcFace 的 ONNX 模型，拿“对齐 vs 不对齐“两版输入各跑一次，对比同一个人的相似度差多少。</p>
+</li>
+</ol>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="ch19-diff-models.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                            </a>
+
+                            <a rel="next prefetch" href="ch21-tracking.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="ch19-diff-models.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                    </a>
+
+                    <a rel="next prefetch" href="ch21-tracking.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                    </a>
+            </nav>
+
+        </div>
+
+        <template id=fa-eye><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M288 32c-80.8 0-145.5 36.8-192.6 80.6C48.6 156 17.3 208 2.5 243.7c-3.3 7.9-3.3 16.7 0 24.6C17.3 304 48.6 356 95.4 399.4C142.5 443.2 207.2 480 288 480s145.5-36.8 192.6-80.6c46.8-43.5 78.1-95.4 93-131.1c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C433.5 68.8 368.8 32 288 32zM432 256c0 79.5-64.5 144-144 144s-144-64.5-144-144s64.5-144 144-144s144 64.5 144 144zM288 192c0 35.3-28.7 64-64 64c-11.5 0-22.3-3-31.6-8.4c-.2 2.8-.4 5.5-.4 8.4c0 53 43 96 96 96s96-43 96-96s-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6z"/></svg></span></template>
+        <template id=fa-eye-slash><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M38.8 5.1C28.4-3.1 13.3-1.2 5.1 9.2S-1.2 34.7 9.2 42.9l592 464c10.4 8.2 25.5 6.3 33.7-4.1s6.3-25.5-4.1-33.7L525.6 386.7c39.6-40.6 66.4-86.1 79.9-118.4c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C465.5 68.8 400.8 32 320 32c-68.2 0-125 26.3-169.3 60.8L38.8 5.1zM223.1 149.5C248.6 126.2 282.7 112 320 112c79.5 0 144 64.5 144 144c0 24.9-6.3 48.3-17.4 68.7L408 294.5c5.2-11.8 8-24.8 8-38.5c0-53-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6c0 10.2-2.4 19.8-6.6 28.3l-90.3-70.8zm223.1 298L373 389.9c-16.4 6.5-34.3 10.1-53 10.1c-79.5 0-144-64.5-144-144c0-6.9 .5-13.6 1.4-20.2L83.1 161.5C60.3 191.2 44 220.8 34.5 243.7c-3.3 7.9-3.3 16.7 0 24.6c14.9 35.7 46.2 87.7 93 131.1C174.5 443.2 239.2 480 320 480c47.8 0 89.9-12.9 126.2-32.5z"/></svg></span></template>
+        <template id=fa-copy><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M502.6 70.63l-61.25-61.25C435.4 3.371 427.2 0 418.7 0H255.1c-35.35 0-64 28.66-64 64l.0195 256C192 355.4 220.7 384 256 384h192c35.2 0 64-28.8 64-64V93.25C512 84.77 508.6 76.63 502.6 70.63zM464 320c0 8.836-7.164 16-16 16H255.1c-8.838 0-16-7.164-16-16L239.1 64.13c0-8.836 7.164-16 16-16h128L384 96c0 17.67 14.33 32 32 32h47.1V320zM272 448c0 8.836-7.164 16-16 16H63.1c-8.838 0-16-7.164-16-16L47.98 192.1c0-8.836 7.164-16 16-16H160V128H63.99c-35.35 0-64 28.65-64 64l.0098 256C.002 483.3 28.66 512 64 512h192c35.2 0 64-28.8 64-64v-32h-47.1L272 448z"/></svg></span></template>
+        <template id=fa-play><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M73 39c-14.8-9.1-33.4-9.4-48.5-.9S0 62.6 0 80V432c0 17.4 9.4 33.4 24.5 41.9s33.7 8.1 48.5-.9L361 297c14.3-8.7 23-24.2 23-41s-8.7-32.2-23-41L73 39z"/></svg></span></template>
+        <template id=fa-clock-rotate-left><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M75 75L41 41C25.9 25.9 0 36.6 0 57.9V168c0 13.3 10.7 24 24 24H134.1c21.4 0 32.1-25.9 17-41l-30.8-30.8C155 85.5 203 64 256 64c106 0 192 86 192 192s-86 192-192 192c-40.8 0-78.6-12.7-109.7-34.4c-14.5-10.1-34.4-6.6-44.6 7.9s-6.6 34.4 7.9 44.6C151.2 495 201.7 512 256 512c141.4 0 256-114.6 256-256S397.4 0 256 0C185.3 0 121.3 28.7 75 75zm181 53c-13.3 0-24 10.7-24 24V256c0 6.4 2.5 12.5 7 17l72 72c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9l-65-65V152c0-13.3-10.7-24-24-24z"/></svg></span></template>
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="elasticlunr-ef4e11c1.min.js"></script>
+        <script src="mark-09e88c2c.min.js"></script>
+        <script src="searcher-09f2665d.js"></script>
+
+        <script src="clipboard-1626706a.min.js"></script>
+        <script src="highlight-abc7f01d.js"></script>
+        <script src="book-609e4cb8.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+
+    </div>
+    </body>
+</html>

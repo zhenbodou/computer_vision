@@ -1,0 +1,613 @@
+<!DOCTYPE HTML>
+<html lang="zh" class="rust sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>第 23 章 · 拌线检测：单拌线、双拌线与方向判断 - 机器视觉工程实战：用 Rust 看懂图像与模型</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="一本面向零基础读者的机器视觉工程教程：从像素、编解码、预处理、推理、后处理到模型转换，全部用 Rust 动手实现。">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="favicon-de23e50b.svg">
+        <link rel="shortcut icon" href="favicon-8114d1fc.png">
+        <link rel="stylesheet" href="css/variables-8adf115d.css">
+        <link rel="stylesheet" href="css/general-e96d0476.css">
+        <link rel="stylesheet" href="css/chrome-d279d366.css">
+        <link rel="stylesheet" href="css/print-9e4910d8.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="fonts/fonts-9644e21d.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="mdbook-highlight-css" href="highlight-493f70e1.css">
+        <link rel="stylesheet" id="mdbook-tomorrow-night-css" href="tomorrow-night-4c0ae647.css">
+        <link rel="stylesheet" id="mdbook-ayu-highlight-css" href="ayu-highlight-3fdfc3ac.css">
+
+        <!-- Custom theme stylesheets -->
+
+        <!-- MathJax -->
+        <script async src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "";
+            const default_light_theme = "rust";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "searchindex-4d8e5ec0.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="toc-c1d54236.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="mdbook-body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('rust')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="mdbook-sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("mdbook-sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="mdbook-sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="toc.html"></iframe>
+            </noscript>
+            <div id="mdbook-sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="mdbook-page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="mdbook-menu-bar-hover-placeholder"></div>
+                <div id="mdbook-menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="mdbook-sidebar-toggle" class="icon-button" for="mdbook-sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="mdbook-sidebar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M0 96C0 78.3 14.3 64 32 64H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H416c17.7 0 32 14.3 32 32z"/></svg></span>
+                        </label>
+                        <button id="mdbook-theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="mdbook-theme-list">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M371.3 367.1c27.3-3.9 51.9-19.4 67.2-42.9L600.2 74.1c12.6-19.5 9.4-45.3-7.6-61.2S549.7-4.4 531.1 9.6L294.4 187.2c-24 18-38.2 46.1-38.4 76.1L371.3 367.1zm-19.6 25.4l-116-104.4C175.9 290.3 128 339.6 128 400c0 3.9 .2 7.8 .6 11.6c1.8 17.5-10.2 36.4-27.8 36.4H96c-17.7 0-32 14.3-32 32s14.3 32 32 32H240c61.9 0 112-50.1 112-112c0-2.5-.1-5-.2-7.5z"/></svg></span>
+                        </button>
+                        <ul id="mdbook-theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-ayu">Ayu</button></li>
+                        </ul>
+                        <button id="mdbook-search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="mdbook-searchbar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352c79.5 0 144-64.5 144-144s-64.5-144-144-144S64 128.5 64 208s64.5 144 144 144z"/></svg></span>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">机器视觉工程实战：用 Rust 看懂图像与模型</h1>
+
+                    <div class="right-buttons">
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <span class=fa-svg id="print-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M128 0C92.7 0 64 28.7 64 64v96h64V64H354.7L384 93.3V160h64V93.3c0-17-6.7-33.3-18.7-45.3L400 18.7C388 6.7 371.7 0 354.7 0H128zM384 352v32 64H128V384 368 352H384zm64 32h32c17.7 0 32-14.3 32-32V256c0-35.3-28.7-64-64-64H64c-35.3 0-64 28.7-64 64v96c0 17.7 14.3 32 32 32H64v64c0 35.3 28.7 64 64 64H384c35.3 0 64-28.7 64-64V384zm-16-88c-13.3 0-24-10.7-24-24s10.7-24 24-24s24 10.7 24 24s-10.7 24-24 24z"/></svg></span>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="mdbook-search-wrapper" class="hidden">
+                    <form id="mdbook-searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="mdbook-searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="mdbook-searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <span class=fa-svg id="fa-spin"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M304 48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zm0 416c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM48 304c26.5 0 48-21.5 48-48s-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48zm464-48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM142.9 437c18.7-18.7 18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zm0-294.2c18.7-18.7 18.7-49.1 0-67.9S93.7 56.2 75 75s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zM369.1 437c18.7 18.7 49.1 18.7 67.9 0s18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9z"/></svg></span>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="mdbook-searchresults-outer" class="searchresults-outer hidden">
+                        <div id="mdbook-searchresults-header" class="searchresults-header"></div>
+                        <ul id="mdbook-searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('mdbook-sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('mdbook-sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#mdbook-sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="mdbook-content" class="content">
+                    <main>
+                        <h1 id="第-23-章--拌线检测单拌线双拌线与方向判断"><a class="header" href="#第-23-章--拌线检测单拌线双拌线与方向判断">第 23 章 · 拌线检测：单拌线、双拌线与方向判断</a></h1>
+<blockquote>
+<p><strong>本章导读</strong>：第 21 章我们给每个目标配上了稳定的<strong>跟踪 ID</strong>，第 22 章又用 <strong>ROI</strong> 把“画面里哪块区域算数“圈了出来——这两样都是<strong>空间</strong>层面的过滤。本章在它们之上做一件更“动态“的判断：目标有没有<strong>跨过一条线</strong>、朝哪个方向跨。这就是<strong>拌线检测（tripwire，也叫绊线）</strong>，是人流计数、越界报警最核心的业务过滤器。读完这一章你能：用<strong>叉积（cross product）<strong>判断点落在线的哪一侧、用</strong>线段相交</strong>精准抓住“跨线“那一瞬间、区分“进 / 出“两个方向，并亲手写出<strong>单拌线</strong>的计数骨架，以及更抗误报的<strong>双拌线</strong>状态机。它们正是第 27 章周界入侵报警、第 28 章人流统计的地基。</p>
+</blockquote>
+<hr>
+<h2 id="231-拌线是什么画面里的一条虚拟线"><a class="header" href="#231-拌线是什么画面里的一条虚拟线">23.1 拌线是什么：画面里的一条虚拟线</a></h2>
+<p><strong>拌线</strong>就是你在摄像头画面里画的<strong>一条虚拟线段</strong>（不是真的物理设备，只是软件里的两个端点连成的线）。规则很简单：<strong>当一个目标从线的一侧移动到另一侧，就算它“跨线“了，触发一个事件。</strong></p>
+<p>打两个生活比喻，一下就懂：</p>
+<ul>
+<li><strong>跨过起跑线</strong>：裁判盯着地上那条白线，谁的身体越过去，就记一次“通过“。线是画在地上的，运动员是移动的目标。</li>
+<li><strong>红外对射报警</strong>：走廊两头装一对红外收发器，中间形成一条看不见的“光墙“，有人穿过就报警。拌线就是这堵“光墙“的软件版——只不过它是我们在画面里随便画的一条线，位置、朝向都能自由调。</li>
+</ul>
+<p>它能干的事非常“业务“：</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>场景</th><th>拌线怎么用</th></tr>
+</thead>
+<tbody>
+<tr><td>商场客流</td><td>门口画一条线，进店 +1、出店 −1</td></tr>
+<tr><td>周界入侵</td><td>沿围墙画一条线，有人朝院内方向跨 → 报警</td></tr>
+<tr><td>车流统计</td><td>车道上画一条线，每辆车压过计一次</td></tr>
+<tr><td>电梯口滞留</td><td>配合双拌线，只统计“真正走进去“的人</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="为什么必须基于跟踪-id"><a class="header" href="#为什么必须基于跟踪-id">为什么必须基于跟踪 ID</a></h3>
+<p>这是新手最容易忽略的一点：<strong>拌线判断的不是“某一帧的画面“，而是“同一个目标在相邻两帧的移动“。</strong></p>
+<p>想想“跨线“的本质——它是一个<strong>过程</strong>：某个目标<strong>上一帧</strong>还在线的左边，<strong>这一帧</strong>跑到了线的右边。要判断这件事，你必须能回答“这两帧里的这两个框，是不是<strong>同一个人</strong>“。这正是第 21 章多目标跟踪给我们的东西：每个目标有一个<strong>稳定的 <code>id</code></strong>，跨帧不变。</p>
+<p>所以拌线的输入不是零散的检测框，而是带 ID 的 <strong><code>Track</code></strong>（复用全书统一类型）：</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// 复用全书统一类型（写作规范第 6 节），本章不再重复定义
+use crate::{BBox, Track};        // Track { id, bbox, class_id, score }
+use std::collections::HashMap;
+
+/// 画面里的一个点：(x, y)，单位一律是原图像素（写作规范坐标约定）
+type Pt = (f32, f32);
+<span class="boring">}</span></code></pre>
+<p>有了 ID，我们就能给每个目标维护一份“上一帧它在哪“的记录，拿它和这一帧比。没有 ID（比如只有裸检测框），你根本分不清“这一帧线右边的人“和“上一帧线左边的人“是不是同一个，拌线就无从谈起。</p>
+<h2 id="232-核心几何叉积判断点在线的哪一侧"><a class="header" href="#232-核心几何叉积判断点在线的哪一侧">23.2 核心几何：叉积判断点在线的哪一侧</a></h2>
+<p>拌线检测的全部数学，就压缩在一个问题里：<strong>给一条线和一个点，这个点在线的哪一侧？</strong> 解决它的工具叫<strong>叉积</strong>。</p>
+<h3 id="先打比方河流的左岸和右岸"><a class="header" href="#先打比方河流的左岸和右岸">先打比方：河流的左岸和右岸</a></h3>
+<p>把拌线想成一条<strong>有方向的河</strong>，水从端点 $A$ 流向端点 $B$。河把平面分成两半：<strong>左岸</strong>和<strong>右岸</strong>。任意一个点，要么在左岸、要么在右岸、要么正好踩在河中央（线上）。叉积做的事，就是用一个<strong>数的正负号</strong>告诉你：这个点在左岸还是右岸。</p>
+<p>它的算式是（$A$、$B$ 是拌线两端，$P$ 是要判断的点）：</p>
+<p>$$\text{side}(A,B,P) = (B_x - A_x)(P_y - A_y) - (B_y - A_y)(P_x - A_x)$$</p>
+<ul>
+<li>结果 <strong>&gt; 0</strong>：在一侧（记为<strong>正侧</strong>）</li>
+<li>结果 <strong>&lt; 0</strong>：在另一侧（记为<strong>负侧</strong>）</li>
+<li>结果 <strong>= 0</strong>：恰好落在直线上</li>
+</ul>
+<p>正负号具体对应哪个方向，取决于你怎么定 $A$、$B$ 的顺序；不用死记，<strong>算一次就知道</strong>，重要的是“两侧符号相反“这件事。</p>
+<h3 id="用具体数字手算一遍"><a class="header" href="#用具体数字手算一遍">用具体数字手算一遍</a></h3>
+<p>设拌线是一条<strong>竖线</strong>：$A=(100, 50)$（上端）、$B=(100, 300)$（下端）。注意图像坐标里 <strong>x 向右、y 向下</strong>。我们拿两个点来算：</p>
+<p><strong>点 P1 = (60, 180)</strong>，它在竖线<strong>左边</strong>（x 更小）：</p>
+<p>$$\text{side} = (100-100)(180-50) - (300-50)(60-100) = 0\times130 - 250\times(-40) = 0 - (-10000) = +10000$$</p>
+<p><strong>点 P2 = (140, 180)</strong>，它在竖线<strong>右边</strong>（x 更大）：</p>
+<p>$$\text{side} = (100-100)(180-50) - (300-50)(140-100) = 0\times130 - 250\times40 = 0 - 10000 = -10000$$</p>
+<p>结论一目了然：<strong>画面左边的点算出来是正号，右边的点是负号。</strong> 一条线把世界分成“正侧 / 负侧“，靠的就是这个符号。配张图：</p>
+<pre><code class="language-text">   叉积 side(A, B, p) 的符号 = 点 p 在有向线 A-&gt;B 的哪一侧
+
+               A (100, 50)
+                *
+    左侧(x 小)  |  右侧(x 大)
+   P1(60,180)  |  P2(140,180)
+      o         |     o
+   side=+10000  |  side=-10000
+     (正侧)     |    (负侧)
+                *
+               B (100, 300)
+</code></pre>
+<p>翻成 Rust，就是一行乘减法：</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>/// 叉积符号：点 p 相对"有向线段 a-&gt;b"在哪一侧
+/// 返回值 &gt; 0 一侧、&lt; 0 另一侧、== 0 恰好落在线上
+fn side(a: Pt, b: Pt, p: Pt) -&gt; f32 {
+    (b.0 - a.0) * (p.1 - a.1) - (b.1 - a.1) * (p.0 - a.0)
+}
+<span class="boring">}</span></code></pre>
+<p>就这么短。但别小看它——单拌线的方向判断、双拌线的过线检测，全都建立在这个 <code>side</code> 上。</p>
+<h2 id="233-从在哪侧到跨没跨线段相交"><a class="header" href="#233-从在哪侧到跨没跨线段相交">23.3 从“在哪侧“到“跨没跨“：线段相交</a></h2>
+<p>知道点在哪一侧，还不等于知道它“跨线“了。跨线是一个<strong>变化</strong>：目标的代表点<strong>上一帧在正侧、这一帧到了负侧</strong>（或反过来）。</p>
+<h3 id="代表点拿目标的哪个点去判断"><a class="header" href="#代表点拿目标的哪个点去判断">代表点：拿目标的哪个点去判断</a></h3>
+<p>一个目标是一个框，不是一个点。我们得先从框里挑一个<strong>代表点（representative point）<strong>来代表它的位置。最常用的是</strong>底边中点</strong>——因为对站立的人、地面上的车来说，这个点就是它“脚踩在地面上的位置“，最贴合“它到底走到了地面上的哪里“。</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>/// 目标的代表点：底边中点（站立的人/地面车辆，约等于"脚的位置"）
+fn foot_point(b: &amp;BBox) -&gt; Pt {
+    ((b.x1 + b.x2) * 0.5, b.y2) // x 取左右中点，y 取框底
+}
+<span class="boring">}</span></code></pre>
+<blockquote>
+<p>顶视（俯拍）摄像头下，人是“一个头顶“，用框的几何中心 <code>BBox::center()</code> 更合适。代表点选错是常见坑，23.8 会专门说。</p>
+</blockquote>
+<h3 id="方法一简单只看两帧的符号变没变"><a class="header" href="#方法一简单只看两帧的符号变没变">方法一（简单）：只看两帧的符号变没变</a></h3>
+<p>最朴素的判据：把拌线当成<strong>一条无限长的直线</strong>，只要目标代表点从正侧变到负侧（或反之），就算跨线：</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let s_prev = side(a, b, p_prev); // 上一帧在哪侧
+let s_curr = side(a, b, p_curr); // 这一帧在哪侧
+let crossed = s_prev * s_curr &lt; 0.0; // 一正一负 =&gt; 换侧了 =&gt; 跨线
+<span class="boring">}</span></code></pre>
+<p><code>s_prev * s_curr &lt; 0.0</code> 是个小技巧：两个数<strong>一正一负</strong>，乘积才为负。这行代码在很多简单场景里够用了。但它有个毛病——它把拌线当成了<strong>无限长的直线</strong>，目标从线段<strong>端点外侧</strong>掠过时也会误判。</p>
+<h3 id="方法二稳线段相交"><a class="header" href="#方法二稳线段相交">方法二（稳）：线段相交</a></h3>
+<p>更严谨的做法：把“目标这一步的移动“也看成一条<strong>线段</strong> <code>p_prev -&gt; p_curr</code>，判断它和<strong>拌线线段</strong> <code>A—B</code> 是不是真的<strong>交叉</strong>。这解决了两个方法一处理不好的问题：</p>
+<pre><code class="language-text">  (1) 快速目标一帧跨很远：
+      只盯"点在不在线上"会漏，因为它从没"踩"在线上过；
+      看"移动线段 与 拌线 是否相交"就能稳稳抓住。
+
+     p_prev o- - - - - -|- - - - - -&gt; o p_curr
+                     拌线 |
+                       （两线段相交 =&gt; 触发）
+
+  (2) 无限直线 vs 有限线段：目标从拌线端点"外侧"经过
+      p_prev o───────► o p_curr   (从 A 端上方掠过)
+              A========B           &lt;- 拌线真正的范围就这么长
+                       :
+                       :  (A—B 的延长线)
+      =&gt; 换侧了(叉积变号)，但根本没穿过线段本身 =&gt; 不该触发
+</code></pre>
+<p>线段相交怎么判？还是用 <code>side</code>。两条线段 $ab$、$cd$ <strong>真正交叉</strong>，当且仅当：<strong>$a$、$b$ 分居直线 $cd$ 的两侧，同时 $c$、$d$ 也分居直线 $ab$ 的两侧</strong>。四次叉积搞定：</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>/// 线段 (a,b) 与线段 (c,d) 是否交叉（一般位置版，暂不处理三点共线的退化情况）
+fn segments_intersect(a: Pt, b: Pt, c: Pt, d: Pt) -&gt; bool {
+    let d1 = side(c, d, a);
+    let d2 = side(c, d, b);
+    let d3 = side(a, b, c);
+    let d4 = side(a, b, d);
+    // a、b 分居 cd 两侧，且 c、d 分居 ab 两侧 =&gt; 两线段真正交叉
+    ((d1 &gt; 0.0 &amp;&amp; d2 &lt; 0.0) || (d1 &lt; 0.0 &amp;&amp; d2 &gt; 0.0))
+        &amp;&amp; ((d3 &gt; 0.0 &amp;&amp; d4 &lt; 0.0) || (d3 &lt; 0.0 &amp;&amp; d4 &gt; 0.0))
+}
+<span class="boring">}</span></code></pre>
+<blockquote>
+<p>这里用的是“一般位置“版本，假设不会出现“点恰好落在线上“（叉积正好 = 0）的巧合。对浮点像素坐标，这种巧合几乎不发生；真要较真，工程上会在 <code>== 0</code> 时再补一个“点是否落在线段范围内“的判断。生产系统里<strong>优先用方法二</strong>，它更稳、也顺带解决了下面要讲的“快速目标跳过线“的坑。</p>
+</blockquote>
+<h2 id="234-方向判断ab-还是-ba"><a class="header" href="#234-方向判断ab-还是-ba">23.4 方向判断：A→B 还是 B→A</a></h2>
+<p>拌线不光要知道“跨了没有“，通常还要知道“往哪个方向跨“——进店还是出店、进院还是出院。方向信息其实<strong>免费</strong>藏在叉积符号的<strong>变化方向</strong>里：</p>
+<ul>
+<li>符号 <strong>正 → 负</strong>：从正侧跨到负侧，记作一个方向；</li>
+<li>符号 <strong>负 → 正</strong>：从负侧跨到正侧，记作反方向。</li>
+</ul>
+<p>用上一节竖线的数字：目标上一帧在 P1(60,180)（正侧，+10000），这一帧到了 P2(140,180)（负侧，−10000），就是“正 → 负“这个方向。哪个方向叫“进“、哪个叫“出“，是你在项目里<strong>配置一次</strong>的业务约定，和几何无关。</p>
+<p>我们用一个枚举把两个方向和“没跨线“钉死：</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>/// 一次跨线事件的方向（两个方向的业务含义由你配置，例如"进 / 出"）
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CrossDir {
+    AtoB, // 正侧 -&gt; 负侧，例如"进"
+    BtoA, // 负侧 -&gt; 正侧，例如"出"
+    None, // 这一步没有跨线
+}
+
+/// 判断相邻两帧的移动是否跨过拌线 (wire_a, wire_b)，并给出方向
+fn cross_dir(wire_a: Pt, wire_b: Pt, p_prev: Pt, p_curr: Pt) -&gt; CrossDir {
+    // 先用线段相交确认：确实跨过了"这条线段"，而不是它的延长线
+    if !segments_intersect(wire_a, wire_b, p_prev, p_curr) {
+        return CrossDir::None;
+    }
+    // 再用叉积符号的变化方向定"向"
+    let s_prev = side(wire_a, wire_b, p_prev);
+    let s_curr = side(wire_a, wire_b, p_curr);
+    if s_prev &gt; 0.0 &amp;&amp; s_curr &lt; 0.0 {
+        CrossDir::AtoB
+    } else if s_prev &lt; 0.0 &amp;&amp; s_curr &gt; 0.0 {
+        CrossDir::BtoA
+    } else {
+        CrossDir::None // 理论上相交时不会走到这，留作兜底
+    }
+}
+<span class="boring">}</span></code></pre>
+<p>一个函数就把“跨没跨 + 往哪跨“两件事一起答了：先用 <code>segments_intersect</code> 确认是真跨过了这条<strong>线段</strong>，再用两帧的符号变化定方向。</p>
+<h2 id="235-单拌线完整判定骨架"><a class="header" href="#235-单拌线完整判定骨架">23.5 单拌线：完整判定骨架</a></h2>
+<p><strong>单拌线（single tripwire）</strong> 就是一条线：目标每跨一次就计一次数或报一次警，并按方向分别累加。要把它跑起来，只差一件事——<strong>给每个 <code>track_id</code> 缓存“上一帧的代表点“</strong>，这样下一帧来了才有 <code>p_prev</code> 可比。</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>/// 单拌线：一条线段 (p1, p2) + 每个 track 上一帧代表点的缓存
+pub struct Tripwire {
+    p1: Pt,                    // 拌线端点 1
+    p2: Pt,                    // 拌线端点 2
+    last_pt: HashMap&lt;u64, Pt&gt;, // track_id -&gt; 上一帧代表点
+    pub in_count: u64,         // AtoB 方向累计（例如"进"）
+    pub out_count: u64,        // BtoA 方向累计（例如"出"）
+}
+
+impl Tripwire {
+    pub fn new(p1: Pt, p2: Pt) -&gt; Self {
+        Self { p1, p2, last_pt: HashMap::new(), in_count: 0, out_count: 0 }
+    }
+
+    /// 喂入这一帧所有跟踪目标，返回本帧发生的跨线事件 (track_id, 方向)
+    pub fn update(&amp;mut self, tracks: &amp;[Track]) -&gt; Vec&lt;(u64, CrossDir)&gt; {
+        let mut events = Vec::new();
+        for t in tracks {
+            let p_curr = foot_point(&amp;t.bbox);
+            // 只有能拿到"上一帧位置"的 track 才判定；首次出现的只记录、不判定
+            if let Some(&amp;p_prev) = self.last_pt.get(&amp;t.id) {
+                match cross_dir(self.p1, self.p2, p_prev, p_curr) {
+                    CrossDir::AtoB =&gt; { self.in_count += 1; events.push((t.id, CrossDir::AtoB)); }
+                    CrossDir::BtoA =&gt; { self.out_count += 1; events.push((t.id, CrossDir::BtoA)); }
+                    CrossDir::None =&gt; {}
+                }
+            }
+            self.last_pt.insert(t.id, p_curr); // 更新"上一帧位置"
+        }
+        events
+        // 工程提示：还应定期清理已消失 track 的缓存，否则 last_pt 会无限增长；
+        // 具体的"目标何时算消失"由第 21 章的跟踪器生命周期决定。
+    }
+}
+<span class="boring">}</span></code></pre>
+<p><strong>走一遍</strong>：某个 <code>id=7</code> 的人，上一帧代表点在 (60,180)（正侧），这一帧走到 (140,180)（负侧）。<code>update</code> 里 <code>cross_dir</code> 先确认移动线段和拌线相交（人是横着穿过竖线的，相交），再看符号 <code>+ -&gt; -</code>，返回 <code>AtoB</code>，于是 <code>in_count</code> 加一、事件 <code>(7, AtoB)</code> 入列。下一帧它继续往右走、不再碰线，<code>cross_dir</code> 返回 <code>None</code>，计数不动。这就是单拌线的全部逻辑。</p>
+<p>单拌线<strong>简单、够用</strong>，但它有个软肋：只要目标在<strong>线附近来回抖一下</strong>（跟踪框轻微晃动、或人真的在门口犹豫），代表点就可能反复穿越，触发一串“进出进出“的假事件。要更稳，就上双拌线。</p>
+<h2 id="236-双拌线状态机与依次跨越"><a class="header" href="#236-双拌线状态机与依次跨越">23.6 双拌线：状态机与“依次跨越“</a></h2>
+<p><strong>双拌线（double tripwire）</strong> 用<strong>两条平行线</strong> A 和 B，规则升级为：<strong>目标必须依次跨过 A 再跨过 B，才算一次有效通过。</strong> 顺序 A→B 记为一个方向（比如“进“），顺序 B→A 记为反方向（“出”）。</p>
+<blockquote>
+<p>注意：这一节的 <strong>A、B 指两条线</strong>；上一节的 A、B 指<strong>同一条线的两侧</strong>，别混淆。</p>
+</blockquote>
+<p>为什么这样更好？因为它把“通过“从<strong>一个瞬间</strong>升级成了<strong>一段有先后的过程</strong>，天然过滤掉大量误触：</p>
+<ul>
+<li><strong>抗徘徊/误触</strong>：只在一条线附近晃、没走到第二条线，永远不计数；</li>
+<li><strong>方向更准</strong>：方向由“先碰哪条线“这个<strong>顺序</strong>决定，比单看一次叉积符号更可靠——哪怕目标斜着走、框在抖，只要它是“先过 A 后过 B“，方向就是确定的。</li>
+</ul>
+<pre><code class="language-text">   双拌线：必须依次跨过 A 再跨过 B，才算一次有效通过
+
+        line A        line B
+          |             |
+   进 -&gt;  |   (中间带)   |  -&gt;    先 A 后 B = "进"  (in_count++)
+          |             |
+   出 &lt;-  |             |  &lt;-    先 B 后 A = "出"  (out_count++)
+          |             |
+
+   状态机：
+     Idle --跨A--&gt; HitA --跨B--&gt; 计一次"进"，回 Idle
+     Idle --跨B--&gt; HitB --跨A--&gt; 计一次"出"，回 Idle
+     （只碰一条就走开 / 隔太久没碰第二条 =&gt; 超时重置，视为徘徊）
+</code></pre>
+<p>核心是给每个 <code>track_id</code> 维护一个<strong>状态机</strong>，记录它“先碰到了哪条线、在等哪条线“：</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>/// 每个 track 的过线状态；括号里存"进入该状态时的帧号"，用于超时重置
+#[derive(Clone, Copy)]
+enum PassState {
+    Idle,      // 还没碰任何线
+    HitA(u64), // 先跨了 A，正在等着跨 B
+    HitB(u64), // 先跨了 B，正在等着跨 A
+}
+
+pub struct DoubleTripwire {
+    line_a: (Pt, Pt),
+    line_b: (Pt, Pt),
+    last_pt: HashMap&lt;u64, Pt&gt;,        // track_id -&gt; 上一帧代表点
+    state: HashMap&lt;u64, PassState&gt;,   // track_id -&gt; 过线状态
+    max_gap: u64,                     // 跨完第一条线后，最多等几帧就得跨第二条，否则作废
+    pub in_count: u64,                // 依次 A-&gt;B（"进"）
+    pub out_count: u64,               // 依次 B-&gt;A（"出"）
+}
+
+impl DoubleTripwire {
+    pub fn new(line_a: (Pt, Pt), line_b: (Pt, Pt), max_gap: u64) -&gt; Self {
+        Self {
+            line_a, line_b,
+            last_pt: HashMap::new(),
+            state: HashMap::new(),
+            max_gap, // 例如 30fps 下填 30，即最多允许两条线间隔 1 秒
+            in_count: 0, out_count: 0,
+        }
+    }
+
+    /// frame 是当前帧号（用于超时判断），tracks 是本帧所有跟踪目标
+    pub fn update(&amp;mut self, tracks: &amp;[Track], frame: u64) -&gt; Vec&lt;(u64, CrossDir)&gt; {
+        let mut events = Vec::new();
+        for t in tracks {
+            let p_curr = foot_point(&amp;t.bbox);
+            // 首帧出现的目标：只记录位置，下一帧才有 p_prev 可比
+            let p_prev = match self.last_pt.get(&amp;t.id) {
+                Some(&amp;p) =&gt; p,
+                None =&gt; { self.last_pt.insert(t.id, p_curr); continue; }
+            };
+
+            // 这一步是否分别跨过了 A / B（用线段相交，天然防"快速目标跳过线"）
+            let hit_a = segments_intersect(self.line_a.0, self.line_a.1, p_prev, p_curr);
+            let hit_b = segments_intersect(self.line_b.0, self.line_b.1, p_prev, p_curr);
+
+            let st = *self.state.get(&amp;t.id).unwrap_or(&amp;PassState::Idle);
+            let next = match st {
+                PassState::Idle =&gt; {
+                    if hit_a { PassState::HitA(frame) }
+                    else if hit_b { PassState::HitB(frame) }
+                    else { PassState::Idle }
+                }
+                PassState::HitA(f0) =&gt; {
+                    if hit_b {
+                        // 先 A 后 B：一次完整的"进"
+                        self.in_count += 1;
+                        events.push((t.id, CrossDir::AtoB));
+                        PassState::Idle
+                    } else if hit_a || frame - f0 &gt; self.max_gap {
+                        PassState::Idle // 又退回 A，或等太久（徘徊）=&gt; 作废重置
+                    } else {
+                        PassState::HitA(f0) // 继续等 B
+                    }
+                }
+                PassState::HitB(f0) =&gt; {
+                    if hit_a {
+                        self.out_count += 1;
+                        events.push((t.id, CrossDir::BtoA));
+                        PassState::Idle
+                    } else if hit_b || frame - f0 &gt; self.max_gap {
+                        PassState::Idle
+                    } else {
+                        PassState::HitB(f0)
+                    }
+                }
+            };
+            self.state.insert(t.id, next);
+            self.last_pt.insert(t.id, p_curr);
+        }
+        events
+    }
+}
+<span class="boring">}</span></code></pre>
+<p>读一遍状态转移就懂了：目标在 <code>Idle</code> 时先跨了 A，进入 <code>HitA</code>，开始“等 B“；如果它接着跨了 B，就是一次干净的“进“，计数后回到 <code>Idle</code>；如果它没等来 B、反而又退回跨了 A，或者磨蹭超过 <code>max_gap</code> 帧还没动静，就当它在<strong>徘徊</strong>，直接重置作废。B→A 方向完全对称。</p>
+<blockquote>
+<p><strong>一个边界情况</strong>：如果两条线挨得太近、目标又太快，可能一帧之内同时 <code>hit_a &amp;&amp; hit_b</code>。上面的代码在 <code>Idle</code> 时会先记成 <code>HitA</code>，方向可能判不准。解决办法是<strong>把两条线拉开一点</strong>（间距大于目标一帧的位移），或提高帧率。<code>max_gap</code> 太小也会漏掉走得慢的人，需要按现场步速和帧率调。</p>
+</blockquote>
+<h2 id="237-组合与计数拌线--roi--方向"><a class="header" href="#237-组合与计数拌线--roi--方向">23.7 组合与计数：拌线 + ROI + 方向</a></h2>
+<p>拌线很少单独用，真实项目里常和前两章的过滤器叠起来，规则越叠越精准：</p>
+<ul>
+<li><strong>拌线 + ROI（第 22 章）</strong>：只统计“跨线点落在某个 ROI 内“的事件。比如画面远处背景里也有条路，但你只关心店门口那一小块，就用 ROI 把跨线事件限定在门口区域，远处的行人跨线一律忽略。</li>
+<li><strong>拌线 + 方向</strong>：周界报警往往<strong>只关心一个方向</strong>——只在目标朝“院内“方向跨线（比如只对 <code>CrossDir::AtoB</code>）时才报警，从院里出来的不管。判定时对 <code>events</code> 里的方向做个筛选即可。</li>
+<li><strong>拌线 + 类别（<code>Track.class_id</code>）</strong>：车道拌线只数 <code>class_id == car</code>（COCO 中 <code>car=2</code>），门口客流只数 <code>person</code>（<code>person=0</code>），把不相干的类别过滤掉。</li>
+</ul>
+<p><strong>进出计数</strong>是拌线最典型的产出，做法就是把两个方向<strong>分别累加</strong>——这正是前面 <code>in_count</code> / <code>out_count</code> 干的事：</p>
+<pre><code class="language-text">   in_count  : A-&gt;B 方向累计（进）
+   out_count : B-&gt;A 方向累计（出）
+   当前区域内人数 ≈ in_count - out_count
+</code></pre>
+<p>“当前区域人数 = 进 − 出“是人流看板最常见的指标。但要提醒一句：这个差值<strong>对漏计/重计极其敏感</strong>——少数一个进、或多数一个出，误差会一直累积下去，越到后面越离谱。怎么防止重复计数、给事件加冷却，是第 24 章的主题，也是让这套计数真正可用的关键一环。</p>
+<h2 id="238-工程坑清单"><a class="header" href="#238-工程坑清单">23.8 工程坑清单</a></h2>
+<p>拌线的数学不难，真正的坑都在工程细节里。下面这些几乎每个项目都会踩：</p>
+<ul>
+<li><strong>代表点选错</strong>：站立的人用底边中点（脚的位置）；俯拍/顶视用几何中心；大货车这种大目标用底边中点也可能因为透视而“提前“或“滞后“跨线。代表点决定了“目标到底算走到哪了“，选之前先想清楚你的相机视角。</li>
+<li><strong>跟踪 ID 跳变</strong>：如果第 21 章的跟踪器在目标跨线的<strong>那一两帧</strong>恰好把 ID 换了（遮挡、检测漏帧导致），新 ID 没有 <code>p_prev</code>，这一次跨线就<strong>漏计</strong>；反过来，一个目标被拆成两个 ID，可能被<strong>重计</strong>两次。这是拌线计数最大的误差来源，缓解手段（去重、冷却）见第 24 章。</li>
+<li><strong>快速目标跨帧“跳过“线</strong>：目标走得快、或帧率低时，它可能上一帧还在线左边一大截、这一帧已经窜到线右边一大截，<strong>从没“踩“在线上</strong>。所以判据一定要用<strong>线段相交</strong>（23.3 方法二），而不是“点是否落在线上“——这也是本章反复强调用 <code>segments_intersect</code> 的原因。</li>
+<li><strong>线画在透视地面上的位置</strong>：画面里的一条线对应地面上的一条线，但因为<strong>透视</strong>，同样长的地面距离在画面远处被压得很窄。线要画在目标代表点<strong>真正会经过的地面位置</strong>上；画高了（画到人的腰部空中）或画在透视严重变形的远景里，都会让跨线时机不准。</li>
+<li><strong>抖动导致反复横跳</strong>：目标停在线上附近，跟踪框每帧抖一两个像素，代表点就可能反复穿越，刷出一串假事件。<strong>双拌线</strong>能挡掉很大一部分（必须走完两条线），剩下的靠第 24 章的冷却时间（cooldown）压制。</li>
+<li><strong>缓存不清理</strong>：<code>last_pt</code> / <code>state</code> 这些 <code>HashMap</code> 要跟着跟踪器的目标生命周期清理已消失的 ID，否则长时间运行会内存越吃越多。</li>
+<li><strong>拌线太靠画面边缘</strong>：目标可能“半个身子“就到边界外了，代表点抖出画面，跨线判定不稳。线尽量画在画面中间、目标完整可见的区域。</li>
+</ul>
+<h2 id="239-小结"><a class="header" href="#239-小结">23.9 小结</a></h2>
+<ul>
+<li><strong>拌线（tripwire）</strong> 是画面里的一条虚拟线段，判断目标有没有<strong>跨过</strong>它、朝哪个方向跨；它是人流计数、越界报警的核心业务过滤器，必须建立在第 21 章的<strong>跟踪 ID</strong> 之上（要比较“同一个目标“相邻两帧的位置）。</li>
+<li>全部数学压缩成一个<strong>叉积</strong> <code>side(a, b, p)</code>：符号告诉你点在有向线的<strong>哪一侧</strong>（正侧 / 负侧），我们用竖线的例子手算验证了“左边为正、右边为负“。</li>
+<li>“跨没跨“要用<strong>线段相交</strong> <code>segments_intersect</code>（四次叉积）判断“移动线段“和“拌线线段“是否真交叉——这比“点在线上“稳，还能抓住快速目标的跨帧跳跃。</li>
+<li><strong>方向</strong>藏在叉积符号的变化里：正→负是一个方向、负→正是反方向，业务上映射成“进 / 出“。</li>
+<li><strong>单拌线</strong>给每个 <code>track_id</code> 缓存上一帧代表点，跨线即按方向计数，简单够用但怕线上抖动；<strong>双拌线</strong>用<strong>状态机</strong>要求目标<strong>依次跨过两条线</strong>，抗徘徊、方向更准，是更工程化的选择。</li>
+<li>拌线常和 <strong>ROI（第 22 章）、方向、类别</strong>叠加使用；进出计数就是两个方向分别累加，但它对漏计/重计敏感，去重与冷却留给第 24 章。这套能力将在第 27 章周界报警、第 28 章人流统计里挑大梁。</li>
+</ul>
+<h2 id="2310-练习"><a class="header" href="#2310-练习">23.10 练习</a></h2>
+<ol>
+<li>
+<p><strong>手算叉积</strong>：拌线端点 $A=(0,0)$、$B=(4,4)$（一条 45° 斜线）。分别计算点 $P=(3,1)$ 和 $Q=(1,3)$ 的 <code>side(A,B,·)</code>，判断它们各在哪一侧（正侧还是负侧）。再用本章的 <code>side</code> 函数跑一遍，核对符号是否一致，并说说这条斜线把平面分成了“哪两半“。</p>
+</li>
+<li>
+<p><strong>两种判据的差别</strong>：拌线是竖线 $A=(100,50)$、$B=(100,300)$。某目标上一帧代表点在 $(90, 400)$、这一帧在 $(110, 400)$（注意 y=400 已在端点 B 的<strong>下方</strong>）。用“方法一“（只看叉积符号 <code>s_prev * s_curr &lt; 0</code>）和“方法二“（<code>segments_intersect</code>）各判一次，看结果是否不同，并解释为什么方法二更对。</p>
+</li>
+<li>
+<p><strong>补一个方向过滤</strong>：给单拌线的 <code>Tripwire::update</code> 返回的 <code>events</code> 写一个筛选函数，只保留 <code>CrossDir::AtoB</code>（“进“方向）的事件，模拟“周界报警只对朝院内跨线的目标报警”。再想想：如果要求同时满足“是 person 类别“，该在哪里加判断（提示：<code>Track.class_id</code>）。</p>
+</li>
+<li>
+<p><strong>双拌线状态机走查</strong>：不写代码，纸上推演。<code>max_gap = 30</code>。一个 <code>id=5</code> 的目标依次经历：第 10 帧跨过 line A、第 15 帧跨过 line B。它的状态怎么变、最终计到 <code>in</code> 还是 <code>out</code>？再换一种：第 10 帧跨 A、之后一直在两线之间徘徊到第 50 帧才跨 B，结果又如何？说明 <code>max_gap</code> 在这里起了什么作用。</p>
+</li>
+</ol>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="ch22-roi-mask.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                            </a>
+
+                            <a rel="next prefetch" href="ch24-cooldown-window.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="ch22-roi-mask.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                    </a>
+
+                    <a rel="next prefetch" href="ch24-cooldown-window.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                    </a>
+            </nav>
+
+        </div>
+
+        <template id=fa-eye><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M288 32c-80.8 0-145.5 36.8-192.6 80.6C48.6 156 17.3 208 2.5 243.7c-3.3 7.9-3.3 16.7 0 24.6C17.3 304 48.6 356 95.4 399.4C142.5 443.2 207.2 480 288 480s145.5-36.8 192.6-80.6c46.8-43.5 78.1-95.4 93-131.1c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C433.5 68.8 368.8 32 288 32zM432 256c0 79.5-64.5 144-144 144s-144-64.5-144-144s64.5-144 144-144s144 64.5 144 144zM288 192c0 35.3-28.7 64-64 64c-11.5 0-22.3-3-31.6-8.4c-.2 2.8-.4 5.5-.4 8.4c0 53 43 96 96 96s96-43 96-96s-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6z"/></svg></span></template>
+        <template id=fa-eye-slash><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M38.8 5.1C28.4-3.1 13.3-1.2 5.1 9.2S-1.2 34.7 9.2 42.9l592 464c10.4 8.2 25.5 6.3 33.7-4.1s6.3-25.5-4.1-33.7L525.6 386.7c39.6-40.6 66.4-86.1 79.9-118.4c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C465.5 68.8 400.8 32 320 32c-68.2 0-125 26.3-169.3 60.8L38.8 5.1zM223.1 149.5C248.6 126.2 282.7 112 320 112c79.5 0 144 64.5 144 144c0 24.9-6.3 48.3-17.4 68.7L408 294.5c5.2-11.8 8-24.8 8-38.5c0-53-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6c0 10.2-2.4 19.8-6.6 28.3l-90.3-70.8zm223.1 298L373 389.9c-16.4 6.5-34.3 10.1-53 10.1c-79.5 0-144-64.5-144-144c0-6.9 .5-13.6 1.4-20.2L83.1 161.5C60.3 191.2 44 220.8 34.5 243.7c-3.3 7.9-3.3 16.7 0 24.6c14.9 35.7 46.2 87.7 93 131.1C174.5 443.2 239.2 480 320 480c47.8 0 89.9-12.9 126.2-32.5z"/></svg></span></template>
+        <template id=fa-copy><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M502.6 70.63l-61.25-61.25C435.4 3.371 427.2 0 418.7 0H255.1c-35.35 0-64 28.66-64 64l.0195 256C192 355.4 220.7 384 256 384h192c35.2 0 64-28.8 64-64V93.25C512 84.77 508.6 76.63 502.6 70.63zM464 320c0 8.836-7.164 16-16 16H255.1c-8.838 0-16-7.164-16-16L239.1 64.13c0-8.836 7.164-16 16-16h128L384 96c0 17.67 14.33 32 32 32h47.1V320zM272 448c0 8.836-7.164 16-16 16H63.1c-8.838 0-16-7.164-16-16L47.98 192.1c0-8.836 7.164-16 16-16H160V128H63.99c-35.35 0-64 28.65-64 64l.0098 256C.002 483.3 28.66 512 64 512h192c35.2 0 64-28.8 64-64v-32h-47.1L272 448z"/></svg></span></template>
+        <template id=fa-play><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M73 39c-14.8-9.1-33.4-9.4-48.5-.9S0 62.6 0 80V432c0 17.4 9.4 33.4 24.5 41.9s33.7 8.1 48.5-.9L361 297c14.3-8.7 23-24.2 23-41s-8.7-32.2-23-41L73 39z"/></svg></span></template>
+        <template id=fa-clock-rotate-left><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M75 75L41 41C25.9 25.9 0 36.6 0 57.9V168c0 13.3 10.7 24 24 24H134.1c21.4 0 32.1-25.9 17-41l-30.8-30.8C155 85.5 203 64 256 64c106 0 192 86 192 192s-86 192-192 192c-40.8 0-78.6-12.7-109.7-34.4c-14.5-10.1-34.4-6.6-44.6 7.9s-6.6 34.4 7.9 44.6C151.2 495 201.7 512 256 512c141.4 0 256-114.6 256-256S397.4 0 256 0C185.3 0 121.3 28.7 75 75zm181 53c-13.3 0-24 10.7-24 24V256c0 6.4 2.5 12.5 7 17l72 72c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9l-65-65V152c0-13.3-10.7-24-24-24z"/></svg></span></template>
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="elasticlunr-ef4e11c1.min.js"></script>
+        <script src="mark-09e88c2c.min.js"></script>
+        <script src="searcher-09f2665d.js"></script>
+
+        <script src="clipboard-1626706a.min.js"></script>
+        <script src="highlight-abc7f01d.js"></script>
+        <script src="book-609e4cb8.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+
+    </div>
+    </body>
+</html>

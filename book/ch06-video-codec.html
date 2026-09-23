@@ -1,0 +1,564 @@
+<!DOCTYPE HTML>
+<html lang="zh" class="rust sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>第 6 章 · 视频编解码与流：帧、码流与 RTSP - 机器视觉工程实战：用 Rust 看懂图像与模型</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="一本面向零基础读者的机器视觉工程教程：从像素、编解码、预处理、推理、后处理到模型转换，全部用 Rust 动手实现。">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="favicon-de23e50b.svg">
+        <link rel="shortcut icon" href="favicon-8114d1fc.png">
+        <link rel="stylesheet" href="css/variables-8adf115d.css">
+        <link rel="stylesheet" href="css/general-e96d0476.css">
+        <link rel="stylesheet" href="css/chrome-d279d366.css">
+        <link rel="stylesheet" href="css/print-9e4910d8.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="fonts/fonts-9644e21d.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="mdbook-highlight-css" href="highlight-493f70e1.css">
+        <link rel="stylesheet" id="mdbook-tomorrow-night-css" href="tomorrow-night-4c0ae647.css">
+        <link rel="stylesheet" id="mdbook-ayu-highlight-css" href="ayu-highlight-3fdfc3ac.css">
+
+        <!-- Custom theme stylesheets -->
+
+        <!-- MathJax -->
+        <script async src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "";
+            const default_light_theme = "rust";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "searchindex-4d8e5ec0.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="toc-c1d54236.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="mdbook-body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('rust')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="mdbook-sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("mdbook-sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="mdbook-sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="toc.html"></iframe>
+            </noscript>
+            <div id="mdbook-sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="mdbook-page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="mdbook-menu-bar-hover-placeholder"></div>
+                <div id="mdbook-menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="mdbook-sidebar-toggle" class="icon-button" for="mdbook-sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="mdbook-sidebar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M0 96C0 78.3 14.3 64 32 64H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H416c17.7 0 32 14.3 32 32z"/></svg></span>
+                        </label>
+                        <button id="mdbook-theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="mdbook-theme-list">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M371.3 367.1c27.3-3.9 51.9-19.4 67.2-42.9L600.2 74.1c12.6-19.5 9.4-45.3-7.6-61.2S549.7-4.4 531.1 9.6L294.4 187.2c-24 18-38.2 46.1-38.4 76.1L371.3 367.1zm-19.6 25.4l-116-104.4C175.9 290.3 128 339.6 128 400c0 3.9 .2 7.8 .6 11.6c1.8 17.5-10.2 36.4-27.8 36.4H96c-17.7 0-32 14.3-32 32s14.3 32 32 32H240c61.9 0 112-50.1 112-112c0-2.5-.1-5-.2-7.5z"/></svg></span>
+                        </button>
+                        <ul id="mdbook-theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-ayu">Ayu</button></li>
+                        </ul>
+                        <button id="mdbook-search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="mdbook-searchbar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352c79.5 0 144-64.5 144-144s-64.5-144-144-144S64 128.5 64 208s64.5 144 144 144z"/></svg></span>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">机器视觉工程实战：用 Rust 看懂图像与模型</h1>
+
+                    <div class="right-buttons">
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <span class=fa-svg id="print-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M128 0C92.7 0 64 28.7 64 64v96h64V64H354.7L384 93.3V160h64V93.3c0-17-6.7-33.3-18.7-45.3L400 18.7C388 6.7 371.7 0 354.7 0H128zM384 352v32 64H128V384 368 352H384zm64 32h32c17.7 0 32-14.3 32-32V256c0-35.3-28.7-64-64-64H64c-35.3 0-64 28.7-64 64v96c0 17.7 14.3 32 32 32H64v64c0 35.3 28.7 64 64 64H384c35.3 0 64-28.7 64-64V384zm-16-88c-13.3 0-24-10.7-24-24s10.7-24 24-24s24 10.7 24 24s-10.7 24-24 24z"/></svg></span>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="mdbook-search-wrapper" class="hidden">
+                    <form id="mdbook-searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="mdbook-searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="mdbook-searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <span class=fa-svg id="fa-spin"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M304 48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zm0 416c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM48 304c26.5 0 48-21.5 48-48s-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48zm464-48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM142.9 437c18.7-18.7 18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zm0-294.2c18.7-18.7 18.7-49.1 0-67.9S93.7 56.2 75 75s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zM369.1 437c18.7 18.7 49.1 18.7 67.9 0s18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9z"/></svg></span>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="mdbook-searchresults-outer" class="searchresults-outer hidden">
+                        <div id="mdbook-searchresults-header" class="searchresults-header"></div>
+                        <ul id="mdbook-searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('mdbook-sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('mdbook-sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#mdbook-sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="mdbook-content" class="content">
+                    <main>
+                        <h1 id="第-6-章--视频编解码与流帧码流与-rtsp"><a class="header" href="#第-6-章--视频编解码与流帧码流与-rtsp">第 6 章 · 视频编解码与流：帧、码流与 RTSP</a></h1>
+<blockquote>
+<p><strong>本章导读</strong>：第 5 章我们把镜头对准“一张图片怎么压缩“。这一章把镜头沿时间轴拉长——<strong>一连串图片就是视频</strong>。你会先搞懂帧、帧率、时间戳这套“时间坐标系“，再理解视频压缩的核心秘密：<strong>I/P/B 帧与 GOP</strong>（为什么随便拖动进度条，播放器会先“卡“一下跳到关键帧）。接着分清 <strong>codec（编码）和 container（容器）<strong>这对最容易混淆的概念，认识视频的常见来源（本地文件、USB 摄像头、RTSP/RTMP、GB28181），最后用 <code>opencv</code> 写一个能真正跑起来的</strong>拉流取帧循环</strong>，把每一帧变成第 3 章的图像/张量，交给后续章节做预处理和推理。本章也会点名几个上线必踩的坑：花屏、时间戳跳变、断流重连、延迟越跑越大。读完你就能把“一路摄像头“稳稳地接进你的视觉程序。</p>
+</blockquote>
+<hr>
+<h2 id="61-视频是什么帧帧率与时间戳"><a class="header" href="#61-视频是什么帧帧率与时间戳">6.1 视频是什么：帧、帧率与时间戳</a></h2>
+<p>小时候玩过<strong>手翻书</strong>（在本子每一页画一个小人，快速翻动小人就动起来）吗？视频就是这么回事：</p>
+<ul>
+<li><strong>帧（frame）</strong>：视频里的一张静态图片，就是我们前几章反复处理的那种 RGB 图像。</li>
+<li><strong>帧率（fps，frames per second）</strong>：一秒钟放多少张。电影 24 fps，监控常见 25/30 fps，游戏可能 60 fps。</li>
+<li><strong>时间戳（timestamp）</strong>：每一帧“该在第几毫秒出现“。</li>
+</ul>
+<p><strong>“1 秒 30 帧“到底意味着什么？</strong> 意味着每 <code>1000 ms ÷ 30 ≈ 33.3 ms</code> 就要显示一张新图片。你的处理程序如果每帧要花 50 ms，那就跟不上 30 fps 的流——这是后面所有实时性问题的根源。</p>
+<p><strong>为什么必须压缩？</strong> 我们用小学算术算笔账。一张 1080p（<code>1920×1080</code>）的 RGB 图，每像素 3 字节：</p>
+<pre><code class="language-text">单帧原始大小 = 1920 × 1080 × 3 ≈ 6,220,800 字节 ≈ 6 MB
+1 分钟 30fps = 30 × 60 = 1800 帧
+1 分钟原始视频 ≈ 1800 × 6 MB ≈ 10.6 GB
+</code></pre>
+<p>一分钟就 10 GB，一路摄像头存一天要 15 TB——完全没法用。而同样这一分钟，H.264 压出来可能只有 50~100 MB，<strong>压缩比高达 100~200 倍</strong>。视频编码就是干这个的。</p>
+<p><strong>pts 与 dts。</strong> 每帧带两个时间戳，新手常搞混：</p>
+<ul>
+<li><strong>pts（Presentation Time Stamp，显示时间戳）</strong>：这帧<strong>该在什么时候显示</strong>给人看。</li>
+<li><strong>dts（Decode Time Stamp，解码时间戳）</strong>：这帧<strong>该在什么时候被送进解码器</strong>。</li>
+</ul>
+<p>只有 I/P 帧的简单流里，两者顺序一致；一旦有了 B 帧（下一节讲），“解码顺序“就和“显示顺序“不一样了，pts 和 dts 于是分道扬镳。时间戳通常不是以秒为单位，而是以一个**时基（time base）**为单位（比如网络流常用 <code>1/90000</code> 秒），换算成秒要除以时基——先记住有这回事，用到时再细说。</p>
+<h2 id="62-为什么不能每帧都存-jpeg帧间冗余"><a class="header" href="#62-为什么不能每帧都存-jpeg帧间冗余">6.2 为什么不能每帧都存 JPEG：帧间冗余</a></h2>
+<p>一个自然的念头是：既然第 5 章会把单图压成 JPEG，那视频不就是“一堆 JPEG 摞起来“吗？技术上可行（这叫 MJPEG），但<strong>极其浪费</strong>。</p>
+<p>想象一个盯着停车场的监控摄像头：画面里 98% 是<strong>一动不动</strong>的地面、围墙、车位线，只有一辆车在缓慢移动。如果每帧都独立存成 JPEG，你就把<strong>同一堵墙</strong>重复存了成千上万遍。</p>
+<p>这里有两种“冗余“：</p>
+<ul>
+<li><strong>帧内冗余（intra-frame redundancy）</strong>：一张图片内部相邻像素相似。JPEG 干掉的就是它（第 5 章）。</li>
+<li><strong>帧间冗余（inter-frame redundancy）</strong>：相邻两帧之间高度相似。<strong>这是视频独有的、也是最大的一块可压缩空间</strong>，JPEG 完全没利用。</li>
+</ul>
+<p>用小数字感受一下：如果相邻两帧只有 2% 的像素真正变了，那么“只记录变化的那 2%“，理论上能比“整帧重存“小几十倍。视频编码的核心思路就是：<strong>别重复存不变的部分，只存“帧与帧之间的差”</strong>。怎么存这个“差“？答案就是下一节的 P 帧和 B 帧。</p>
+<h2 id="63-i-帧--p-帧--b-帧-与-gop"><a class="header" href="#63-i-帧--p-帧--b-帧-与-gop">6.3 I 帧 / P 帧 / B 帧 与 GOP</a></h2>
+<p>视频编码器把帧分成三种角色：</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>帧类型</th><th>全称</th><th>通俗理解</th><th>能否单独解码</th><th>典型大小</th></tr>
+</thead>
+<tbody>
+<tr><td><strong>I 帧</strong></td><td>Intra-coded（帧内编码帧，即关键帧）</td><td>一张完整的画面，本质像一张 JPEG</td><td>✅ 能，自给自足</td><td>最大（几十~几百 KB）</td></tr>
+<tr><td><strong>P 帧</strong></td><td>Predicted（前向预测帧）</td><td>只存“和<strong>前面</strong>参考帧的差“</td><td>❌ 不能，得先有参考帧</td><td>中（几 KB）</td></tr>
+<tr><td><strong>B 帧</strong></td><td>Bi-directional（双向预测帧）</td><td>同时参考<strong>前后</strong>帧的差</td><td>❌ 不能</td><td>最小</td></tr>
+</tbody>
+</table>
+</div>
+<p><strong>GOP（Group of Pictures，画面组）</strong>：从一个 I 帧开始，到下一个 I 帧之前的所有帧，组成一个 GOP。相邻两个 I 帧的间隔就是<strong>关键帧间隔</strong>（GOP 长度）。摄像头常见设成 1~2 秒一个 I 帧，也就是 30fps 下 GOP ≈ 30~60 帧。</p>
+<p>一个 GOP 的显示顺序大致长这样：</p>
+<pre><code class="language-text">显示顺序(PTS):  I  B  B  P  B  B  P  B  B  P  |  I  B  B  P ...
+                └──────────── 一个 GOP ─────────┘  └─ 下一个 GOP
+                ↑关键帧                              ↑下一个关键帧
+
+  I 帧：完整画面，可独立解码（GOP 的"锚点"）
+  P 帧：只记录相对前面参考帧的变化
+  B 帧：同时参考前、后帧，压得最狠
+</code></pre>
+<p><strong>为什么随机跳转视频会先跳到最近的关键帧？</strong> 这是本节最该记住的一句话。P 帧、B 帧都是“差值“，<strong>离开参考帧根本没法还原</strong>。所以当你把进度条拖到某个位置时，解码器不能凭空从那一帧开始，它必须：</p>
+<pre><code class="language-text">1. 往前找到最近的一个 I 帧（关键帧）
+2. 从这个 I 帧开始，一帧帧解码 P/B 帧，一路"追"到你想要的那一帧
+</code></pre>
+<p>这就是拖动进度条时那一瞬间“卡顿感“的来源，也是为什么 GOP 越长（关键帧越稀疏）跳转越慢、但压缩率越高——这是个工程取舍。</p>
+<p><strong>B 帧如何让 pts ≠ dts？</strong> B 帧要参考它<strong>后面</strong>的帧，所以那个“后面的帧“必须<strong>先解码</strong>出来。于是解码顺序被迫重排：</p>
+<pre><code class="language-text">显示顺序(PTS):  I₀  B₁  B₂  P₃  B₄  B₅  P₆
+解码顺序(DTS):  I₀  P₃  B₁  B₂  P₆  B₄  B₅
+                    ↑ P₃ 必须抢在 B₁/B₂ 前解码，因为 B₁/B₂ 要参考它
+</code></pre>
+<p>看懂这张图，你就彻底理解 6.1 里 pts/dts 为什么要分开了。（好消息：用 <code>opencv</code>/FFmpeg 拉流时，这些重排解码器都替你处理好了，<code>read()</code> 拿到的帧已经是按显示顺序排好的。）</p>
+<h2 id="64-编码标准-vs-容器codec-与-container"><a class="header" href="#64-编码标准-vs-容器codec-与-container">6.4 编码标准 vs 容器：codec 与 container</a></h2>
+<p>这是新手最容易混的一对概念。打个比方：</p>
+<ul>
+<li><strong>编码（codec）= 用哪种“压缩语言“把画面写小</strong>。</li>
+<li><strong>容器（container）= 一个“盒子/包装“，把压好的视频流、音频流、字幕、元数据装在一起</strong>。</li>
+</ul>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>层面</th><th>常见例子</th><th>作用</th></tr>
+</thead>
+<tbody>
+<tr><td><strong>编码 codec</strong></td><td>H.264/AVC、H.265/HEVC、AV1、VP9</td><td>决定画面<strong>怎么被压小</strong>（算法）</td></tr>
+<tr><td><strong>容器 container</strong></td><td>mp4、mkv、flv、avi、ts</td><td>决定视频+音频+字幕+元数据<strong>怎么打包成一个文件/流</strong></td></tr>
+</tbody>
+</table>
+</div>
+<p>关键点：<strong>文件后缀（容器）不能告诉你里面是什么编码</strong>。一个 <code>.mp4</code> 里可能装的是 H.264，也可能是 H.265；一个 <code>.mkv</code> 里可能是 AV1。所以拿到一个视频，先用 <code>ffprobe in.mp4</code> 看清楚里面到底是哪种 codec，再决定能不能硬解（见 6.6）。</p>
+<p><strong>码流（bitstream）与 NAL 单元（点到为止）。</strong> 编码器吐出来的那一长串压缩字节就叫<strong>码流</strong>。H.264/H.265 会把码流切成一个个 <strong>NAL 单元（Network Abstraction Layer unit，网络抽象层单元）</strong>，每个 NAL 单元是一个自包含的小包：有的装参数（分辨率、编码配置，叫 SPS/PPS），有的装一个 I/P/B 帧的一片数据。为什么要切成小包？因为这样才方便<strong>在网络上一包一包地传</strong>——这正是下一节 RTSP 网络摄像头的工作方式。你暂时不用会手写 NAL 解析，知道“网络传的是一个个 NAL 单元“即可。</p>
+<h2 id="65-视频从哪来文件usbrtsprtmpgb28181"><a class="header" href="#65-视频从哪来文件usbrtsprtmpgb28181">6.5 视频从哪来：文件、USB、RTSP/RTMP、GB28181</a></h2>
+<p>工程里视频源无非这么几类：</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>来源</th><th>典型形式</th><th>说明</th></tr>
+</thead>
+<tbody>
+<tr><td><strong>本地文件</strong></td><td><code>test.mp4</code>、<code>clip.mkv</code></td><td>离线分析、算法调试最常用，稳定可复现</td></tr>
+<tr><td><strong>USB 摄像头</strong></td><td>Linux <code>/dev/video0</code>；OpenCV 里用索引 <code>0</code></td><td>UVC 协议免驱，笔记本自带摄像头也算</td></tr>
+<tr><td><strong>RTSP 网络摄像头</strong></td><td><code>rtsp://user:pass@192.168.1.64:554/Streaming/Channels/101</code></td><td>海康/大华等 IP Cam 的主流方式，程序主动去“<strong>拉流</strong>“</td></tr>
+<tr><td><strong>RTMP</strong></td><td><code>rtmp://server/live/stream</code></td><td>直播场景常见，通常是把流“<strong>推</strong>“到流媒体服务器</td></tr>
+<tr><td><strong>GB28181</strong></td><td>SIP 信令 + 媒体流</td><td>国内安防国标：设备先注册到平台，平台再下发指令取流</td></tr>
+</tbody>
+</table>
+</div>
+<p>几点工程经验：</p>
+<ul>
+<li>**RTSP（Real Time Streaming Protocol，实时流协议）**是安防项目里 90% 会遇到的形式。URL 里的路径（<code>/Streaming/Channels/101</code> 之类）各家厂商不同，一般去摄像头后台或厂商文档查；<code>101</code> 常表示“通道 1 主码流“，<code>102</code> 是子码流（分辨率低、更省带宽，抽帧分析常用子码流）。</li>
+<li><strong>RTMP</strong> 更多是“推流“方向（往服务器送），拉流分析较少直接对接它。</li>
+<li><strong>GB28181</strong> 是国内公安/安防的联网国标，基于 SIP 做信令（设备注册、点播、云台控制），真正的画面数据往往还是一路媒体流。工程上通常由专门的信令网关处理注册和点播，<strong>你的视觉程序最终拿到的，多半还是一路可以用 FFmpeg/OpenCV 打开的流地址</strong>。所以本章重点讲通用的“拉流取帧“，它对上面所有来源都适用。</li>
+</ul>
+<h2 id="66-抽帧策略与硬件解码"><a class="header" href="#66-抽帧策略与硬件解码">6.6 抽帧策略与硬件解码</a></h2>
+<p>拿到一路流，不代表每一帧都要处理。<strong>抽帧（取哪些帧来分析）是实时系统的第一个设计决策。</strong></p>
+<p><strong>策略一：解码全部帧。</strong> 跟踪（第 21 章）、拌线计数（第 23 章）、动作识别这类任务需要<strong>连续帧</strong>，必须逐帧解码，一帧不落。</p>
+<p><strong>策略二：只取关键帧（I 帧）做稀疏分析。</strong> 如果只是“每隔一会儿看看画面里有没有人/车“，完全不必解码 P/B 帧——只挑 I 帧（或每秒抽 1 帧）送去检测/分类，计算量骤降。因为 I 帧本来就能独立解码，抽起来最省事。</p>
+<p><strong>策略三：实时流按需丢帧保时效。</strong> 这是本节的重点。如果你的模型每帧要 80 ms（≈12 fps），而流是 30 fps，那流每秒送 30 帧、你只吃得下 12 帧。<strong>多出来的帧不能排队等</strong>，否则你处理的永远是“几秒前“的旧画面，延迟越拖越长（详见 6.10）。正确做法：<strong>只保留最新帧，旧帧直接丢</strong>。宁可漏看几帧，也要保证“现在看到的就是现在“。</p>
+<p><strong>硬件解码（hardware decoding）：边缘设备的生命线。</strong> 软件解码（CPU 硬算）1080p H.264 30fps，往往要吃掉整整一个 CPU 核心——一路就吃满一核，四路摄像头 CPU 就爆了，哪还有算力留给模型推理？<strong>硬件解码</strong>用的是芯片里专门的解码电路：</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>硬解方案</th><th>平台</th><th>场景</th></tr>
+</thead>
+<tbody>
+<tr><td><strong>NVDEC</strong></td><td>NVIDIA 显卡 / Jetson</td><td>服务器、边缘 GPU 盒子</td></tr>
+<tr><td><strong>VAAPI</strong></td><td>Intel 核显 / AMD（Linux）</td><td>x86 边缘盒子、工控机</td></tr>
+<tr><td><strong>RKMPP</strong></td><td>瑞芯微 Rockchip（RK3588 等）</td><td>ARM 边缘设备，国产方案常见</td></tr>
+<tr><td><strong>VideoToolbox</strong></td><td>Apple（macOS/iOS）</td><td>Mac 上开发/推理</td></tr>
+</tbody>
+</table>
+</div>
+<p><strong>为什么边缘设备一定要用硬解？</strong> 两个原因：一是<strong>省 CPU</strong>——把解码卸载给专用电路，CPU/GPU 腾出来跑模型；二是<strong>少一次内存搬运</strong>——硬解出来的帧可以直接留在 GPU 显存里，喂给 GPU 上的模型推理，省掉“显存→内存→显存“的来回拷贝（这类零拷贝优化留到第 29 章展开）。边缘芯片（如 RK3588、Jetson）的 CPU 往往很弱，不用硬解基本没法多路并发。</p>
+<h2 id="67-rust-实操用-opencv-拉流取帧"><a class="header" href="#67-rust-实操用-opencv-拉流取帧">6.7 Rust 实操：用 opencv 拉流取帧</a></h2>
+<p>原理讲完，上代码。最省心的方案是 <code>opencv</code> crate 的 <code>VideoCapture</code>——它底层走 FFmpeg，<strong>本地文件、USB 摄像头、RTSP 一套 API 全搞定</strong>。</p>
+<blockquote>
+<p><strong>依赖较重、可选</strong>：<code>opencv</code> crate 需要系统先装好 OpenCV 本体和 clang。</p>
+<ul>
+<li>macOS：<code>brew install opencv</code></li>
+<li>Ubuntu：<code>sudo apt install libopencv-dev clang libclang-dev</code></li>
+</ul>
+<p>然后 <code>cargo add opencv</code>（版本以拉到的最新为准）。如果只是离线批量抽帧，不想背这么重的依赖，可以直接用 6.8 的 ffmpeg 命令行。</p>
+</blockquote>
+<p>先定义一个<strong>帧处理器</strong>接口，把“取帧“和“处理帧“解耦——后续章节（预处理、检测、跟踪）只要实现这个 trait 就能接进来：</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use opencv::{core, prelude::*, videoio};
+
+/// 帧处理器：每来一帧调用一次 on_frame。
+/// 后续章节可以让它做 letterbox→推理→NMS（见第 10、16 章）。
+pub trait FrameSink {
+    fn on_frame(&amp;mut self, idx: u64, frame: &amp;core::Mat) -&gt; opencv::Result&lt;()&gt;;
+}
+
+/// 一个最简处理器：只打印帧序号和尺寸，先把链路跑通。
+struct Printer;
+
+impl FrameSink for Printer {
+    fn on_frame(&amp;mut self, idx: u64, frame: &amp;core::Mat) -&gt; opencv::Result&lt;()&gt; {
+        // OpenCV 的 Mat 默认是 BGR、HxWx3、u8（BGR 顺序见第 4 章）
+        println!("帧 #{idx}: {}x{} (宽x高)", frame.cols(), frame.rows());
+        Ok(())
+    }
+}
+<span class="boring">}</span></code></pre>
+<p>核心是这个<strong>拉流取帧循环</strong>：</p>
+<pre class="playground"><code class="language-rust">/// 打开视频源（本地文件路径 / rtsp:// 地址 / 摄像头），循环取帧喂给 sink。
+fn run_capture(source: &amp;str, sink: &amp;mut dyn FrameSink) -&gt; opencv::Result&lt;()&gt; {
+    // CAP_FFMPEG：强制走 FFmpeg 后端，文件和 RTSP 都能开
+    let mut cap = videoio::VideoCapture::from_file(source, videoio::CAP_FFMPEG)?;
+
+    // 减小内部缓冲到 1 帧，尽量拿"最新帧"，降低实时延迟（见 6.10）
+    cap.set(videoio::CAP_PROP_BUFFERSIZE, 1.0)?;
+
+    if !cap.is_opened()? {
+        eprintln!("打不开视频源: {source}");
+        return Ok(());
+    }
+
+    let mut frame = core::Mat::default();
+    let mut idx = 0u64;
+    loop {
+        // read() = grab() + retrieve()，把下一帧解码进 frame（已按显示顺序排好）
+        let ok = cap.read(&amp;mut frame)?;
+        if !ok || frame.empty()? {
+            // 文件读到结尾，或网络流断开
+            eprintln!("流结束或读取失败，退出循环");
+            break;
+        }
+        sink.on_frame(idx, &amp;frame)?; // 把这一帧交给处理函数
+        idx += 1;
+    }
+    Ok(())
+}
+
+fn main() -&gt; opencv::Result&lt;()&gt; {
+    // 用法：cargo run -- test.mp4    或    cargo run -- rtsp://user:pass@ip:554/...
+    let source = std::env::args().nth(1).unwrap_or_else(|| "test.mp4".to_string());
+    let mut sink = Printer;
+    run_capture(&amp;source, &amp;mut sink)
+}</code></pre>
+<p>打开 <strong>USB 摄像头</strong>只需换一行——用索引而不是路径：</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// 打开第 0 个摄像头（Linux 的 /dev/video0）
+let mut cap = videoio::VideoCapture::new(0, videoio::CAP_ANY)?;
+<span class="boring">}</span></code></pre>
+<p><strong>把帧接上前几章的图像/张量。</strong> <code>Mat</code> 是 OpenCV 的图像类型，我们要把它变回第 3 章的 <code>ndarray</code>，才能喂给第 10 章的 letterbox 预处理：</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use ndarray::Array3;
+
+/// 把 BGR 的 Mat 转成第 3 章的 ndarray（形状 HxWx3, u8）。
+fn mat_to_ndarray(frame: &amp;core::Mat) -&gt; opencv::Result&lt;Array3&lt;u8&gt;&gt; {
+    let h = frame.rows() as usize;
+    let w = frame.cols() as usize;
+    let data = frame.data_bytes()?; // 连续的 BGR 字节切片
+    // 长度对得上就不会失败；注意此处假设内存连续、无行填充
+    let arr = Array3::from_shape_vec((h, w, 3), data.to_vec())
+        .expect("shape 与数据长度不符");
+    Ok(arr)
+}
+<span class="boring">}</span></code></pre>
+<blockquote>
+<p><strong>坑提示</strong>：<code>Mat</code> 的每一行可能有对齐<strong>填充（padding）</strong>，<code>data_bytes()</code> 不一定是紧凑的 <code>H×W×3</code>。生产代码要先判断 <code>frame.is_continuous()?</code>，不连续时用 <code>frame.clone()</code> 拷成连续内存，或按行 <code>step</code> 逐行拷贝。另外记得 OpenCV 是 <strong>BGR</strong> 顺序，喂给多数模型前要转成 RGB（第 4、10 章会反复处理这件事）。</p>
+</blockquote>
+<p>现在，一路视频就变成了“源源不断的 <code>Array3&lt;u8&gt;</code>“，后面接检测、跟踪都顺理成章。</p>
+<h2 id="68-用-ffmpeg-命令行抽帧当外部工具"><a class="header" href="#68-用-ffmpeg-命令行抽帧当外部工具">6.8 用 ffmpeg 命令行抽帧（当外部工具）</a></h2>
+<p>不想在程序里链接重依赖时，<code>ffmpeg</code> 命令行是最好用的“外部工具“，尤其适合<strong>离线批量抽帧</strong>。几条最常用的命令：</p>
+<pre><code class="language-bash"># 每秒抽 1 帧，存成 out_001.jpg, out_002.jpg ...（稀疏采样做检测/分类很够用）
+ffmpeg -i in.mp4 -vf fps=1 out_%03d.jpg
+
+# 只抽关键帧(I 帧)，最省：I 帧本就能独立解码
+ffmpeg -i in.mp4 -vf "select='eq(pict_type,I)'" -vsync vfr key_%03d.jpg
+
+# 从 RTSP 拉 10 秒存成 mp4；-c copy 表示不重新编码、直接搬运码流（最快、不失真）
+ffmpeg -rtsp_transport tcp -i "rtsp://user:pass@ip:554/stream" -t 10 -c copy clip.mp4
+
+# 先看清楚里面是什么编码/容器/分辨率（决定能不能硬解）
+ffprobe in.mp4
+</code></pre>
+<p>两个要点：<code>-rtsp_transport tcp</code> 强制 RTSP 走 TCP，比默认 UDP 更抗丢包（少花屏，见 6.10）；<code>-c copy</code> 是“只搬运不转码“，省 CPU 也不损画质。</p>
+<p>在 Rust 里把它当外部命令调用即可：</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use std::process::Command;
+
+/// 调用系统 ffmpeg，每秒抽 1 帧到 out_dir。适合离线批处理。
+fn extract_frames(input: &amp;str, out_dir: &amp;str) -&gt; std::io::Result&lt;()&gt; {
+    let pattern = format!("{out_dir}/out_%03d.jpg");
+    let status = Command::new("ffmpeg")
+        .args(["-i", input, "-vf", "fps=1", &amp;pattern])
+        .status()?; // 阻塞等 ffmpeg 跑完
+    if !status.success() {
+        eprintln!("ffmpeg 退出码非 0");
+    }
+    Ok(())
+}
+<span class="boring">}</span></code></pre>
+<p><strong>如何取舍</strong>：离线、批量、一次性的活儿，<code>ffmpeg</code> 命令行最省事；实时、在进程内、要逐帧接推理的活儿，用 6.7 的 <code>opencv</code>（或下一节的库）更合适——总不能对着一路直播每秒 fork 一个进程。</p>
+<h2 id="69-纯-rust-方向ffmpeg-next--video-rs--retina"><a class="header" href="#69-纯-rust-方向ffmpeg-next--video-rs--retina">6.9 纯 Rust 方向：ffmpeg-next / video-rs / retina</a></h2>
+<p>如果你希望更“Rust 原生“、少依赖 OpenCV 那一大坨，可以看这三个方向：</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>crate</th><th>定位</th><th>说明</th></tr>
+</thead>
+<tbody>
+<tr><td><code>ffmpeg-next</code></td><td>libav* 的安全绑定</td><td>功能最全（几乎等于 FFmpeg 本体），但仍需链接系统 FFmpeg 库</td></tr>
+<tr><td><code>video-rs</code></td><td><code>ffmpeg-next</code> 之上的易用封装</td><td>解码后可直接拿到 <code>ndarray</code>，上手快，样板少</td></tr>
+<tr><td><code>retina</code></td><td><strong>纯 Rust</strong> 的 RTSP 客户端</td><td>自己实现 RTSP/RTP 信令与拆包，不依赖 FFmpeg</td></tr>
+</tbody>
+</table>
+</div>
+<p>几句实话：</p>
+<ul>
+<li><code>ffmpeg-next</code> / <code>video-rs</code> 走的还是 FFmpeg 的老底子，稳定、编码格式支持最全，是“想脱离 OpenCV 但要功能全“的首选。</li>
+<li><code>retina</code> 专注把 <strong>RTSP 这段网络协议</strong>用纯 Rust 处理干净（连接、鉴权、断线重连、TCP/UDP 传输控制都能精细掌控），非常适合“我要牢牢控制拉流行为“的场景。但它只负责把 H.264/H.265 的**负载（NAL 单元）**取出来，<strong>真正的解码你还得配一个解码器</strong>（交给硬件解码器，或另一个解码 crate）。</li>
+<li>现实是：<strong>目前纯 Rust 的 H.264/H.265 解码还不成熟</strong>，绝大多数生产系统底层仍然是 FFmpeg 或硬件解码器在干活。别为了“纯 Rust“这个执念，牺牲了稳定性和编码兼容性。</li>
+</ul>
+<p><strong>选型小结</strong>：快速上手/多来源统一 → <code>opencv</code>；离线批处理 → <code>ffmpeg</code> 命令行；要精细控制 RTSP → <code>retina</code>（+ 解码器）；要 FFmpeg 全功能又想 Rust API → <code>ffmpeg-next</code> / <code>video-rs</code>。</p>
+<h2 id="610-工程坑花屏时间戳断流重连缓冲堆积"><a class="header" href="#610-工程坑花屏时间戳断流重连缓冲堆积">6.10 工程坑：花屏、时间戳、断流重连、缓冲堆积</a></h2>
+<p>拉流循环写出来只是“能跑“，离“能上线跑一年“还差这几个坑：</p>
+<p><strong>1. 丢包花屏。</strong> UDP 传的 RTSP 一旦丢包，P/B 帧就拿不到完整的参考数据，画面会<strong>糊成马赛克/拖影</strong>，直到下一个 I 帧才恢复。对策：优先用 <strong>TCP 传输</strong>（命令行 <code>-rtsp_transport tcp</code>）；让摄像头<strong>缩短 GOP</strong>（关键帧更密，花屏恢复更快）；解码报错时别崩，丢掉坏帧继续读。</p>
+<p><strong>2. 时间戳跳变 / 回绕。</strong> 别天真地拿 <code>dt = pts₂ - pts₁</code> 当帧间隔。摄像头对时、重连都可能让 pts <strong>突然跳变</strong>；而某些格式的时间戳位宽有限会<strong>回绕（wraparound）</strong>（比如 MPEG-TS 的 33 位时钟约 26.5 小时绕一圈，绕回去后 <code>pts₂ - pts₁</code> 会变成一个巨大的负数）。对策：对帧间隔做合理性检查（异常的负值/超大值就丢弃或钳制），必要时退回用<strong>本机墙上时钟</strong>估算节奏。</p>
+<p><strong>3. 断流自动重连。</strong> 网络摄像头掉线是常态，<code>read()</code> 会返回 <code>false</code> 或空帧。生产代码要把拉流包在一个<strong>带退避的重连循环</strong>里，而不是一断就退出：</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>/// 断流后自动重连，永不退出。注意退避，别 tight-loop 把 CPU 打满。
+fn run_forever(source: &amp;str, sink: &amp;mut dyn FrameSink) {
+    loop {
+        match run_capture(source, sink) {
+            Ok(()) =&gt; eprintln!("流正常结束"),
+            Err(e) =&gt; eprintln!("拉流出错: {e}"),
+        }
+        eprintln!("2 秒后重连 {source} ...");
+        std::thread::sleep(std::time::Duration::from_secs(2)); // 退避
+    }
+}
+<span class="boring">}</span></code></pre>
+<p><strong>4. 缓冲堆积导致延迟越跑越大。</strong> 这是实时视觉<strong>最经典</strong>的坑。只要<strong>解码速度 &gt; 推理速度</strong>，帧就会在队列里越堆越多，你处理的永远是几秒前的旧画面，延迟单调增长、再也回不来。根因就是 6.6 说的“没有丢帧“。对策：用<strong>有界队列</strong>，满了就丢最旧的帧、只留最新帧。6.7 里那句 <code>cap.set(CAP_PROP_BUFFERSIZE, 1.0)</code> 也是同一思路——从源头就少缓冲。</p>
+<p><strong>5. 解码线程与推理线程解耦。</strong> 正确的实时架构是<strong>生产者-消费者</strong>：解码线程按实时速率不停取帧、往一个小容量队列里塞；推理线程从队列取“当前最新的一帧“来算，算得慢没关系，因为旧帧早被丢了。</p>
+<pre><code class="language-text"> [解码线程/生产者]                         [推理线程/消费者]
+ 拉流→解码 ──push──▶ 有界队列(容量 1~2) ──pop──▶ letterbox→模型→后处理
+   (按流的实时速率)      队列满就丢最旧的帧        (慢也只处理最新帧,延迟可控)
+</code></pre>
+<p>这套线程模型、通道选型、多路并发和性能调优，是第 29 章的主题，这里只点到为止——先记住“<strong>丢帧保时效、有界队列、生产者消费者</strong>“这三板斧，你的实时程序就不会越跑越卡。</p>
+<h2 id="611-小结"><a class="header" href="#611-小结">6.11 小结</a></h2>
+<ul>
+<li><strong>视频 = 帧序列 + 帧率 + 时间戳</strong>。1080p 原始视频一分钟就要 10 GB，所以必须编码压缩；压缩的核心是消灭<strong>帧间冗余</strong>（相邻帧太像了）。</li>
+<li><strong>I/P/B 帧与 GOP</strong>：I 帧完整可独立解码，P/B 帧只存“差值“、离不开参考帧。这解释了“随机跳转必先跳到最近关键帧“，以及 B 帧导致 <strong>pts ≠ dts</strong>（解码顺序 ≠ 显示顺序）。</li>
+<li>分清 <strong>codec（H.264/H.265/AV1，怎么压）</strong> 和 <strong>container（mp4/mkv/flv，怎么装）</strong>；文件后缀不代表内部编码，网络上传的是一个个 <strong>NAL 单元</strong>。</li>
+<li>视频来源有本地文件、USB、<strong>RTSP/RTMP</strong>、GB28181，但最终大多能归一成“一路可被 FFmpeg/OpenCV 打开的流“。边缘设备**必须用硬件解码（NVDEC/VAAPI/RKMPP）**省 CPU、少拷贝。</li>
+<li>Rust 实操首选 <code>opencv</code> 的 <code>VideoCapture</code>：<code>from_file</code> 打开 → 循环 <code>read()</code> → <code>Mat</code> 转 <code>ndarray</code> 交给预处理；离线批量抽帧用 <code>ffmpeg</code> 命令行；要纯 Rust 看 <code>ffmpeg-next</code>/<code>video-rs</code>/<code>retina</code>。</li>
+<li>上线四大坑：<strong>花屏（用 TCP）、时间戳跳变/回绕（做合理性检查）、断流重连（带退避）、缓冲堆积（丢帧保时效 + 有界队列 + 生产者消费者）</strong>。</li>
+</ul>
+<h2 id="612-练习"><a class="header" href="#612-练习">6.12 练习</a></h2>
+<ol>
+<li>
+<p><strong>算一笔账</strong>：一路 4K（<code>3840×2160</code>）RGB 摄像头，25 fps，若不压缩，一小时原始数据是多少 GB？再查一下同规格 H.265 大约多少 GB，估算压缩比。（提示：先算单帧字节数，再乘帧数。）</p>
+</li>
+<li>
+<p><strong>跑通拉流循环</strong>：装好 OpenCV 后，用 6.7 的代码打开一个本地 mp4（没有就用手机录一段），打印每帧序号和尺寸；再把 <code>source</code> 换成你手边摄像头的 RTSP 地址或 USB 索引 <code>0</code>，观察行为差异。进阶：实现一个“每 30 帧才真正处理一次“的 <code>FrameSink</code>（模拟稀疏抽帧）。</p>
+</li>
+<li>
+<p><strong>理解关键帧</strong>：用 <code>ffprobe -show_frames in.mp4 | grep pict_type</code> 统计视频里 I/P/B 帧各有多少、GOP 大概多长；再分别用“每秒抽 1 帧“和“只抽 I 帧“两条 ffmpeg 命令抽图，对比生成的图片数量，解释差异。</p>
+</li>
+<li>
+<p><strong>模拟延迟堆积</strong>：在你练习 2 的 <code>on_frame</code> 里 <code>sleep(100ms)</code> 假装推理很慢，喂一路 30fps 的流，观察“处理的帧“是否越来越滞后于“当前画面“。然后加一个容量为 1 的有界队列（解码线程只往里塞最新帧、满了丢旧帧），验证延迟是否被稳住。（这题是第 29 章的预热。）</p>
+</li>
+</ol>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="ch05-image-codec.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                            </a>
+
+                            <a rel="next prefetch" href="ch07-spatial-filters.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="ch05-image-codec.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                    </a>
+
+                    <a rel="next prefetch" href="ch07-spatial-filters.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                    </a>
+            </nav>
+
+        </div>
+
+        <template id=fa-eye><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M288 32c-80.8 0-145.5 36.8-192.6 80.6C48.6 156 17.3 208 2.5 243.7c-3.3 7.9-3.3 16.7 0 24.6C17.3 304 48.6 356 95.4 399.4C142.5 443.2 207.2 480 288 480s145.5-36.8 192.6-80.6c46.8-43.5 78.1-95.4 93-131.1c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C433.5 68.8 368.8 32 288 32zM432 256c0 79.5-64.5 144-144 144s-144-64.5-144-144s64.5-144 144-144s144 64.5 144 144zM288 192c0 35.3-28.7 64-64 64c-11.5 0-22.3-3-31.6-8.4c-.2 2.8-.4 5.5-.4 8.4c0 53 43 96 96 96s96-43 96-96s-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6z"/></svg></span></template>
+        <template id=fa-eye-slash><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M38.8 5.1C28.4-3.1 13.3-1.2 5.1 9.2S-1.2 34.7 9.2 42.9l592 464c10.4 8.2 25.5 6.3 33.7-4.1s6.3-25.5-4.1-33.7L525.6 386.7c39.6-40.6 66.4-86.1 79.9-118.4c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C465.5 68.8 400.8 32 320 32c-68.2 0-125 26.3-169.3 60.8L38.8 5.1zM223.1 149.5C248.6 126.2 282.7 112 320 112c79.5 0 144 64.5 144 144c0 24.9-6.3 48.3-17.4 68.7L408 294.5c5.2-11.8 8-24.8 8-38.5c0-53-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6c0 10.2-2.4 19.8-6.6 28.3l-90.3-70.8zm223.1 298L373 389.9c-16.4 6.5-34.3 10.1-53 10.1c-79.5 0-144-64.5-144-144c0-6.9 .5-13.6 1.4-20.2L83.1 161.5C60.3 191.2 44 220.8 34.5 243.7c-3.3 7.9-3.3 16.7 0 24.6c14.9 35.7 46.2 87.7 93 131.1C174.5 443.2 239.2 480 320 480c47.8 0 89.9-12.9 126.2-32.5z"/></svg></span></template>
+        <template id=fa-copy><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M502.6 70.63l-61.25-61.25C435.4 3.371 427.2 0 418.7 0H255.1c-35.35 0-64 28.66-64 64l.0195 256C192 355.4 220.7 384 256 384h192c35.2 0 64-28.8 64-64V93.25C512 84.77 508.6 76.63 502.6 70.63zM464 320c0 8.836-7.164 16-16 16H255.1c-8.838 0-16-7.164-16-16L239.1 64.13c0-8.836 7.164-16 16-16h128L384 96c0 17.67 14.33 32 32 32h47.1V320zM272 448c0 8.836-7.164 16-16 16H63.1c-8.838 0-16-7.164-16-16L47.98 192.1c0-8.836 7.164-16 16-16H160V128H63.99c-35.35 0-64 28.65-64 64l.0098 256C.002 483.3 28.66 512 64 512h192c35.2 0 64-28.8 64-64v-32h-47.1L272 448z"/></svg></span></template>
+        <template id=fa-play><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M73 39c-14.8-9.1-33.4-9.4-48.5-.9S0 62.6 0 80V432c0 17.4 9.4 33.4 24.5 41.9s33.7 8.1 48.5-.9L361 297c14.3-8.7 23-24.2 23-41s-8.7-32.2-23-41L73 39z"/></svg></span></template>
+        <template id=fa-clock-rotate-left><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M75 75L41 41C25.9 25.9 0 36.6 0 57.9V168c0 13.3 10.7 24 24 24H134.1c21.4 0 32.1-25.9 17-41l-30.8-30.8C155 85.5 203 64 256 64c106 0 192 86 192 192s-86 192-192 192c-40.8 0-78.6-12.7-109.7-34.4c-14.5-10.1-34.4-6.6-44.6 7.9s-6.6 34.4 7.9 44.6C151.2 495 201.7 512 256 512c141.4 0 256-114.6 256-256S397.4 0 256 0C185.3 0 121.3 28.7 75 75zm181 53c-13.3 0-24 10.7-24 24V256c0 6.4 2.5 12.5 7 17l72 72c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9l-65-65V152c0-13.3-10.7-24-24-24z"/></svg></span></template>
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="elasticlunr-ef4e11c1.min.js"></script>
+        <script src="mark-09e88c2c.min.js"></script>
+        <script src="searcher-09f2665d.js"></script>
+
+        <script src="clipboard-1626706a.min.js"></script>
+        <script src="highlight-abc7f01d.js"></script>
+        <script src="book-609e4cb8.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+
+    </div>
+    </body>
+</html>

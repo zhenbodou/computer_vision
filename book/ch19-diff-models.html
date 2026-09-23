@@ -1,0 +1,510 @@
+<!DOCTYPE HTML>
+<html lang="zh" class="rust sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>第 19 章 · 差分模型：帧差、背景建模与变化检测 - 机器视觉工程实战：用 Rust 看懂图像与模型</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="一本面向零基础读者的机器视觉工程教程：从像素、编解码、预处理、推理、后处理到模型转换，全部用 Rust 动手实现。">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="favicon-de23e50b.svg">
+        <link rel="shortcut icon" href="favicon-8114d1fc.png">
+        <link rel="stylesheet" href="css/variables-8adf115d.css">
+        <link rel="stylesheet" href="css/general-e96d0476.css">
+        <link rel="stylesheet" href="css/chrome-d279d366.css">
+        <link rel="stylesheet" href="css/print-9e4910d8.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="fonts/fonts-9644e21d.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="mdbook-highlight-css" href="highlight-493f70e1.css">
+        <link rel="stylesheet" id="mdbook-tomorrow-night-css" href="tomorrow-night-4c0ae647.css">
+        <link rel="stylesheet" id="mdbook-ayu-highlight-css" href="ayu-highlight-3fdfc3ac.css">
+
+        <!-- Custom theme stylesheets -->
+
+        <!-- MathJax -->
+        <script async src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "";
+            const default_light_theme = "rust";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "searchindex-4d8e5ec0.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="toc-c1d54236.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="mdbook-body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('rust')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="mdbook-sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("mdbook-sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="mdbook-sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="toc.html"></iframe>
+            </noscript>
+            <div id="mdbook-sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="mdbook-page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="mdbook-menu-bar-hover-placeholder"></div>
+                <div id="mdbook-menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="mdbook-sidebar-toggle" class="icon-button" for="mdbook-sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="mdbook-sidebar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M0 96C0 78.3 14.3 64 32 64H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H416c17.7 0 32 14.3 32 32z"/></svg></span>
+                        </label>
+                        <button id="mdbook-theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="mdbook-theme-list">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M371.3 367.1c27.3-3.9 51.9-19.4 67.2-42.9L600.2 74.1c12.6-19.5 9.4-45.3-7.6-61.2S549.7-4.4 531.1 9.6L294.4 187.2c-24 18-38.2 46.1-38.4 76.1L371.3 367.1zm-19.6 25.4l-116-104.4C175.9 290.3 128 339.6 128 400c0 3.9 .2 7.8 .6 11.6c1.8 17.5-10.2 36.4-27.8 36.4H96c-17.7 0-32 14.3-32 32s14.3 32 32 32H240c61.9 0 112-50.1 112-112c0-2.5-.1-5-.2-7.5z"/></svg></span>
+                        </button>
+                        <ul id="mdbook-theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-ayu">Ayu</button></li>
+                        </ul>
+                        <button id="mdbook-search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="mdbook-searchbar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352c79.5 0 144-64.5 144-144s-64.5-144-144-144S64 128.5 64 208s64.5 144 144 144z"/></svg></span>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">机器视觉工程实战：用 Rust 看懂图像与模型</h1>
+
+                    <div class="right-buttons">
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <span class=fa-svg id="print-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M128 0C92.7 0 64 28.7 64 64v96h64V64H354.7L384 93.3V160h64V93.3c0-17-6.7-33.3-18.7-45.3L400 18.7C388 6.7 371.7 0 354.7 0H128zM384 352v32 64H128V384 368 352H384zm64 32h32c17.7 0 32-14.3 32-32V256c0-35.3-28.7-64-64-64H64c-35.3 0-64 28.7-64 64v96c0 17.7 14.3 32 32 32H64v64c0 35.3 28.7 64 64 64H384c35.3 0 64-28.7 64-64V384zm-16-88c-13.3 0-24-10.7-24-24s10.7-24 24-24s24 10.7 24 24s-10.7 24-24 24z"/></svg></span>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="mdbook-search-wrapper" class="hidden">
+                    <form id="mdbook-searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="mdbook-searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="mdbook-searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <span class=fa-svg id="fa-spin"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M304 48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zm0 416c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM48 304c26.5 0 48-21.5 48-48s-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48zm464-48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM142.9 437c18.7-18.7 18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zm0-294.2c18.7-18.7 18.7-49.1 0-67.9S93.7 56.2 75 75s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zM369.1 437c18.7 18.7 49.1 18.7 67.9 0s18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9z"/></svg></span>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="mdbook-searchresults-outer" class="searchresults-outer hidden">
+                        <div id="mdbook-searchresults-header" class="searchresults-header"></div>
+                        <ul id="mdbook-searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('mdbook-sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('mdbook-sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#mdbook-sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="mdbook-content" class="content">
+                    <main>
+                        <h1 id="第-19-章--差分模型帧差背景建模与变化检测"><a class="header" href="#第-19-章--差分模型帧差背景建模与变化检测">第 19 章 · 差分模型：帧差、背景建模与变化检测</a></h1>
+<blockquote>
+<p><strong>本章导读</strong>：第 15~18 章的模型（分类、检测、关键点、分割）都在回答同一个问题——“<strong>这是什么</strong>”。它们本事大，但代价也大：每一帧都要把一个几千万参数的神经网络从头跑一遍。可很多真实场景里，我们其实不关心画面里有什么，只关心“<strong>和刚才比，哪里变了</strong>“：一条空走廊、一个空仓库，99% 的时间什么也没发生，直到某一刻有个东西动了。本章讲的<strong>差分（differencing）<strong>与</strong>变化检测（change detection）<strong>就是干这个的：不做识别，只做“找不同”。它极快、零训练、零模型，天生适合当</strong>触发器（trigger）</strong>——先用它把不动的帧筛掉，只有真有动静时才叫醒后面的重模型。读完你能亲手写出一个能跑的运动侦测器：帧差、三帧差、滑动平均背景建模，再借第 8 章的形态学与轮廓把结果清理成一组“运动区域框“（复用全书统一的 <code>BBox</code>），并理解工业界“差分粗筛 + 深度模型确认“这套省钱的级联范式。</p>
+</blockquote>
+<h2 id="191-换个思路不问是什么只问变了没"><a class="header" href="#191-换个思路不问是什么只问变了没">19.1 换个思路：不问“是什么“，只问“变了没“</a></h2>
+<p>先玩个小游戏。杂志上常有“<strong>找不同</strong>“：两张几乎一样的图并排，让你圈出不一样的几处。你不会去逐一辨认“这是花瓶、那是猫”，你的眼睛只盯着“<strong>和另一张不一样的地方</strong>“。差分算法干的就是这件事——把两张图（两帧）<strong>逐像素相减</strong>，结果为 0 的地方（没变）忽略，非 0 的地方（变了）就是答案。</p>
+<p>再想想监控值班室：保安面对 16 路监控墙，他不是在“识别每个画面里有什么“，而是在等“<strong>哪个画面动了一下</strong>“。人动了、门开了、有车进来了——是“变化“触发了他的注意，而不是“内容”。</p>
+<p><strong>为什么差分这么省算力？</strong> 算笔账就懂了。一帧 1080p 灰度图有 <code>1920×1080 ≈ 200 万</code>个像素，帧差不过是 200 万次减法加比大小，普通 CPU <strong>零点几毫秒</strong>就算完。而跑一次 YOLOv8（第 16 章）动辄几十毫秒，还得要 GPU。二者差着几百倍。</p>
+<p>于是有了工业界最常见的省钱套路——<strong>触发器 + 重模型</strong>的级联：</p>
+<pre><code class="language-text">每一帧 ─▶ 差分粗筛(极快) ─┬─ 没动静？ ─▶ 丢弃，看下一帧
+                          └─ 有动静？ ─▶ 唤醒 YOLO 检测(慢但准) ─▶ 报警 / 录像 / 抓拍
+</code></pre>
+<p>一路 24 小时的摄像头，画面绝大多数时间是静止的。让 GPU 全天候空跑 YOLO 是巨大的浪费；让差分当“门卫“，只有真有东西动了才叫醒重模型——同样一块边缘盒子，功耗和成本能降一个数量级。<strong>差分很少单独交付结果，它更多是整条流水线最前端那个便宜、高召回的开关。</strong></p>
+<h2 id="192-帧差法和上一帧相减"><a class="header" href="#192-帧差法和上一帧相减">19.2 帧差法：和上一帧相减</a></h2>
+<p>最朴素的差分叫<strong>帧差法（frame differencing）</strong>：拿<strong>当前帧</strong>减去<strong>上一帧</strong>，逐像素取绝对值。静止的背景两帧一模一样，相减得 0；有物体移动经过的地方，两帧不同，差值就大。写成公式就是 $|frame_t - frame_{t-1}|$。</p>
+<p><strong>用一行像素手算一遍</strong>。取一行 6 个灰度像素，看一个亮物体移动到中间：</p>
+<pre><code class="language-text">帧 t-1:   50   50   50   50   50   50      ← 一段静止的墙（灰度 50）
+帧 t:     50   50  200  200   50   50      ← 一个亮物体（灰度 200）挪到了中间
+|差|:      0    0  150  150    0    0      ← 只有物体所在的两列亮了起来
+</code></pre>
+<p>差出来的还是灰度值，我们只想要“动/不动“两种答案，于是<strong>阈值二值化（threshold）</strong>：差值大于阈值 <code>T</code> 的判为“动“（涂 255），否则“静“（涂 0），得到一张只有黑白两色的<strong>运动掩膜（motion mask）</strong>。取 <code>T = 30</code>：</p>
+<pre><code class="language-text">|差|:     0    0  150  150    0    0
+mask:     0    0  255  255    0    0        （&gt; 30 → 255，否则 0）
+</code></pre>
+<p>帧差法快得离谱、不用任何模型，但它有三个必须知道的毛病：</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>毛病</th><th>为什么</th><th>后果</th></tr>
+</thead>
+<tbody>
+<tr><td><strong>内部空洞（hollow）</strong></td><td>一辆纯白色的车，车身中间大片同色，前一帧白、这一帧还是白，相减为 0</td><td>mask 只描出车的<strong>前后边缘</strong>，中间是空的</td></tr>
+<tr><td><strong>静止即消失</strong></td><td>物体一旦停下不动，和上一帧又一模一样</td><td>停住的人/车瞬间从 mask 里消失</td></tr>
+<tr><td><strong>拖影 / 双影</strong></td><td>物体从 A 挪到 B，A（它离开的空位）和 B（它到达处）两帧都不同</td><td>一个物体被点亮成两团，其中 A 处是“假运动“</td></tr>
+</tbody>
+</table>
+</div>
+<p>前两个毛病是帧差法的天性（它只对“正在变化“敏感），后一个可以靠三帧差改善（下一节）。</p>
+<p><strong>用 Rust 实现两帧差</strong>。输入是相邻两帧的灰度图（<code>GrayImage</code> 即第 2/3 章的 <code>Luma&lt;u8&gt;</code> 图，彩色帧先用 <code>to_luma8()</code> 转灰度——我们只关心亮度变化）：</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use image::{GrayImage, Luma};
+
+/// 两帧差：输入相邻两帧灰度图，输出运动掩膜（255=动，0=静）
+/// prev、curr 尺寸必须相同，复用第 2/3 章的逐像素访问
+fn frame_diff(prev: &amp;GrayImage, curr: &amp;GrayImage, thresh: u8) -&gt; GrayImage {
+    let (w, h) = curr.dimensions();
+    let mut mask = GrayImage::new(w, h);
+    for y in 0..h {
+        for x in 0..w {
+            // 关键：先转 i16 再相减，否则 u8 相减会下溢（50u8 - 200u8 会 panic 或回绕）
+            let a = prev.get_pixel(x, y)[0] as i16;
+            let b = curr.get_pixel(x, y)[0] as i16;
+            let d = (b - a).abs() as u8;                 // |curr - prev|
+            let v = if d &gt; thresh { 255 } else { 0 };    // 阈值二值化
+            mask.put_pixel(x, y, Luma([v]));
+        }
+    }
+    mask
+}
+<span class="boring">}</span></code></pre>
+<p>注意那个 <code>as i16</code>：<code>u8</code> 直接相减会下溢，这是新手写帧差最常见的第一个坑。<strong>工程上通常会</strong>把这层循环换成对底层 <code>&amp;[u8]</code> 缓冲区的顺序遍历、甚至用 SIMD 一次算 16 个像素，速度还能再上一个台阶——但看得懂优先，先把逻辑理清。</p>
+<h2 id="193-三帧差治一治拖影"><a class="header" href="#193-三帧差治一治拖影">19.3 三帧差：治一治拖影</a></h2>
+<p>两帧差最烦人的是<strong>拖影</strong>：物体从 A 移到 B，差分图会把 A（它刚离开的空位）和 B（它现在所在）<strong>同时</strong>点亮，于是一个物体报成一团横跨 A、B 的“糊影“，其中 A 处根本已经没东西了。</p>
+<p><strong>三帧差（three-frame differencing）<strong>的思路很巧：拿</strong>中间帧当“当前“</strong>，分别和它的前一帧、后一帧各做一次帧差，再把两张 mask 取<strong>逻辑与（AND）</strong>——只有两次都判为“动“的像素，才算真运动。</p>
+<pre><code class="language-text">用中间帧 f2 分别和前帧 f1、后帧 f3 比，再取交集（AND）：
+
+帧 f1:        . . ■ ■ . . . .     物体在 A
+帧 f2:        . . . . ■ ■ . .     物体到 B（要判断的当前帧）
+帧 f3:        . . . . . . ■ ■     物体到 C
+
+da=|f2-f1|:   . . ▓ ▓ ▓ ▓ . .     A(空了) + B(来了) 都亮  ← 这就是两帧差的"拖影"
+db=|f2-f3|:   . . . . ▓ ▓ ▓ ▓     B(还在) + C(将到) 都亮
+da AND db:    . . . . ▓ ▓ . .     只剩 B ← A 的拖影、C 的"未来位置"都被交集消掉了
+</code></pre>
+<p>直觉：A 处只在“和前帧比“时变了（后帧那里也是空的，不亮），C 处只在“和后帧比“时变了，一取交集，这两处各自落单的就被剔除，留下的正是物体在中间帧的真实位置。代价是：需要<strong>缓存三帧</strong>、且对纯平移的大物体内部空洞更明显。</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>/// 三帧差：判断中间帧 f2。两次差都为"动"才算真运动
+fn three_frame_diff(f1: &amp;GrayImage, f2: &amp;GrayImage, f3: &amp;GrayImage, thresh: u8) -&gt; GrayImage {
+    let da = frame_diff(f1, f2, thresh); // |f2 - f1|：当前帧相对前一帧
+    let db = frame_diff(f2, f3, thresh); // |f3 - f2|：当前帧相对后一帧（绝对值，方向不影响）
+    let (w, h) = f2.dimensions();
+    let mut mask = GrayImage::new(w, h);
+    for y in 0..h {
+        for x in 0..w {
+            let hit = da.get_pixel(x, y)[0] == 255 &amp;&amp; db.get_pixel(x, y)[0] == 255;
+            mask.put_pixel(x, y, Luma([if hit { 255 } else { 0 }]));
+        }
+    }
+    mask
+}
+<span class="boring">}</span></code></pre>
+<h2 id="194-背景建模和干净的背景比"><a class="header" href="#194-背景建模和干净的背景比">19.4 背景建模：和“干净的背景“比</a></h2>
+<p>帧差法有个绕不过的硬伤：<strong>物体一停就消失</strong>——因为它总是和“上一帧“比，而停住的物体和上一帧完全一样。要让停住的东西也能被持续发现，就得换个参照物：不和上一帧比，而和一张<strong>干净的空场景背景</strong>比。这类方法叫<strong>背景减除（background subtraction）</strong>，也叫<strong>背景建模</strong>。</p>
+<p>最天真的做法是“拍一张空场景当背景，每帧减它“。但真实背景是会<strong>缓慢变化</strong>的：日光渐移、云影飘过、树影摇动、摄像头自动增益跳变……一张拍死的背景很快就对不上号，导致<strong>全屏误报</strong>。所以背景必须“活“起来，能跟着环境慢慢更新。</p>
+<p>最常用的活背景是<strong>滑动平均（running average）<strong>背景：每来一帧，就用当前帧把背景</strong>更新一点点</strong>：</p>
+<p>$$bg \leftarrow \alpha \cdot frame + (1-\alpha)\cdot bg$$</p>
+<p>这里的 $\alpha$ 叫<strong>学习率（learning rate）</strong>，取 0~1，控制“背景追新画面的速度“：</p>
+<ul>
+<li>$\alpha$ <strong>大</strong>（如 0.5）：背景紧跟当前帧，光照变化立刻被吸收——但停下的物体也很快被“学“进背景，记性短。</li>
+<li>$\alpha$ <strong>小</strong>（如 0.01）：背景更新极慢，稳如老狗，能记住很久以前的空场景——但突然的光照变化要好一阵才追上。</li>
+</ul>
+<p><strong>用小数字体会 $\alpha$</strong>。设某像素背景 <code>bg = 50</code>，来了个物体让它变成 <code>frame = 200</code>，物体停在原地不走，取 $\alpha = 0.1$：</p>
+<pre><code class="language-text">第 1 帧后: bg = 0.1×200 + 0.9×50   = 20 + 45.0 = 65.0
+第 2 帧后: bg = 0.1×200 + 0.9×65   = 20 + 58.5 = 78.5
+第 3 帧后: bg = 0.1×200 + 0.9×78.5 = 20 + 70.7 = 90.7
+...        背景一点点"爬"向 200
+</code></pre>
+<p>背景与目标值 200 的差距，每帧乘以 <code>(1-α)=0.9</code>，所以 <code>0.9ⁿ = 0.5</code> 时差距减半——解得 <code>n ≈ 7</code>：$\alpha=0.1$ 时，一个停住的物体大约 <strong>7 帧</strong>后就被背景“吃掉一半“，十几帧后基本溶进背景，前景差随之变小。换成 $\alpha=0.01$，半衰期约 <strong>69 帧</strong>（25fps 下近 3 秒），物体能“存在“久得多。<strong>这就是调 $\alpha$ 的直接后果：想让停住的目标赖得久，就把 $\alpha$ 调小。</strong></p>
+<p>有了背景，前景就是 $|frame - bg| &gt; T$。用 Rust 实现一个滑动平均背景建模器（背景用 <code>f32</code> 存，因为 <code>α·frame</code> 会产生小数）：</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use image::{GrayImage, Luma};
+
+/// 滑动平均背景建模器：维护一张 f32 背景图，逐帧更新并输出前景掩膜
+struct RunningAvgBg {
+    bg: Vec&lt;f32&gt;,   // 背景灰度，行主序，索引 = y*w + x
+    w: u32,
+    h: u32,
+    alpha: f32,     // 学习率 0~1
+}
+
+impl RunningAvgBg {
+    /// 用第一帧初始化背景（最好是"空场景"，否则目标会被当成背景，直到被慢慢学掉）
+    fn new(first: &amp;GrayImage, alpha: f32) -&gt; Self {
+        let (w, h) = first.dimensions();
+        let bg = first.pixels().map(|p| p[0] as f32).collect(); // 逐像素拷成 f32
+        Self { bg, w, h, alpha }
+    }
+
+    /// 喂一帧：先算前景掩膜，再更新背景。thresh 为前景判定阈值
+    fn apply(&amp;mut self, frame: &amp;GrayImage, thresh: f32) -&gt; GrayImage {
+        let mut mask = GrayImage::new(self.w, self.h);
+        for y in 0..self.h {
+            for x in 0..self.w {
+                let i = (y * self.w + x) as usize;
+                let cur = frame.get_pixel(x, y)[0] as f32;
+                let diff = (cur - self.bg[i]).abs();
+                let v = if diff &gt; thresh { 255 } else { 0 };   // 偏离背景够多 → 前景
+                mask.put_pixel(x, y, Luma([v]));
+                // 背景更新：bg = α·当前 + (1-α)·旧背景
+                self.bg[i] = self.alpha * cur + (1.0 - self.alpha) * self.bg[i];
+            }
+        }
+        mask
+    }
+}
+<span class="boring">}</span></code></pre>
+<p>一个进阶细节：上面对<strong>所有</strong>像素都更新背景，包括前景像素。讲究的做法是对判为前景的像素<strong>慢更新甚至不更新</strong>（叫 <strong>selective update</strong>，选择性更新），否则停住的目标会被快速学进背景。点到为止，读者按需加。</p>
+<p><strong>更高级的背景建模：MOG2 与 KNN。</strong> 滑动平均给每个像素只记“一个背景值“，遇到<strong>会晃动的背景</strong>（风吹树叶、水面波光、闪烁的屏幕）就抓瞎——那个像素一会儿是叶子绿、一会儿是天空蓝，用一个平均值根本描述不了。工业界常用的 **MOG2（Mixture of Gaussians，高斯混合模型）**换了个思路：给每个像素记住“它平时会出现哪几种值“（用几个高斯分布表示），新来的值只要落在这些“常见值“里就算背景，否则算前景，因此扛得住摇摆背景，还自带阴影检测。<strong>KNN</strong> 思路类似，用最近邻判断新像素像不像最近见过的背景样本。二者 OpenCV 都有现成：<code>cv::createBackgroundSubtractorMOG2()</code> / <code>createBackgroundSubtractorKNN()</code>，Rust 的 <code>opencv</code> 绑定同名可用。思想懂了即可，数学不深挖。</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>方法</th><th>每像素记什么</th><th>扛摇摆背景</th><th>成本</th></tr>
+</thead>
+<tbody>
+<tr><td>帧差 / 三帧差</td><td>不建模，只比相邻帧</td><td>差</td><td>最低</td></tr>
+<tr><td>滑动平均</td><td>一个背景值</td><td>差</td><td>低</td></tr>
+<tr><td>MOG2 / KNN</td><td>一组背景值的分布</td><td>好</td><td>中</td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="195-差分之后形态学清理与运动框"><a class="header" href="#195-差分之后形态学清理与运动框">19.5 差分之后：形态学清理与运动框</a></h2>
+<p>到这里，本章的零件正好拼成一条完整的差分流水线——和第 8 章那条传统检测流水线是“表亲“，只是把“阈值“换成了“差分“：</p>
+<pre><code class="language-text">彩色帧 → 灰度 → 差分/背景减除 → 阈值二值化 → 开运算去噪 → 闭运算补洞 → 找轮廓 → 面积筛选 → 运动框 BBox
+─────   ────   ────────────    ─────────    ─────────    ─────────    ──────   ────────   ──────────
+第3/4章  转亮度   19.2~19.4        运动掩膜      第8章         第8章        第8章     去残渣      统一类型
+</code></pre>
+<p>不论帧差还是背景减除，出来的运动掩膜总是<strong>脏的</strong>：星星点点的噪点（传感器噪声、视频压缩的块效应）、物体内部的空洞、断成几截的运动块。直接拿去找轮廓会得到一堆碎渣。清理手段正是第 8 章的<strong>形态学</strong>——这里只用、不重讲原理：</p>
+<ul>
+<li><strong>开运算（open，先腐蚀后膨胀）</strong>：干掉零星噪点白斑，主体保留。</li>
+<li><strong>闭运算（close，先膨胀后腐蚀）</strong>：填掉物体内部空洞、把断裂的运动块连成一整块。</li>
+</ul>
+<p>常见顺序是“先开去噪，再闭补洞“。清理干净后，用第 8 章的 <code>find_contours</code> 找轮廓、取外接矩形，产出全书统一的 <code>BBox</code>（左上-右下像素坐标），再按面积滤掉太小的残渣：</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use image::GrayImage;
+use imageproc::morphology::{open, close};
+use imageproc::distance_transform::Norm;
+use imageproc::contours::{find_contours, Contour, BorderType};
+
+// BBox 与 bbox_of_contour 沿用第 8 章的定义（全书统一类型），此处不再重复
+
+/// 把运动掩膜清理干净，转成一组"运动区域框"
+fn motion_boxes(mask: &amp;GrayImage, min_area: f32) -&gt; Vec&lt;BBox&gt; {
+    // ① 形态学清理：开运算去噪点，再闭运算补空洞（原理见第 8 章）
+    let cleaned = close(&amp;open(mask, Norm::LInf, 1), Norm::LInf, 2);
+
+    // ② 找轮廓 → 外接框（第 8 章的老套路）
+    let contours: Vec&lt;Contour&lt;i32&gt;&gt; = find_contours(&amp;cleaned);
+    let mut boxes = Vec::new();
+    for c in &amp;contours {
+        if c.border_type != BorderType::Outer { continue; } // 只要外轮廓，内部空洞的边不算目标
+        let b = bbox_of_contour(c);
+        if b.area() &lt; min_area { continue; }                // 太小 → 噪声残渣，丢弃
+        boxes.push(b);
+    }
+    boxes
+}
+<span class="boring">}</span></code></pre>
+<p>得到的这组 <code>BBox</code> 就是“画面里哪几块在动“，它能直接：画在录像上高亮、当作 ROI 裁给检测模型（下一节）、或作为多目标跟踪（第 21 章）的初始框。<strong>注意本章的差分只告诉你“这块在动“，并不知道“动的是人还是猫“——那要靠后面的识别模型补上。</strong></p>
+<blockquote>
+<p>小提醒：<code>min_area</code> 不是一个可以到处照搬的魔法数字。同一个人，站在镜头近处占几万像素，走到画面深处可能只剩几百像素——阈值定死了，近处正常、远处全漏。工程上要么按分辨率和目标“最远处该有多大“来估算，要么干脆分区域设不同的 <code>min_area</code>。</p>
+</blockquote>
+<h2 id="196-变化检测能用在哪"><a class="header" href="#196-变化检测能用在哪">19.6 变化检测能用在哪</a></h2>
+<p>差分虽“笨“，却是无数真实产品的骨架。几个典型场景：</p>
+<ul>
+<li><strong>移动侦测录像（motion-triggered recording）</strong>：家用摄像头、行车记录仪、云台机的看家功能——没动静不录，运动掩膜的白像素面积超过阈值才存这一段。轻松省下 90% 的存储和回放翻找时间。工程上还会留一个几秒的<strong>预录缓冲（pre-roll）</strong>：把最近几秒的帧一直存在内存环形队列里，触发时连同“事发前那几秒“一起落盘，否则录下来的永远缺了动作发生的开头。</li>
+<li><strong>遗留物检测（abandoned object detection）</strong>：反着用背景建模。同时维护一快一慢两个背景：快背景很快把新物体学进去，慢背景还记得“没它的时候“。若两者在某处<strong>长时间</strong>不一致，说明“有人放下东西走了“——车站的无主行李、路上的路障、货架空位补货提醒。</li>
+<li><strong>周界预警前置粗筛</strong>：在画面里划一块警戒区，差分一旦发现区内有运动就触发，再叫醒人形检测确认“是不是人“（排除猫狗、树影、飘动的塑料袋），是人才报警。这套完整系统是第 27 章的主题，本章只负责提供最前端那个“动静触发器“。</li>
+<li><strong>工业与产线</strong>：传送带上“有没有来料“、料位/液面变化、设备指示灯闪动——这些固定视角、固定光照的场景，差分比训练一个模型划算太多。</li>
+</ul>
+<h2 id="197-差分做触发模型做确认"><a class="header" href="#197-差分做触发模型做确认">19.7 差分做触发，模型做确认</a></h2>
+<p>把前面几节收束成一句工程箴言：<strong>差分做触发，检测/分类模型做确认</strong>。这是视频分析里最普遍的**级联（cascade）**范式，因为二者优劣正好互补：</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th></th><th>差分</th><th>深度检测/分类</th></tr>
+</thead>
+<tbody>
+<tr><td>速度</td><td>极快（CPU 亚毫秒）</td><td>慢（几十 ms，常需 GPU）</td></tr>
+<tr><td>召回（漏不漏）</td><td>高，任何动静都不放过</td><td>取决于模型</td></tr>
+<tr><td>精度（准不准）</td><td>低，风吹草动都报</td><td>高，能说出“是什么“</td></tr>
+<tr><td>成本</td><td>几乎为 0</td><td>高</td></tr>
+</tbody>
+</table>
+</div>
+<p>于是让差分负责<strong>缩小范围</strong>——时间上只在“有动静的帧“、空间上只在“运动框那块 ROI“——把昂贵的检测模型的调用次数压到最低；检测模型负责<strong>下最终判断</strong>。一台没有 GPU 的边缘盒子，靠这套配合也能 24 小时稳稳跑一路摄像头。这正是第 26、27 章实战程序的底层骨架。</p>
+<p>顺带一提，差分本身也能“深度学习化“：<strong>孪生网络（Siamese network）</strong>、**变化检测网络（change detection network）**直接吃两个时刻的图像、输出一张“变化图“，常见于遥感（比对同一地块不同年份，自动找出新盖的房子）和缺陷检测。不过那些是训练侧话题，成本高；本章的传统差分零训练、可解释、够用就好，一句带过即可。</p>
+<h2 id="198-工程坑与调参"><a class="header" href="#198-工程坑与调参">19.8 工程坑与调参</a></h2>
+<p>差分简单，但上线后的误报几乎全来自下面这几个坑。逐个认清，比背公式重要：</p>
+<ul>
+<li><strong>光照突变 → 全屏误报</strong>：云突然遮住太阳、灯被打开关闭、摄像头自动增益（AGC）跳变——整帧亮度齐刷刷变，差分瞬间“满屏都在动“。<strong>缓解</strong>：统计“运动像素占比“，一旦超过某个大比例（如 50%）就判定为全局光照突变、丢弃这一帧不报警；或改用 MOG2 这类能较快吸收全局亮度变化的背景。</li>
+<li><strong>摄像头抖动 → 边缘全是假运动</strong>：风吹杆晃、车载震动使整帧平移几像素，所有高对比边缘（栏杆、树枝、屋檐）都错位，勾出一圈假运动。<strong>缓解</strong>：先做帧对齐/电子防抖（第 9 章几何变换里的配准），或把阈值和最小面积调大，忽略细碎的边缘运动。</li>
+<li><strong>阴影 → 物体被放大、粘连</strong>：人的影子亮度也和背景不同，会被算成运动的一部分，框比人大；两个人的影子还会把他俩连成一坨。<strong>缓解</strong>：阴影通常“颜色不变、只是变暗“，可在 HSV 空间里判断（色调 H 基本不变、明度 V 下降）来剔除；MOG2 自带阴影检测开关。</li>
+<li><strong>缓慢变化被背景“学掉“</strong>：$\alpha$ 偏大时，站着不动的人、缓慢移动的物体会被背景一点点吸收，几秒后凭空“消失“。<strong>缓解</strong>：调小 $\alpha$、对前景像素用选择性更新（selective update）、或配合跟踪（第 21 章）在目标停下后仍保住它的身份。</li>
+</ul>
+<p>调参其实就拧三个旋钮，记住方向即可：</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>现象</th><th>拧哪个旋钮</th><th>方向</th></tr>
+</thead>
+<tbody>
+<tr><td>噪点多、误报频繁</td><td>阈值 <code>T</code> / 最小面积 <code>min_area</code></td><td>调大</td></tr>
+<tr><td>漏检、动了没反应</td><td>阈值 <code>T</code></td><td>调小</td></tr>
+<tr><td>光照/背景变化后误报持续不停</td><td>学习率 $\alpha$</td><td>调大（让背景快点适应）</td></tr>
+<tr><td>停下的目标很快消失</td><td>学习率 $\alpha$</td><td>调小（让背景记性久一点）</td></tr>
+</tbody>
+</table>
+</div>
+<p>最后一句忠告：差分<strong>没有万能参数</strong>。一定要拿目标现场的<strong>真实回放视频</strong>来调，而且白天、夜晚、雨天可能各要一套参数——这也是为什么它虽简单，却是需要长期在现场打磨的工程活。</p>
+<h2 id="199-小结"><a class="header" href="#199-小结">19.9 小结</a></h2>
+<ul>
+<li>差分/变化检测换了个问题：不问“是什么“，只问“和之前比变了没“——逐像素相减 + 阈值二值化，极快、零训练、零模型，天生适合当“门卫“式<strong>触发器</strong>。</li>
+<li><strong>帧差法</strong>（两帧差）= $|frame_t - frame_{t-1}|$ → 阈值 → 运动掩膜；快，但有“内部空洞““静止即消失”“拖影“三大毛病。<strong>三帧差</strong>用中间帧和前后帧各做一次差再取交集，压掉拖影、定位更准。</li>
+<li><strong>背景建模</strong>和“干净背景“比，能持续发现停住的目标：滑动平均 $bg=\alpha\cdot frame+(1-\alpha)\cdot bg$，$\alpha$ 是学习率——大则跟得快但记性短、小则稳但反应慢；会晃动的背景要上 <strong>MOG2/KNN</strong>（每像素记一组分布，OpenCV 现成）。</li>
+<li>差分结果脏，用<strong>开运算去噪、闭运算补洞</strong>（第 8 章），再找轮廓取外接框，产出全书统一的 <code>BBox</code> 运动区域框，可交给 ROI 裁剪或跟踪（第 21 章）。</li>
+<li>工程主线是<strong>级联</strong>：差分粗筛（便宜、高召回）触发，检测/分类（贵、高精度）确认——边缘盒子也能全天候跑；应用有移动侦测录像、遗留物检测、周界预警前置（第 27 章）。</li>
+<li>头号坑：光照突变全屏误报、摄像头抖动、阴影、慢速目标被背景学掉；靠“阈值 / 最小面积 / 学习率“三个旋钮 + 现场真实视频反复调参。</li>
+</ul>
+<h2 id="1910-练习"><a class="header" href="#1910-练习">19.10 练习</a></h2>
+<ol>
+<li><strong>手算三帧差</strong>：给下面三帧同一行像素（背景 50，物体 200），先各算 <code>da=|f2-f1|</code>、<code>db=|f2-f3|</code> 并以 <code>T=30</code> 二值化，再取 <code>da AND db</code>，说明结果为什么恰好落在物体在 f2 的位置：
+<pre><code class="language-text">f1:  200 200  50  50  50  50
+f2:   50 200 200  50  50  50
+f3:   50  50 200 200  50  50
+</code></pre>
+</li>
+<li><strong>帧差 vs 背景减除</strong>：录一段“人走进来、站定约 10 秒、再走出去“的视频，抽帧（第 6 章）后分别跑 <code>frame_diff</code> 和 <code>RunningAvgBg</code>（用小 $\alpha$，如 0.01）。观察：帧差里人一站定就消失，而背景减除里人还持续被框住。解释两者行为差异的根源。</li>
+<li><strong>$\alpha$ 半衰期实验</strong>：用 <code>RunningAvgBg</code> 对同一段视频分别取 $\alpha=0.5, 0.05, 0.005$，数“一个停下的物体大约多少帧后从前景里消失“，和 19.4 用 <code>0.9ⁿ=0.5</code> 推出的半衰期公式对一对，验证 $\alpha$ 越小目标赖得越久。</li>
+<li><strong>搭一个触发器</strong>：以 <code>motion_boxes</code> 返回的所有框总面积 <code>&gt; 画面面积的 1%</code> 作为“有动静“信号，打印出视频里哪些帧被触发；再想想（不必真跑模型）如何把它接成“只在触发帧才调用 YOLO（第 16 章）“的级联管线，估算相比每帧都跑 YOLO 能省下多少次推理。</li>
+</ol>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="ch18-segmentation.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                            </a>
+
+                            <a rel="next prefetch" href="ch20-face.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="ch18-segmentation.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                    </a>
+
+                    <a rel="next prefetch" href="ch20-face.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                    </a>
+            </nav>
+
+        </div>
+
+        <template id=fa-eye><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M288 32c-80.8 0-145.5 36.8-192.6 80.6C48.6 156 17.3 208 2.5 243.7c-3.3 7.9-3.3 16.7 0 24.6C17.3 304 48.6 356 95.4 399.4C142.5 443.2 207.2 480 288 480s145.5-36.8 192.6-80.6c46.8-43.5 78.1-95.4 93-131.1c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C433.5 68.8 368.8 32 288 32zM432 256c0 79.5-64.5 144-144 144s-144-64.5-144-144s64.5-144 144-144s144 64.5 144 144zM288 192c0 35.3-28.7 64-64 64c-11.5 0-22.3-3-31.6-8.4c-.2 2.8-.4 5.5-.4 8.4c0 53 43 96 96 96s96-43 96-96s-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6z"/></svg></span></template>
+        <template id=fa-eye-slash><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M38.8 5.1C28.4-3.1 13.3-1.2 5.1 9.2S-1.2 34.7 9.2 42.9l592 464c10.4 8.2 25.5 6.3 33.7-4.1s6.3-25.5-4.1-33.7L525.6 386.7c39.6-40.6 66.4-86.1 79.9-118.4c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C465.5 68.8 400.8 32 320 32c-68.2 0-125 26.3-169.3 60.8L38.8 5.1zM223.1 149.5C248.6 126.2 282.7 112 320 112c79.5 0 144 64.5 144 144c0 24.9-6.3 48.3-17.4 68.7L408 294.5c5.2-11.8 8-24.8 8-38.5c0-53-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6c0 10.2-2.4 19.8-6.6 28.3l-90.3-70.8zm223.1 298L373 389.9c-16.4 6.5-34.3 10.1-53 10.1c-79.5 0-144-64.5-144-144c0-6.9 .5-13.6 1.4-20.2L83.1 161.5C60.3 191.2 44 220.8 34.5 243.7c-3.3 7.9-3.3 16.7 0 24.6c14.9 35.7 46.2 87.7 93 131.1C174.5 443.2 239.2 480 320 480c47.8 0 89.9-12.9 126.2-32.5z"/></svg></span></template>
+        <template id=fa-copy><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M502.6 70.63l-61.25-61.25C435.4 3.371 427.2 0 418.7 0H255.1c-35.35 0-64 28.66-64 64l.0195 256C192 355.4 220.7 384 256 384h192c35.2 0 64-28.8 64-64V93.25C512 84.77 508.6 76.63 502.6 70.63zM464 320c0 8.836-7.164 16-16 16H255.1c-8.838 0-16-7.164-16-16L239.1 64.13c0-8.836 7.164-16 16-16h128L384 96c0 17.67 14.33 32 32 32h47.1V320zM272 448c0 8.836-7.164 16-16 16H63.1c-8.838 0-16-7.164-16-16L47.98 192.1c0-8.836 7.164-16 16-16H160V128H63.99c-35.35 0-64 28.65-64 64l.0098 256C.002 483.3 28.66 512 64 512h192c35.2 0 64-28.8 64-64v-32h-47.1L272 448z"/></svg></span></template>
+        <template id=fa-play><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M73 39c-14.8-9.1-33.4-9.4-48.5-.9S0 62.6 0 80V432c0 17.4 9.4 33.4 24.5 41.9s33.7 8.1 48.5-.9L361 297c14.3-8.7 23-24.2 23-41s-8.7-32.2-23-41L73 39z"/></svg></span></template>
+        <template id=fa-clock-rotate-left><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M75 75L41 41C25.9 25.9 0 36.6 0 57.9V168c0 13.3 10.7 24 24 24H134.1c21.4 0 32.1-25.9 17-41l-30.8-30.8C155 85.5 203 64 256 64c106 0 192 86 192 192s-86 192-192 192c-40.8 0-78.6-12.7-109.7-34.4c-14.5-10.1-34.4-6.6-44.6 7.9s-6.6 34.4 7.9 44.6C151.2 495 201.7 512 256 512c141.4 0 256-114.6 256-256S397.4 0 256 0C185.3 0 121.3 28.7 75 75zm181 53c-13.3 0-24 10.7-24 24V256c0 6.4 2.5 12.5 7 17l72 72c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9l-65-65V152c0-13.3-10.7-24-24-24z"/></svg></span></template>
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="elasticlunr-ef4e11c1.min.js"></script>
+        <script src="mark-09e88c2c.min.js"></script>
+        <script src="searcher-09f2665d.js"></script>
+
+        <script src="clipboard-1626706a.min.js"></script>
+        <script src="highlight-abc7f01d.js"></script>
+        <script src="book-609e4cb8.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+
+    </div>
+    </body>
+</html>
