@@ -62,7 +62,7 @@
 
 所以要一个函数，把任意一组实数"挤"成一组"非负、且加起来正好等于 1"的数——这就是 **Softmax**。它的思路是：先用指数 $e^x$ 把每个数变成正数（并且拉大差距，大的更大），再除以总和做归一化，让它们凑成 100%。就像把全班同学的原始分先各自取指数、再换算成"占全班的百分比"。
 
-公式（数学补漏见附录 A.6）：
+公式（数学补漏见附录 A.10）：
 
 $$\text{softmax}(x_i) = \frac{e^{x_i}}{\sum_{j} e^{x_j}}$$
 
@@ -103,7 +103,7 @@ $$\text{softmax}(x_i) = \frac{e^{x_i - m}}{\sum_j e^{x_j - m}}, \qquad m = \max_
 
 和上面**一模一样**，但过程里再也不会出现 `e^100` 这种大数——最大的指数项永远是 `e^0 = 1`。用 Rust 实现就照这个稳定版来：
 
-```rust
+```rust,ignore
 /// 数值稳定版 Softmax：把一组 logits 变成加起来为 1 的概率
 fn softmax(logits: &[f32]) -> Vec<f32> {
     // ① 找最大值，用来平移，防止 exp 溢出
@@ -129,7 +129,7 @@ fn softmax(logits: &[f32]) -> Vec<f32> {
 
 Rust 实现。先是 argmax（Top-1）：
 
-```rust
+```rust,ignore
 /// 返回最大值所在的下标（Top-1 类别号）
 fn argmax(scores: &[f32]) -> usize {
     scores
@@ -144,7 +144,7 @@ fn argmax(scores: &[f32]) -> usize {
 
 再是 Top-K：
 
-```rust
+```rust,ignore
 /// 取分数最高的 k 个，返回 (类别号, 分数)，按分数从高到低排列
 fn top_k(scores: &[f32], k: usize) -> Vec<(usize, f32)> {
     // 把 (下标, 分数) 配成对
@@ -161,7 +161,7 @@ fn top_k(scores: &[f32], k: usize) -> Vec<(usize, f32)> {
 
 把本章的零件串起来，一个分类模型的后处理就成型了（假设推理已拿到 `logits: &[f32]`，共 1000 个，怎么拿到见第 14 章）：
 
-```rust
+```rust,ignore
 let probs = softmax(logits);          // logits → 概率
 for (id, p) in top_k(&probs, 5) {     // 取 Top-5
     println!("{:>5.1}%  类别 {}", p * 100.0, id);
@@ -188,7 +188,7 @@ great white shark     ← 第 2 类
 
 用 Rust 读进来就是一个 `Vec<String>`，下标即类别号：
 
-```rust
+```rust,ignore
 use std::fs;
 
 /// 从 labels.txt 加载类别表：每行一个名字，行号 = 类别号
@@ -200,7 +200,7 @@ fn load_labels(path: &str) -> std::io::Result<Vec<String>> {
 
 配上 15.4 的结果就能打印人话了（数值为示意）：
 
-```rust
+```rust,ignore
 let labels = load_labels("imagenet_classes.txt")?; // 1000 行
 for (id, p) in top_k(&probs, 5) {
     println!("{:>5.1}%  {}", p * 100.0, labels[id]); // 用类别号去查名字
@@ -222,7 +222,7 @@ for (id, p) in top_k(&probs, 5) {
 
 但很多场景不是这样。一张海边度假照，可以**同时**属于"户外""沙滩""人""晴天"好几个标签——它们**并不互斥**。这叫**多标签分类（multi-label classification）**。这时候再用 Softmax 就错了：Softmax 强行让总和为 1，"户外"分高了就会**压低**"沙滩"，可现实里这两个本该都高。
 
-正确做法是**放弃 Softmax，改成逐类独立地过 Sigmoid，再各自和一个阈值比**。**Sigmoid**（附录 A.5）把**单个** logit 压进 `(0, 1)`，`σ(0)=0.5`，越大越接近 1：
+正确做法是**放弃 Softmax，改成逐类独立地过 Sigmoid，再各自和一个阈值比**。**Sigmoid**（附录 A.9）把**单个** logit 压进 `(0, 1)`，`σ(0)=0.5`，越大越接近 1：
 
 $$\sigma(x) = \frac{1}{1 + e^{-x}}$$
 
@@ -241,7 +241,7 @@ Softmax 和 Sigmoid 的区别是本章的核心分水岭，用表格钉死：
 
 多标签的 Rust 实现，比 Softmax 还简单——没有归一化，逐类算、逐类筛：
 
-```rust
+```rust,ignore
 /// Sigmoid：把单个 logit 压到 (0, 1)
 fn sigmoid(x: f32) -> f32 {
     1.0 / (1.0 + (-x).exp())
@@ -276,9 +276,9 @@ fn multi_label(logits: &[f32], threshold: f32) -> Vec<(usize, f32)> {
 | 均值 mean | 无 | `[0.485, 0.456, 0.406]`（RGB） |
 | 标准差 std | 无 | `[0.229, 0.224, 0.225]`（RGB） |
 
-也就是说，检测器那套"读进来除以 255 就完事"的预处理，**直接套到分类模型上是错的**——你漏掉了 ImageNet 的均值方差这一步（这套统计值是在 ImageNet 训练集上算出来的，含义见附录 A.4）。分类模型正确的预处理片段（假设已把图缩放到 224×224、RGB、每像素 3 个 `u8`，缩放细节见第 10 章）：
+也就是说，检测器那套"读进来除以 255 就完事"的预处理，**直接套到分类模型上是错的**——你漏掉了 ImageNet 的均值方差这一步（这套统计值是在 ImageNet 训练集上算出来的，方差、标准差和标准化见附录 A.6~A.7）。分类模型正确的预处理片段（假设已把图缩放到 224×224、RGB、每像素 3 个 `u8`，缩放细节见第 10 章）：
 
-```rust
+```rust,ignore
 // ImageNet 训练时的逐通道均值/标准差（RGB 顺序）
 const MEAN: [f32; 3] = [0.485, 0.456, 0.406];
 const STD:  [f32; 3] = [0.229, 0.224, 0.225];

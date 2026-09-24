@@ -8,7 +8,7 @@
 
 先分清两件事。
 
-**分类（Classification）** 回答的是"**这张图是什么**"：喂进一张图，模型吐出"猫 92%、狗 5%、……"，一张图一个答案。这就像考试的单选题——整张图只给一个标签。第 15 章讲的就是它，输出是一个走过 Softmax 的概率向量。
+**分类（Classification）** 回答的是"**这张图是什么**"：喂进一张图，模型吐出"猫 92%、狗 5%、……"，一张图一个答案。这就像考试的单选题——整张图只给一个标签。第 15 章讲的就是它，模型通常先输出 logits，再由后处理用 Softmax 转成概率向量。
 
 **检测（Detection）** 要同时回答两件事："**有什么**"+"**在哪**"。喂进一张监控画面，模型要告诉你："左上角有 1 个人（框在这），中间有 2 辆车（框在这、这），右下角有 1 条狗（框在这）"。它不是给整张图一个标签，而是给图里**每一个物体**一个"类别 + 位置框 + 置信度"。
 
@@ -17,7 +17,7 @@
 - 分类像**门口的刷脸闸机**——只判断"是不是员工"，一个是非题。
 - 检测像**保安巡逻点名**——扫一眼大厅，指出"那边站着 3 个人、门口停了 2 辆车"，每个都要圈出来、说清是什么。
 
-多出来的这个"在哪"，就是本章所有麻烦的来源：模型没法只输出一个标签，它得输出**一大堆候选框**，我们再从中筛出真正的物体。位置用**边界框（Bounding Box，简称 bbox）** 表示，全书统一约定用**左上角-右下角** `(x1, y1, x2, y2)` 四个像素坐标（见第 6 章统一类型）。本章的终点，就是把那 70 万个数字变成一小把干净的 `Detection`。
+多出来的这个"在哪"，就是本章所有麻烦的来源：模型没法只输出一个标签，它得输出**一大堆候选框**，我们再从中筛出真正的物体。位置用**边界框（Bounding Box，简称 bbox）** 表示，全书统一约定用**左上角-右下角** `(x1, y1, x2, y2)` 四个像素坐标（这个 `BBox` 类型最早见第 3.8 节）。本章的终点，就是把那 70 万个数字变成一小把干净的 `Detection`。
 
 ---
 
@@ -98,7 +98,7 @@ YOLOv8 在三个不同"粗细"的特征图上做预测（对应下采样步长 s
 
 **关键点 1：前 4 个是 `cx, cy, w, h`（中心 x、中心 y、宽、高），不是 `x1,y1,x2,y2`。** 这是新手第一个大坑，后面 16.5 专门转换。
 
-**关键点 2：YOLOv8 没有单独的 objectness（有无物体）分数。** 对比一下：YOLOv5 的属性是 85 = 4 框 + **1 个 objectness** + 80 类，置信度要算 `objectness × 类别分`；而 v8 是 84 = 4 框 + 80 类，**直接取 80 类里的最大分**当作这个候选的置信度。别把 v5 的公式套到 v8 上。
+**关键点 2：YOLOv8 没有单独的 objectness（有无物体）分数。** 对比一下：YOLOv5 的属性是 85 = 4 框 + **1 个 objectness** + 80 类，置信度要算 `objectness × 类别分`；而 v8 是 84 = 4 框 + 80 类。Ultralytics 常见导出的 ONNX 已在图内对类别 logits 做了 Sigmoid，后处理可**直接取 80 类里的最大分**当作这个候选的置信度。若使用其他导出链，先用 Netron 确认输出是否已经激活，避免漏做或重复做 Sigmoid。别把 v5 的公式套到 v8 上。
 
 ### 最坑的地方：内存布局
 
@@ -130,7 +130,7 @@ flat[i * 84 + c]       ❌ 错误：这是 [1,8400,84] 布局的取法
 
 用错这个下标，取出来的全是张冠李戴的乱数，框会飞得到处都是，还特别难 debug（不报错、只是结果不对）。记住口诀：**属性乘 8400，再加候选号**。
 
-```rust
+```rust,ignore
 const NUM_ANCHORS: usize = 8400; // 候选框个数
 const NUM_CLASSES: usize = 80;   // COCO 类别数
 const NUM_ATTRS:   usize = 4 + NUM_CLASSES; // = 84
@@ -151,7 +151,7 @@ fn at(output: &[f32], c: usize, i: usize) -> f32 {
 
 有了正确的取值方式，解码单个候选就水到渠成了：取出 `cx,cy,w,h`，再在 80 个类别分里找最大值（**argmax**），最大值就是这个候选的**置信度**，对应的下标就是 **class_id**。
 
-```rust
+```rust,ignore
 /// 从展平的 [1,84,8400] 里解码第 i 个候选
 /// 返回 (cx, cy, w, h, class_id, score)，坐标此刻还在 640 letterbox 坐标系里
 fn decode_one(output: &[f32], i: usize) -> (f32, f32, f32, f32, usize, f32) {
@@ -213,10 +213,10 @@ $$x_{\text{原}} = \frac{x_{640} - \text{pad\_x}}{\text{scale}},\qquad y_{\text{
 
 得到原图坐标 `(540, -120, 740, 280)`。注意 `y1` 成了负数——框顶超出了图像上边界，这在贴边物体上很常见，生产里会再 clamp（裁剪）到图像范围内。
 
-统一用第 6 节的 `BBox`（左上右下），写出反算函数：
+统一用第 3.8 节引入的 `BBox`（左上右下），写出反算函数：
 
-```rust
-/// 边界框：左上-右下像素坐标（全书统一类型，见第 6 节）
+```rust,ignore
+/// 边界框：左上-右下像素坐标（全书统一类型，见第 3.8 节）
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct BBox {
     pub x1: f32,
@@ -251,7 +251,7 @@ fn to_original_bbox(cx: f32, cy: f32, w: f32, h: f32, scale: f32, pad: (f32, f32
 
 8400 个候选里，绝大多数是"这里啥也没有"的背景，分数极低（0.01、0.03……）。全部留着送进 NMS 又慢又没意义。所以解码时顺手做**置信度阈值过滤**：分数低于阈值（常用 `conf = 0.25`）的直接扔掉。
 
-```rust
+```rust,ignore
 // 伪代码示意，完整版见 16.8
 if score < conf {
     continue; // 这个候选不要了
@@ -300,9 +300,9 @@ IoU=0 表示完全不挨着，IoU=1 表示两个框完全重合。**手算一遍
 
 0.667 是个很高的重叠度——这俩框八成指着同一辆车。若 NMS 阈值取 0.5，B 就会被分数更高的 A 压制掉。反过来，如果两个框只是稍微擦边（IoU 0.1），说明是两个不同物体，谁也不该压制谁。
 
-给统一类型 `BBox` 补上方法（`width/height/area/center/iou`，命名遵循第 6 节）：
+给统一类型 `BBox` 补上方法（`width/height/area/center/iou`）：
 
-```rust
+```rust,ignore
 impl BBox {
     pub fn width(&self)  -> f32 { (self.x2 - self.x1).max(0.0) } // 退化框宽记 0
     pub fn height(&self) -> f32 { (self.y2 - self.y1).max(0.0) }
@@ -338,10 +338,10 @@ impl BBox {
 3. 计算它与其余每个框的 **IoU**，把 IoU **超过阈值**的框全部删掉（它们和代表指向同一物体）。
 4. 在剩下的框里回到第 2 步，直到没有框剩下。
 
-用统一的 `Detection` 类型（第 6 节）实现，写法上换个等价的贪心角度：**按分数降序遍历，每个框只和"已保留"的比，若和任一已保留框重叠过高就丢弃**（能丢它的一定分更高，逻辑等价、还更好读）：
+用本章统一的 `Detection` 类型实现，写法上换个等价的贪心角度：**按分数降序遍历，每个框只和"已保留"的比，若和任一已保留框重叠过高就丢弃**（能丢它的一定分更高，逻辑等价、还更好读）：
 
-```rust
-/// 一个检测结果（全书统一类型，见第 6 节）
+```rust,ignore
+/// 一个检测结果（从本章起供后续章节复用）
 #[derive(Clone, Debug)]
 pub struct Detection {
     pub bbox: BBox,
@@ -372,7 +372,7 @@ fn nms_single_class(mut dets: Vec<Detection>, iou_thr: f32) -> Vec<Detection> {
 
 上面处理的是**同一类别**。为什么要分类别？想象一个人牵着一条狗，人框和狗框可能高度重叠（IoU 0.7）——但它们是**两个不同类别的真实物体**，绝不能因为重叠就删掉一个。所以通用检测都用**按类 NMS**：先按 `class_id` 分组，**每一类各做各的 NMS**，组间互不干扰。
 
-```rust
+```rust,ignore
 use std::collections::HashMap;
 
 /// 按类别分别做 NMS：不同类别的框互不抑制
@@ -421,7 +421,7 @@ fn nms_per_class(dets: Vec<Detection>, iou_thr: f32) -> Vec<Detection> {
 
 对应任务给定的函数签名，一把梭：
 
-```rust
+```rust,ignore
 const NUM_ANCHORS: usize = 8400;
 const NUM_CLASSES: usize = 80;
 const NUM_ATTRS:   usize = 4 + NUM_CLASSES; // = 84
@@ -476,7 +476,7 @@ fn postprocess(
 
 把本章的 `BBox`（含 `impl`）、`Detection`、`to_original_bbox`、`nms_single_class`、`nms_per_class`、`postprocess` 放进一个模块就能编译。调用方拿到的 `Vec<Detection>`，每个都是**原图像素坐标、类别明确、去过重**的干净结果——可以直接画框（`imageproc` 画矩形）、送去跟踪（第 21 章）或喂给业务过滤器。一个典型调用：
 
-```rust
+```rust,ignore
 // scale、pad 来自第 10 章 letterbox 预处理时记下的值；output 来自第 14 章推理
 let dets = postprocess(&output, scale, pad, 0.25, 0.45);
 for d in &dets {

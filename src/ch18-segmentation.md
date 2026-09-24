@@ -65,7 +65,7 @@
 
 对全图每个像素都做一遍，就得到一张 `H×W` 的**类别图**（每个格子存一个类别号），这就是语义分割的 mask。用 `ndarray` 写出来：
 
-```rust
+```rust,ignore
 use ndarray::{Array2, Array3};
 
 /// 语义分割逐像素 argmax。
@@ -159,7 +159,7 @@ fn argmax_over_channel(scores: &Array3<f32>) -> Array2<u8> {
 
 用 `ndarray` 实现这套"系数 × 原型"合成：
 
-```rust
+```rust,ignore
 use ndarray::{Array2, Array3};
 
 /// 批量合成实例 mask。
@@ -190,7 +190,7 @@ v = −1.5 → σ = 1/(1+e^1.5) = 1/(1+4.48) ≈ 0.18  < 0.5 → 背景
 
 **为什么要用检测框裁剪**：线性组合是全图范围的，某个物体的 mask 可能在画面别处也"亮"了一小块（原型是共享的，难免溢出）。但我们**已经知道这个物体在哪个框里**（第 16 章的检测结果），所以直接把框外的一切像素置 0，既干净又几乎零成本。二值化 + 框裁剪一起做：
 
-```rust
+```rust,ignore
 use ndarray::Array2;
 
 /// 概率 mask → 二值 mask，并只保留检测框内的像素（框外一律置 0）。
@@ -230,7 +230,7 @@ fn binarize_and_crop(
 
 我们给实例分割结果定义一个结构体，**直接内嵌第 16 章的 `Detection`**，不另造轮子：
 
-```rust
+```rust,ignore
 use ndarray::Array2;
 // BBox / Detection 复用第 16 章的统一定义
 
@@ -261,7 +261,7 @@ $$\text{输出} = (1-\alpha)\cdot\text{原图} + \alpha\cdot\text{类别色}$$
 
 `alpha=0.5` 时半透明，既看得见 mask 区域，又透得出底下的原图纹理。手算一个通道：原图某像素红色分量 200，类别色红色分量 0，`alpha=0.5` → 输出 `0.5×200 + 0.5×0 = 100`。代码：
 
-```rust
+```rust,ignore
 use image::RgbImage;
 use ndarray::Array2;
 
@@ -308,7 +308,7 @@ IoU = 2 / 6 ≈ 0.33
 
 代码（注意两张 mask 尺寸必须一致）：
 
-```rust
+```rust,ignore
 use ndarray::Array2;
 
 /// 两张二值 mask 的 IoU。尺寸需相同。

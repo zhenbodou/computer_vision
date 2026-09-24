@@ -37,10 +37,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-4d8e5ec0.js";
+            window.path_to_searchindex_js = "searchindex-ba421b3e.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-c1d54236.js"></script>
+        <script src="toc-68b1d651.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -178,7 +178,7 @@
                     <main>
                         <h1 id="第-22-章--空间过滤器roimask-与静态过滤"><a class="header" href="#第-22-章--空间过滤器roimask-与静态过滤">第 22 章 · 空间过滤器：ROI、Mask 与静态过滤</a></h1>
 <blockquote>
-<p><strong>本章导读</strong>：第 16 章让模型“看见“了目标，第 21 章给每个目标发了跟踪 ID。可模型是老实人——它会把<strong>整幅画面</strong>里所有的车、所有的人都报给你，而业务往往只关心其中一小块。检测+跟踪拿到目标之后，业务规则的第一关就是“<strong>空间</strong>“这一维：只关心画面里我在意的区域，别的通通不算数。本章讲三件事——<strong>ROI</strong>（感兴趣区域，只要框内）、<strong>Mask</strong>（掩码，屏蔽掉某块）、<strong>静态过滤</strong>（赶走长期不动的目标）。读完你能把“模型输出的一堆目标“收拾成“落在正确位置、值得上报的目标”，为后面第 23 章的拌线、第 24 章的去重打好地基。</p>
+<p><strong>本章导读</strong>：第 16 章让模型“看见“了目标，第 21 章给每个目标发了跟踪 ID。可模型是老实人——它会把<strong>整幅画面</strong>里所有的车、所有的人都报给你，而业务往往只关心其中一小块。检测+跟踪拿到目标之后，业务规则的第一关就是“<strong>空间</strong>“这一维：只关心画面里我在意的区域，别的通通不算数。本章讲三件事——<strong>ROI</strong>（感兴趣区域，只要框内）、<strong>Mask</strong>（掩码，屏蔽掉某块）、<strong>静态过滤</strong>（赶走长期不动的目标）。读完你能把“模型输出的一堆目标“收拾成“落在正确位置、值得上报的目标”，为后面第 23 章的绊线、第 24 章的去重打好地基。</p>
 </blockquote>
 <h2 id="221-为什么需要空间过滤模型看全局业务只管一块"><a class="header" href="#221-为什么需要空间过滤模型看全局业务只管一块">22.1 为什么需要空间过滤：模型看全局，业务只管一块</a></h2>
 <p>想象你在监考。考场里坐着五十个考生，走廊上还来来往往一堆送水的、路过的老师。你作为监考员，<strong>只管考场里这五十个人</strong>——走廊上谁在走动跟你没半毛钱关系。于是你在门口拉一条<strong>警戒线</strong>：线内的人我盯着，线外的我一律不看。</p>
@@ -187,7 +187,7 @@
 <pre><code class="language-text">     模型侧                          业务规则第一关：空间
 ┌──────────┐ Detection ┌──────────┐  Track   ┌───────────────────────────┐
 │  检测      │────────→ │  跟踪      │────────→ │      空间过滤（本章）         │──→ 时间维规则
-│ 第 16 章   │  一堆框    │ 第 21 章   │ 带ID目标  │  ROI · Mask · 静态过滤       │   拌线/去重
+│ 第 16 章   │  一堆框    │ 第 21 章   │ 带ID目标  │  ROI · Mask · 静态过滤       │   绊线/去重
 └──────────┘           └──────────┘          └───────────────────────────┘   第 23/24 章
    画面里所有物体                                只留下"该管的那些目标"
 </code></pre>
@@ -205,15 +205,13 @@
 </table>
 </div>
 <blockquote>
-<p>注意本章的“空间“是<strong>当前帧内的位置</strong>这一维。目标<strong>跨过一条线</strong>触发事件（拌线）是第 23 章，同一个目标<strong>短时间内别重复报</strong>（cooldown 去重）是第 24 章——那些属于“时间“和“事件“维度，本章不碰。</p>
+<p>注意本章的“空间“是<strong>当前帧内的位置</strong>这一维。目标<strong>跨过一条线</strong>触发事件（绊线）是第 23 章，同一个目标<strong>短时间内别重复报</strong>（cooldown 去重）是第 24 章——那些属于“时间“和“事件“维度，本章不碰。</p>
 </blockquote>
 <h2 id="222-矩形-roi最简单的感兴趣区域"><a class="header" href="#222-矩形-roi最简单的感兴趣区域">22.2 矩形 ROI：最简单的感兴趣区域</a></h2>
 <p><strong>ROI（Region of Interest，感兴趣区域）</strong> 就是画面里那块“我在意的区域“。最简单的形状是<strong>矩形</strong>：给定左上、右下两个角，判断目标在不在这个矩形里就行。</p>
 <p>先约定：本章所有坐标——ROI 的顶点、mask 的像素、Track 的框——<strong>统统是原图像素坐标</strong>（和第 16 章后处理还原出来的框同一套坐标系）。这一点是空间过滤的命根子，第 22.8 节会专门再敲一遍。</p>
 <p>复用全书统一的 <code>BBox</code>（左上-右下像素坐标）。一个矩形 ROI 可以直接用四元组 <code>(x1, y1, x2, y2)</code> 表示，判定“点在不在矩形内“只是四个比较：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>/// 矩形 ROI：(x_min, y_min, x_max, y_max)，原图像素坐标
+<pre><code class="language-rust ignore">/// 矩形 ROI：(x_min, y_min, x_max, y_max)，原图像素坐标
 type Rect = (f32, f32, f32, f32);
 
 /// 点是否落在矩形内（含边界）
@@ -221,8 +219,7 @@ fn point_in_rect(p: (f32, f32), r: Rect) -&gt; bool {
     let (px, py) = p;
     let (x1, y1, x2, y2) = r;
     px &gt;= x1 &amp;&amp; px &lt;= x2 &amp;&amp; py &gt;= y1 &amp;&amp; py &lt;= y2
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
 <p>问题来了：一个目标是一个<strong>框</strong>，不是一个点。拿框的哪个点去和 ROI 比？常见三种：</p>
 <ul>
 <li><strong>框中心点</strong> <code>center()</code>：<code>((x1+x2)/2, (y1+y2)/2)</code>。</li>
@@ -266,9 +263,7 @@ fn point_in_rect(p: (f32, f32), r: Rect) -&gt; bool {
 <p>再验一个外部点 <strong>Q = (6, 3)</strong>：向右发射线，B→C 边交点在 x=5，但 5 &lt; 6，在 Q 的<strong>左边</strong>不算；E→A 边交点在 x=1 更在左边。右侧穿越次数 = <strong>0</strong>，偶数 → <strong>Q 在外部</strong>。也对：多边形最大 x 才到 5，Q 在它右边。</p>
 <h3 id="可编译的-rust-实现"><a class="header" href="#可编译的-rust-实现">可编译的 Rust 实现</a></h3>
 <p>下面是射线法的标准实现（业界俗称 PNPOLY），签名严格按约定：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>/// 射线法判定点是否在多边形内部。
+<pre><code class="language-rust ignore">/// 射线法判定点是否在多边形内部。
 /// p:   待测点（原图像素坐标）
 /// poly: 多边形顶点，按顺序排列（顺时针或逆时针都行），首尾自动闭合
 fn point_in_polygon(p: (f32, f32), poly: &amp;[(f32, f32)]) -&gt; bool {
@@ -295,8 +290,7 @@ fn point_in_polygon(p: (f32, f32), poly: &amp;[(f32, f32)]) -&gt; bool {
         j = i;
     }
     inside
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
 <p>几个要点：</p>
 <ul>
 <li><code>straddles</code> 用 <code>(yi &gt; py) != (yj &gt; py)</code> 而不是 <code>&gt;=</code>，是为了把每条边看成<strong>半开区间</strong> <code>[下端, 上端)</code>，这样射线<strong>正好穿过某个顶点</strong>时不会被相邻两条边各算一次（那是射线法最容易翻车的 corner case）。</li>
@@ -313,15 +307,12 @@ fn point_in_polygon(p: (f32, f32), poly: &amp;[(f32, f32)]) -&gt; bool {
         └────●────┘  ← 底边中点 ( (x1+x2)/2, y2 )   ← "脚下"、落地点
 </code></pre>
 <p>给 <code>BBox</code> 加一个“底边中点“方法（<code>center()</code> 第 21 章已在用，这里按同样风格扩展）：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>impl BBox {
+<pre><code class="language-rust ignore">impl BBox {
     /// 底边中点：目标"脚下"落地的位置
     pub fn bottom_center(&amp;self) -&gt; (f32, f32) {
         ((self.x1 + self.x2) / 2.0, self.y2)
     }
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
 <p>两种选择的利弊：</p>
 <div class="table-wrapper">
 <table>
@@ -338,9 +329,7 @@ fn point_in_polygon(p: (f32, f32), poly: &amp;[(f32, f32)]) -&gt; bool {
 <h2 id="225-mask把不想看的区域直接涂黑"><a class="header" href="#225-mask把不想看的区域直接涂黑">22.5 Mask：把不想看的区域直接涂黑</a></h2>
 <p>ROI 是“<strong>只要里面</strong>“的白名单思路。有时候反过来更方便：画面大部分都要看，只有<strong>某几块</strong>是麻烦精——比如墙上挂的<strong>电视屏幕</strong>（里面播的人物会被当成真人检测）、地面的<strong>水洼反光</strong>、随风摇的树影。这些区域你想<strong>直接排除</strong>。这就是 <strong>Mask（掩码）</strong> 的活。</p>
 <p>Mask 是一张和原图（大致）等大的<strong>二值图</strong>：白色（255）表示“这里允许检测“，黑色（0）表示“这块屏蔽掉，里面出啥都不算“。你在工具里把电视、水面涂成黑色，存成一张 PNG，运行时按像素查表即可：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use image::GrayImage;
+<pre><code class="language-rust ignore">use image::GrayImage;
 
 /// 查 mask 判断某点是否位于「允许检测」区域。
 /// 约定：白(&gt;127)=允许，黑=屏蔽。
@@ -360,8 +349,7 @@ fn point_allowed_by_mask(
         return false;
     }
     mask.get_pixel(mx as u32, my as u32)[0] &gt; 127
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
 <h3 id="roi-和-mask一个白名单一个黑名单"><a class="header" href="#roi-和-mask一个白名单一个黑名单">ROI 和 Mask，一个白名单一个黑名单</a></h3>
 <p>它们本质是一回事——都在问“<strong>点在不在某区域内</strong>“——只是取用方向相反，表示形式也不同：</p>
 <div class="table-wrapper">
@@ -396,9 +384,7 @@ fn point_allowed_by_mask(
 <p>最后一个空间过滤器，专治一类顽固噪声：<strong>长期不动的目标</strong>。停在路边的车、广场上的<strong>雕像</strong>、被误检成“人“的立柱和海报——它们稳稳待在 ROI 里，帧帧都被上报，却没有任何业务价值。<strong>静态过滤（static filtering）</strong> 的任务就是把它们摘出去。</p>
 <p>判断“动没动“，靠单帧是做不到的——你得知道这个目标<strong>过去几帧在哪</strong>。这正是第 21 章跟踪给的东西：每个目标有稳定的 <code>id</code>。于是思路清晰了：<strong>给每个 track.id 记一段最近位置的历史，统计它在 N 帧内的位移；位移小于阈值，就判为静止、过滤掉。</strong></p>
 <p>统一的 <code>Track</code> 结构（第 21 章）本身只带当前帧的 <code>bbox</code>，不含历史。所以我们在过滤阶段<strong>另起一个历史缓冲</strong>，用 <code>track.id</code> 作键累积位置——不改动统一类型，也更符合工程分层：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use std::collections::{HashMap, VecDeque};
+<pre><code class="language-rust ignore">use std::collections::{HashMap, VecDeque};
 
 /// 每个 track 最近若干帧的落地点历史（原图像素，用底边中点）
 pub struct MotionHistory {
@@ -439,8 +425,7 @@ impl MotionHistory {
         let spread = ((max_x - min_x).powi(2) + (max_y - min_y).powi(2)).sqrt();
         spread &lt; thresh_px
     }
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
 <p><strong>为什么用“外接框对角线“而不是“首帧到末帧的直线位移“？</strong> 因为检测框天生有抖动，一个真静止的目标，落地点也会在几像素内哆嗦。如果只比首末两点，目标“绕一圈回原地“会被误判成静止；而外接框衡量的是“这 N 帧里它到底晃出了多大范围“，对抖动和往返都更稳。手算一下：某 track 最近 5 帧落地点为 <code>(100,200) (101,199) (100,201) (102,200) (101,200)</code>，外接框 <code>x∈[100,102]、y∈[199,201]</code>，对角线 <code>√(2²+2²)=√8≈2.83</code> 像素。阈值取 12 像素，则 <code>2.83 &lt; 12</code> → 判为<strong>静止</strong>，过滤掉。</p>
 <h3 id="静止多久算静止刚停和一直停"><a class="header" href="#静止多久算静止刚停和一直停">“静止多久算静止？”“刚停“和“一直停”</a></h3>
 <p>这几个问题决定阈值和窗口怎么配：</p>
@@ -452,9 +437,7 @@ impl MotionHistory {
 </ul>
 <h2 id="227-串成一个空间过滤阶段"><a class="header" href="#227-串成一个空间过滤阶段">22.7 串成一个空间过滤阶段</a></h2>
 <p>三件工具单独看都简单，真正上线时把它们串成<strong>一个空间过滤阶段</strong>：一批带 ID 的 <code>Track</code> 进去，一批“该管的“ <code>Track</code> 出来。</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use image::GrayImage;
+<pre><code class="language-rust ignore">use image::GrayImage;
 
 /// 空间过滤：ROI（多边形）+ Mask（可选）+ 静态过滤，串成一关。
 /// 所有坐标均为原图像素。判定点统一用底边中点。
@@ -490,20 +473,16 @@ pub fn spatial_filter(
         })
         .cloned()
         .collect()
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
 <p>在每帧的主循环里，<strong>先更新历史，再过滤</strong>（否则当前帧就没被计入位移统计）：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>// 假设 tracks 来自第 21 章的跟踪器输出
+<pre><code class="language-rust ignore">// 假设 tracks 来自第 21 章的跟踪器输出
 motion.update(&amp;tracks);
 let kept = spatial_filter(
     &amp;tracks, &amp;road_roi, Some(&amp;exclude_mask),
     frame_w, frame_h, &amp;motion, 12.0,
 );
 // kept 里就是「在马路 ROI 内、没被屏蔽、且正在移动」的目标，
-// 交给下一关（第 23 章拌线、第 24 章去重）。
-<span class="boring">}</span></code></pre>
+// 交给下一关（第 23 章绊线、第 24 章去重）。</code></pre>
 <p>组织上有几点顺手的约定：ROI 和 mask 是廉价的<strong>点判定</strong>，放前面先把大部分目标筛掉；静态过滤要查历史、稍重，放最后。三者是“<strong>与</strong>“的关系——任意一关不过，目标就出局。真实项目里这一整段常包成一个 <code>SpatialFilter</code> 结构体，把 <code>roi</code>、<code>mask</code>、<code>motion</code>、各种阈值都存成字段，从配置文件加载，一处配置、多路复用。</p>
 <h2 id="228-工程坑位清单"><a class="header" href="#228-工程坑位清单">22.8 工程坑位清单</a></h2>
 <ul>

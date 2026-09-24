@@ -67,12 +67,12 @@ ab_glyph = "0.2"                  # 字体，给框写文字
 fast_image_resize = "5"           # 快速缩放（letterbox 提速）
 
 # --- 数组 / 张量 / 线代 ---
-ndarray = { version = "0.16", features = ["rayon"] }
+ndarray = { version = "0.17", features = ["rayon"] }
 nalgebra = "0.33"                 # 卡尔曼滤波（第 21 章）
 
 # --- 推理（二选一或都用）---
 tract-onnx = "0.21"               # 纯 Rust，易上手
-# ort = "2"                       # 性能更好（需 onnxruntime 动态库，支持 GPU/NPU）
+# ort = "=2.0.0-rc.13"           # 性能更好；预发布版应精确锁定，避免 API 漂移
 
 # --- 视频（可选，编译较重）---
 # opencv = "0.93"
@@ -89,7 +89,7 @@ serde_json = "1"                  # 配置 / 报警 JSON
 
 ## B.3 版本说明
 
-- 本书所有 crate 版本号都经过验证可用。Rust 生态更新快，如果读到本书时版本已过期，直接 `cargo add 包名`（不带版本号）让 cargo 自动选最新版，再对照官方迁移指南调整 API 差异。
+- 表中的版本是本书示例采用的基线。Rust 生态更新快，如果读到本书时版本已过期，应先查看对应 crate 的官方迁移指南；直接升级到最新版时，API 可能需要同步调整。
 - `opencv` 编译需要系统装有 OpenCV 库，新手建议先用 `image` + `ffmpeg` CLI（第 6 章的方案）处理视频，等确实有需求再装绑定。
 - `tract-onnx` 支持的 ONNX opset 版本有限（本书用 opset 12 的模型验证），遇到不支持的算子会报 `unimplemented` 错误——第 12 章讲了用 Netron 查看模型算子与 shape 的方法，可先确认模型是否被支持。
 - `ort`（ONNX Runtime 绑定）性能最强，但要链接 onnxruntime 动态库；想用 GPU/NPU 加速请配合对应的 Execution Provider（第 29 章讲部署与硬件加速时展开）。

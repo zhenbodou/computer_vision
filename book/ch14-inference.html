@@ -37,10 +37,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-4d8e5ec0.js";
+            window.path_to_searchindex_js = "searchindex-ba421b3e.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-c1d54236.js"></script>
+        <script src="toc-68b1d651.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -246,7 +246,7 @@
 <p>好在两者接口高度相似，学会一个另一个照猫画虎。下面各写一个完整可编译的例子，模型统一用第 13 章导出的 <code>yolov8n.onnx</code>，输入统一用第 10 章的 <code>preprocess()</code>。</p>
 <blockquote>
 <p><strong>复用第 10 章的接口约定</strong>：本章所有例子都调用第 10 章造好的预处理函数，签名是
-<code>pub fn preprocess(img: &amp;RgbImage) -&gt; (Array4&lt;f32&gt;, LetterboxInfo)</code>。
+<code>pub fn preprocess(img: &amp;RgbImage, target: u32) -&gt; (Array4&lt;f32&gt;, LetterboxInfo)</code>。
 它吃一张 <code>image::RgbImage</code>，吐出两样东西：<code>ndarray::Array4&lt;f32&gt;</code>（形状正好 <code>[1,3,640,640]</code>、已 letterbox、已归一化到 <code>0~1</code>）和一个 <code>LetterboxInfo</code>（记着缩放比例和填充量，留给第 16 章把框还原回原图用）。本章用不到 <code>LetterboxInfo</code>，先用 <code>_</code> 接住。</p>
 </blockquote>
 <h2 id="143-tract纯-rust-跑通第一个模型"><a class="header" href="#143-tract纯-rust-跑通第一个模型">14.3 tract：纯 Rust 跑通第一个模型</a></h2>
@@ -255,12 +255,12 @@
 cargo add tract-onnx ndarray image
 </code></pre>
 <p>完整程序如下，四步走：加载 → 喂张量 → <code>run()</code> → 取输出。逐行有注释：</p>
-<pre class="playground"><code class="language-rust">use image::RgbImage;
+<pre><code class="language-rust ignore">use image::RgbImage;
 use ndarray::Array4;
 use tract_onnx::prelude::*;
 
 // 第 10 章造好的预处理，签名照搬过来即可：
-// pub fn preprocess(img: &amp;RgbImage) -&gt; (Array4&lt;f32&gt;, LetterboxInfo);
+// pub fn preprocess(img: &amp;RgbImage, target: u32) -&gt; (Array4&lt;f32&gt;, LetterboxInfo);
 
 fn main() -&gt; TractResult&lt;()&gt; {
     // ① 加载模型：解析 onnx → 固定输入形状 → 图优化 → 编译成可执行计划
@@ -274,7 +274,7 @@ fn main() -&gt; TractResult&lt;()&gt; {
 
     // ② 预处理：复用第 10 章的 preprocess，拿到标准 ndarray 的 Array4&lt;f32&gt;
     let img: RgbImage = image::open("test.jpg")?.to_rgb8();
-    let (input, _info): (Array4&lt;f32&gt;, _) = preprocess(&amp;img); // 形状 [1,3,640,640]
+    let (input, _info): (Array4&lt;f32&gt;, _) = preprocess(&amp;img, 640); // 形状 [1,3,640,640]
 
     // ③ 把 ndarray 里的数据搬进 tract 的张量。
     //    张量的本质就是“形状 + 一串连续的数字”，from_shape 正是照这个模型造的：
@@ -298,21 +298,18 @@ run             → 真跑，喂 tvec![张量...]，拿回 outputs
 </code></pre>
 <p><strong>关于第 ③ 步那句 <code>Tensor::from_shape</code> 的桥接</strong>，值得单独点一句：<code>preprocess()</code> 返回的是 crates.io 上标准 <code>ndarray</code> 的 <code>Array4</code>，而 tract 自带一份 <code>tract_ndarray</code>（同源，但版本号可能和你项目里的 <code>ndarray</code> 对不上）。两者类型“同名不同宗“时，直接 <code>input.into()</code> 会编译不过。最稳的桥就是借出底层数据切片（<code>input.as_slice()</code>）、按形状重建一个 tract 张量——绕开版本问题，永远能编过。<strong>这也是使用 tract 时几乎唯一的槽点。</strong></p>
 <p>如果第 16 章的后处理想要一个标准 <code>ndarray</code> 的 owned 数组，同样一句话搬回来：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>// 把输出的 [1,84,8400] 变成标准 ndarray::Array3&lt;f32&gt;，交给第 16 章
+<pre><code class="language-rust ignore">// 把输出的 [1,84,8400] 变成标准 ndarray::Array3&lt;f32&gt;，交给第 16 章
 let out3 = ndarray::Array3::from_shape_vec(
     (1, 84, 8400),
     out.as_slice().unwrap().to_vec(),
 ).unwrap();
-println!("转成 ndarray: {:?}", out3.dim());   // (1, 84, 8400)
-<span class="boring">}</span></code></pre>
+println!("转成 ndarray: {:?}", out3.dim());   // (1, 84, 8400)</code></pre>
 <h2 id="144-ort接上工业级的-onnx-runtime"><a class="header" href="#144-ort接上工业级的-onnx-runtime">14.4 ort：接上工业级的 ONNX Runtime</a></h2>
 <p><code>ort</code> 把微软的 ONNX Runtime 包成了 Rust API。用法和 tract 几乎一一对应，多出来的主要是<strong>注册 EP</strong> 和<strong>要带一个动态库</strong>。</p>
 <p>依赖（写作时最新是 <code>2.0.0-rc.13</code>；<code>ort</code> 的 2.x 各 rc 之间 API 有过调整，工程上建议<strong>锁定版本</strong>）：</p>
 <pre><code class="language-toml">[dependencies]
 ort = "=2.0.0-rc.13"   # 默认会自动下载官方预编译的 onnxruntime 动态库
-ndarray = "0.16"
+ndarray = "0.17"
 image = "0.25"
 # 想用 NVIDIA 显卡，就打开对应 feature（还需机器上装好 CUDA/cuDNN）：
 # ort = { version = "=2.0.0-rc.13", features = ["cuda"] }
@@ -321,13 +318,13 @@ image = "0.25"
 <p><strong>注意</strong>：<code>ort</code> 运行时依赖 <code>onnxruntime</code> 动态库（Linux 上是 <code>libonnxruntime.so</code>，macOS 是 <code>.dylib</code>，Windows 是 <code>onnxruntime.dll</code>）。默认特性下 <code>ort</code> 会自动帮你下载好；离线/受限环境要手动准备并让程序找得到它，否则运行时会报“找不到库“。这正是它比 tract“重“的地方。</p>
 </blockquote>
 <p>完整程序：</p>
-<pre class="playground"><code class="language-rust">use image::RgbImage;
+<pre><code class="language-rust ignore">use image::RgbImage;
 use ndarray::Array4;
 use ort::session::{builder::GraphOptimizationLevel, Session};
 use ort::value::TensorRef;
 
 // 同样复用第 10 章的 preprocess：
-// pub fn preprocess(img: &amp;RgbImage) -&gt; (Array4&lt;f32&gt;, LetterboxInfo);
+// pub fn preprocess(img: &amp;RgbImage, target: u32) -&gt; (Array4&lt;f32&gt;, LetterboxInfo);
 
 fn main() -&gt; ort::Result&lt;()&gt; {
     // ① 建会话(Session)：图优化拉满 + 设线程数 + 注册 EP + 加载模型
@@ -346,7 +343,7 @@ fn main() -&gt; ort::Result&lt;()&gt; {
 
     // ② 预处理，拿到标准 ndarray 的 [1,3,640,640]（ort 直接吃标准 ndarray，不用像 tract 那样桥接）
     let img: RgbImage = image::open("test.jpg").unwrap().to_rgb8();
-    let (input, _info): (Array4&lt;f32&gt;, _) = preprocess(&amp;img);
+    let (input, _info): (Array4&lt;f32&gt;, _) = preprocess(&amp;img, 640);
 
     // ③ 构造输入并 run。"images" 是模型的输入名（第 12 章读元数据得到）。
     //    TensorRef::from_array_view 是“借用”数据、零拷贝，最省内存。
@@ -405,19 +402,14 @@ fn main() -&gt; ort::Result&lt;()&gt; {
 <h2 id="147-性能与工程实践"><a class="header" href="#147-性能与工程实践">14.7 性能与工程实践</a></h2>
 <p>把 demo 变成能上线的推理程序，下面几条是“不做就慢/就崩“的硬常识。</p>
 <p><strong>1. 会话(Session)只创建一次，反复复用。</strong> 加载模型要读文件、建图、优化，动辄几百毫秒到几秒、还吃几百 MB 内存。<strong>千万别放进循环</strong>：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>// ❌ 每帧都重新加载模型：每次几秒 + 内存反复申请释放，程序又慢又抖
+<pre><code class="language-rust ignore">// ❌ 每帧都重新加载模型：每次几秒 + 内存反复申请释放，程序又慢又抖
 for frame in frames { let model = load_model(); model.run(...); }
 
 // ✅ 加载一次，循环里只调用 run
 let model = load_model();
-for frame in frames { model.run(...); }
-<span class="boring">}</span></code></pre>
+for frame in frames { model.run(...); }</code></pre>
 <p><strong>2. 一定要预热（warmup）。</strong> 引擎<strong>第一次推理往往慢 2~10 倍</strong>——内存首次分配、计算核首次编译、CPU 缓存冷启动、GPU 上下文初始化都挤在这一发里。所以：正式服务前先空跑几次把它“焐热“；做性能测试(benchmark)时更要先预热再计时，否则数字毫无意义。</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use std::time::Instant;
+<pre><code class="language-rust ignore">use std::time::Instant;
 
 // 预热：拿真实尺寸的输入空跑几次
 for _ in 0..10 { let _ = model.run(tvec!(tensor.clone().into()))?; }
@@ -425,8 +417,7 @@ for _ in 0..10 { let _ = model.run(tvec!(tensor.clone().into()))?; }
 // 正式计时：跑 100 次取平均
 let t = Instant::now();
 for _ in 0..100 { let _ = model.run(tvec!(tensor.clone().into()))?; }
-println!("平均单次推理: {:?}", t.elapsed() / 100);
-<span class="boring">}</span></code></pre>
+println!("平均单次推理: {:?}", t.elapsed() / 100);</code></pre>
 <p><strong>3. 线程数按场景设。</strong> ORT 默认会吃满 CPU 核心：单路摄像头、追求低延迟时，<code>with_intra_threads</code> 设小一点（甚至 1）反而稳；离线批处理追求吞吐，就放开让它多线程并行。</p>
 <p><strong>4. 少拷贝、复用内存。</strong> 每帧都新建输入缓冲、<code>to_owned()</code> 一份输出，都是白白的内存搬运。工程上常用的招：预处理的输出缓冲固定复用（第 10 章）；取输出优先用零拷贝<strong>视图</strong>（tract 的 <code>to_array_view</code>、ort 的 <code>try_extract_array</code> 拿到的都是借用，不 <code>to_owned</code> 就不拷贝）；ort 还提供 <strong>IO Binding</strong>，把输入/输出缓冲直接绑到设备内存上，省掉 CPU↔GPU 之间的来回搬运——高并发服务里这几微秒累积起来很可观。</p>
 <p><strong>5. 把三段接成流水线。</strong> 真实程序是“预处理 → 推理 → 后处理“连轴转。单张顺着跑没问题，但要吃满多核/多路视频时，通常把三段拆成流水线并发跑（一个线程解码预处理、一个线程推理、一个线程后处理，用队列衔接），让 GPU 不空等。<strong>多路并发、批调度、部署打包这些工程话题，第 29 章会专门展开</strong>，本章先把“单条链路正确、复用得当“打牢。</p>

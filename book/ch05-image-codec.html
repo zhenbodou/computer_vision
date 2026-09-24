@@ -37,10 +37,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-4d8e5ec0.js";
+            window.path_to_searchindex_js = "searchindex-ba421b3e.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-c1d54236.js"></script>
+        <script src="toc-68b1d651.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -302,7 +302,7 @@
 cargo add image anyhow
 </code></pre>
 <p>下面这个程序做两件事：<strong>①</strong> 解码一张图并打印它的尺寸/通道；<strong>②</strong> 用不同 <code>quality</code> 重新编码成 JPEG，比较字节数。</p>
-<pre class="playground"><code class="language-rust">use anyhow::Result;
+<pre><code class="language-rust ignore">use anyhow::Result;
 use image::GenericImageView;            // 提供 .dimensions() 等方法
 use image::codecs::jpeg::JpegEncoder;   // 可精确控制质量的 JPEG 编码器
 
@@ -381,9 +381,7 @@ quality | 字节数  | 压缩比
 <h3 id="坑一exif-方向orientation手机照片会躺着"><a class="header" href="#坑一exif-方向orientation手机照片会躺着">坑一：EXIF 方向（orientation）——手机照片会“躺着“</a></h3>
 <p>这是<strong>最高频、最坑新手</strong>的一个。手机横着、竖着、倒着拍，传感器出来的像素其实一直是同一个方向，手机只是在文件的 <strong>EXIF</strong> 信息里记一个“方向标记（Orientation，1~8）“，让看图软件显示时自己转。问题是：<strong><code>image::open</code> 只解码像素，默认不读、不应用这个方向标记</strong>。于是你解码出来的图可能是<strong>躺着或倒着</strong>的——人眼看着别扭，模型更是直接把一张“歪脖子“的图学歪，检测框全错位。</p>
 <p>处理办法：解码后读出 EXIF Orientation，再把图转正。用 <code>kamadak-exif</code> 读方向：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>// cargo add kamadak-exif
+<pre><code class="language-rust ignore">// cargo add kamadak-exif
 use std::fs::File;
 use std::io::BufReader;
 
@@ -398,12 +396,9 @@ fn read_orientation(path: &amp;str) -&gt; u32 {
     exif.get_field(exif::Tag::Orientation, exif::In::PRIMARY)
         .and_then(|f| f.value.get_uint(0))
         .unwrap_or(1)
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
 <p>拿到值后按下表旋正（<code>DynamicImage</code> 自带 <code>rotate90/180/270</code>、<code>fliph/flipv</code>）：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use image::DynamicImage;
+<pre><code class="language-rust ignore">use image::DynamicImage;
 
 /// 按 EXIF Orientation 把图像"摆正"
 fn apply_orientation(img: DynamicImage, orientation: u32) -&gt; DynamicImage {
@@ -417,8 +412,7 @@ fn apply_orientation(img: DynamicImage, orientation: u32) -&gt; DynamicImage {
         8 =&gt; img.rotate270(),             // 逆时针 90°
         _ =&gt; img,                         // 1 或未知：原样
     }
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
 <blockquote>
 <p>提示：较新版本的 <code>image</code> 也提供了 <code>DynamicImage::apply_orientation</code> 配合解码器读到的方向来一步旋正，但很多老代码/老版本没有，理解上面这套“读标记 → 手动旋转“的逻辑最保险。<strong>一句话记牢：处理手机来源的图，第一件事就是查 EXIF 方向。</strong></p>
 </blockquote>

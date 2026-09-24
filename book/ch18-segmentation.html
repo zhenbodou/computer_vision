@@ -37,10 +37,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-4d8e5ec0.js";
+            window.path_to_searchindex_js = "searchindex-ba421b3e.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-c1d54236.js"></script>
+        <script src="toc-68b1d651.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -234,9 +234,7 @@
 <pre><code class="language-text">[背景 0.5,  人 3.1,  车 1.2]  → 最大是 3.1，下标 1 → 该像素判为"人"
 </code></pre>
 <p>对全图每个像素都做一遍，就得到一张 <code>H×W</code> 的<strong>类别图</strong>（每个格子存一个类别号），这就是语义分割的 mask。用 <code>ndarray</code> 写出来：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use ndarray::{Array2, Array3};
+<pre><code class="language-rust ignore">use ndarray::{Array2, Array3};
 
 /// 语义分割逐像素 argmax。
 /// 输入 scores：形状 [C, H, W]（去掉了 batch 维），
@@ -259,8 +257,7 @@ fn argmax_over_channel(scores: &amp;Array3&lt;f32&gt;) -&gt; Array2&lt;u8&gt; {
         }
     }
     label
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
 <blockquote>
 <p><strong>和第 15 章的联系</strong>：分类是“对<strong>一整张图</strong>的一个向量做 argmax“，语义分割是“对<strong>每个像素</strong>的向量做 argmax“，本质相同，只是重复了 H×W 次。注意这里通常<strong>不需要 Softmax</strong>——我们只关心谁最大，取最大值的下标不受 Softmax 单调变换影响（想回顾 Softmax 见第 15 章）。</p>
 </blockquote>
@@ -312,9 +309,7 @@ fn argmax_over_channel(scores: &amp;Array3&lt;f32&gt;) -&gt; Array2&lt;u8&gt; {
      [N,32] [32,25600]                            每个目标一张 mask
 </code></pre>
 <p>用 <code>ndarray</code> 实现这套“系数 × 原型“合成：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use ndarray::{Array2, Array3};
+<pre><code class="language-rust ignore">use ndarray::{Array2, Array3};
 
 /// 批量合成实例 mask。
 /// coeffs: [N, 32]  —— N 个目标各自的 32 个 mask 系数
@@ -332,16 +327,13 @@ fn synthesize_masks(coeffs: &amp;Array2&lt;f32&gt;, protos: &amp;Array3&lt;f32&g
     // 逐元素 Sigmoid，把"有正有负的原始值"压到 0~1
     masks.mapv_inplace(|v| 1.0 / (1.0 + (-v).exp()));
     masks
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
 <p><strong>Sigmoid 为什么必须有</strong>：线性组合出来的值有正有负（比如 +2.0、−1.5），不是概率。Sigmoid <code>σ(v)=1/(1+e^{-v})</code> 把它单调压到 0~1，可以理解成“这个像素属于该物体的把握“。手算两个值感受一下：</p>
 <pre><code class="language-text">v = +2.0 → σ = 1/(1+e^-2) = 1/(1+0.135) ≈ 0.88  &gt; 0.5 → 前景（属于该物体）
 v = −1.5 → σ = 1/(1+e^1.5) = 1/(1+4.48) ≈ 0.18  &lt; 0.5 → 背景
 </code></pre>
 <p><strong>为什么要用检测框裁剪</strong>：线性组合是全图范围的，某个物体的 mask 可能在画面别处也“亮“了一小块（原型是共享的，难免溢出）。但我们<strong>已经知道这个物体在哪个框里</strong>（第 16 章的检测结果），所以直接把框外的一切像素置 0，既干净又几乎零成本。二值化 + 框裁剪一起做：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use ndarray::Array2;
+<pre><code class="language-rust ignore">use ndarray::Array2;
 
 /// 概率 mask → 二值 mask，并只保留检测框内的像素（框外一律置 0）。
 /// mask: [mh, mw] 概率图（Sigmoid 后）
@@ -361,8 +353,7 @@ fn binarize_and_crop(
         }
     }
     out
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
 <p>把这些拼成端到端流程（<strong>检测与 NMS 完全复用第 16 章，letterbox 复用第 10 章</strong>）：</p>
 <pre><code class="language-text">原图 ──letterbox──▶ 1×3×640×640 ──推理──▶ 输出①[1,116,8400] + 输出②[1,32,160,160]
                                               │
@@ -375,9 +366,7 @@ fn binarize_and_crop(
    放大到 640 → 去 letterbox 灰边 → 缩放回原图 H×W ──▶ 与原图等大的 mask
 </code></pre>
 <p>我们给实例分割结果定义一个结构体，<strong>直接内嵌第 16 章的 <code>Detection</code></strong>，不另造轮子：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use ndarray::Array2;
+<pre><code class="language-rust ignore">use ndarray::Array2;
 // BBox / Detection 复用第 16 章的统一定义
 
 /// 一个实例分割结果 = 一个检测结果 + 一张与原图等大的二值 mask
@@ -385,8 +374,7 @@ fn binarize_and_crop(
 pub struct SegInstance {
     pub det: Detection,     // 框(BBox) + class_id + score，全部沿用第 16 章
     pub mask: Array2&lt;u8&gt;,   // 已缩放回原图尺寸的二值 mask（1=属于该实例）
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
 <h2 id="186-mask-的表示与后处理阈值缩放裁剪与轮廓"><a class="header" href="#186-mask-的表示与后处理阈值缩放裁剪与轮廓">18.6 mask 的表示与后处理：阈值、缩放、裁剪与轮廓</a></h2>
 <p>无论语义还是实例，拿到 mask 后都要经过一段<strong>规整化</strong>才能用。核心动作前面已散见，这里成套梳理：</p>
 <ol>
@@ -402,9 +390,7 @@ pub struct SegInstance {
 <p>mask 是一堆 0/1，肉眼看不出来，得<strong>上色叠加</strong>到原图上。做法是“混色“（alpha blending）：对 mask 为 1 的像素，把原图颜色和该类/该实例的颜色按比例 <code>alpha</code> 混合：</p>
 <p>$$\text{输出} = (1-\alpha)\cdot\text{原图} + \alpha\cdot\text{类别色}$$</p>
 <p><code>alpha=0.5</code> 时半透明，既看得见 mask 区域，又透得出底下的原图纹理。手算一个通道：原图某像素红色分量 200，类别色红色分量 0，<code>alpha=0.5</code> → 输出 <code>0.5×200 + 0.5×0 = 100</code>。代码：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use image::RgbImage;
+<pre><code class="language-rust ignore">use image::RgbImage;
 use ndarray::Array2;
 
 /// 把一张二值 mask 用半透明颜色叠加到原图上。
@@ -423,8 +409,7 @@ fn overlay_mask(img: &amp;mut RgbImage, mask: &amp;Array2&lt;u8&gt;, color: [u8;
             }
         }
     }
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
 <ul>
 <li><strong>语义分割</strong>：为每个类别预设一种固定颜色（做一张“类别→RGB“的调色板），逐类叠加，同类永远同色。</li>
 <li><strong>实例分割</strong>：为<strong>每个实例</strong>分配不同颜色（比如按实例序号取色轮上的颜色），这样两个挨着的人才能一眼分辨。叠加完别忘了顺手用第 16 章的画框函数把 <code>det.bbox</code> 和类别标签也画上，信息才完整。</li>
@@ -443,9 +428,7 @@ fn overlay_mask(img: &amp;mut RgbImage, mask: &amp;Array2&lt;u8&gt;, color: [u8;
 IoU = 2 / 6 ≈ 0.33
 </code></pre>
 <p>代码（注意两张 mask 尺寸必须一致）：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use ndarray::Array2;
+<pre><code class="language-rust ignore">use ndarray::Array2;
 
 /// 两张二值 mask 的 IoU。尺寸需相同。
 fn mask_iou(a: &amp;Array2&lt;u8&gt;, b: &amp;Array2&lt;u8&gt;) -&gt; f32 {
@@ -460,8 +443,7 @@ fn mask_iou(a: &amp;Array2&lt;u8&gt;, b: &amp;Array2&lt;u8&gt;) -&gt; f32 {
         }
     }
     if union == 0 { 0.0 } else { inter as f32 / union as f32 }
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
 <ul>
 <li><strong>实例分割</strong>用 mask IoU 判断“预测实例和某个真值实例是否算命中“（阈值常取 0.5），再统计 mAP，思路和第 16 章检测评测一样，只是把框 IoU 换成 mask IoU。</li>
 <li><strong>语义分割</strong>用 <strong>mIoU（mean IoU）</strong>：对每个类别单独算一次 IoU（该类的所有像素并在一起算），再对所有类别取平均。比如 3 类的 IoU 分别是 0.8、0.6、0.7，则 <code>mIoU = (0.8+0.6+0.7)/3 = 0.7</code>。mIoU 是语义分割论文里的头号指标。</li>

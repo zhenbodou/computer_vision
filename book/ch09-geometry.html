@@ -37,10 +37,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-4d8e5ec0.js";
+            window.path_to_searchindex_js = "searchindex-ba421b3e.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-c1d54236.js"></script>
+        <script src="toc-68b1d651.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -247,13 +247,13 @@ $$</p>
 <h3 id="插值好坏为什么影响模型精度"><a class="header" href="#插值好坏为什么影响模型精度">插值好坏为什么影响模型精度</a></h3>
 <p>预处理里的缩放插值，直接改写了喂给模型的每一个像素值——它不是“无所谓的小细节“。两个常见的坑：</p>
 <ul>
-<li><strong>训练和推理用了不同插值</strong>：训练时用双线性、上线推理时图快用了最近邻，喂进模型的像素分布就和训练时对不上，检测框会莫名偏移、置信度掉点。<strong>经验法则：推理侧的插值方法尽量和训练时保持一致（通常是双线性）。</strong></li>
+<li><strong>训练和推理用了不同插值</strong>：训练时用双线性、上线推理时图库用了最近邻，喂进模型的像素分布就和训练时对不上，检测框会莫名偏移、置信度掉点。<strong>经验法则：推理侧的插值方法尽量和训练时保持一致（通常是双线性）。</strong></li>
 <li><strong>下采样时用了太糙的插值</strong>：把一张 4K 图缩到 640，最近邻会直接“跳采样“，产生锯齿和摩尔纹，把远处小车、小人脸这类<strong>小目标</strong>的细节抹掉——而小目标本来就最难检。缩小场景优先双线性甚至 Lanczos。</li>
 </ul>
 <p>这是“预处理不一致“这个大坑最常见的来源之一，第 10 章会系统展开。先记住结论：<strong>插值不是随便选的</strong>。</p>
 <h3 id="用-image-的-resize-试遍四种插值"><a class="header" href="#用-image-的-resize-试遍四种插值">用 <code>image</code> 的 resize 试遍四种插值</a></h3>
 <p><code>image</code> 的 <code>DynamicImage::resize</code> 用 <code>FilterType</code> 选插值算法，一次把四种都存出来对比：</p>
-<pre class="playground"><code class="language-rust">use image::{open, imageops::FilterType};
+<pre><code class="language-rust ignore">use image::{open, imageops::FilterType};
 
 fn main() -&gt; anyhow::Result&lt;()&gt; {
     let img = open("test.jpg")?;   // DynamicImage
@@ -283,7 +283,7 @@ fn main() -&gt; anyhow::Result&lt;()&gt; {
 <li><strong>翻转（flip）</strong>：水平镜像就是 <code>x' = w−1−x</code>，垂直翻转就是 <code>y' = h−1−y</code>。训练时“左右翻转“是最常用的数据增强。</li>
 <li><strong>90° 整数倍旋转</strong>：<code>rotate90/180/270</code> 也只是像素重排，无损。</li>
 </ul>
-<pre class="playground"><code class="language-rust">use image::{open, imageops};
+<pre><code class="language-rust ignore">use image::{open, imageops};
 
 fn main() -&gt; anyhow::Result&lt;()&gt; {
     let img = open("test.jpg")?.to_rgb8();   // RgbImage
@@ -375,7 +375,7 @@ $$</p>
 <p>反向映射的好处是：<strong>每个输出像素都被访问且只被访问一次</strong>，绝不空洞；落在小数位置的问题，交给 9.2 的插值搞定。所以 OpenCV、<code>image</code>、<code>imageproc</code> 等几乎所有库，底层都用反向映射。这也解释了一个 <code>imageproc</code> 里“反直觉“的点（下一节就会遇到）：你传给 <code>warp</code> 的矩阵描述的是“输入 → 输出“的正向映射，但库内部会自动求逆、按反向映射采样。你只管按“我想把输入搬到哪“来描述变换即可（前提是变换可逆——仿射、透视矩阵都可逆）。</p>
 <h2 id="97-用-imageproc-做旋转仿射与透视"><a class="header" href="#97-用-imageproc-做旋转仿射与透视">9.7 用 imageproc 做旋转、仿射与透视</a></h2>
 <p><code>imageproc::geometric_transformations</code> 把上面几种变换都实现好了。核心是 <code>Projection</code>（一个 3×3 投影，仿射是它的特例）和 <code>warp</code>（按反向映射 + 插值真正搬像素）。<code>Interpolation</code> 选插值（<code>Nearest</code> / <code>Bilinear</code> / <code>Bicubic</code>），<code>Border</code> 指定越界处怎么填。</p>
-<pre class="playground"><code class="language-rust">use image::{open, Rgb, RgbImage};
+<pre><code class="language-rust ignore">use image::{open, Rgb, RgbImage};
 use imageproc::geometric_transformations::{
     rotate_about_center, warp, Border, Interpolation, Projection,
 };
@@ -414,7 +414,7 @@ fn main() -&gt; anyhow::Result&lt;()&gt; {
 <p>几个工程要点：<code>warp</code> 的第二个参数（<code>Projection</code>）表达的是“输入 → 输出“，库内部自动求逆做反向采样（呼应 9.6）；<code>from_control_points(from, to)</code> 正是“给 4 组角点对应、解单应矩阵“的一步到位写法，是车牌 / 文档矫正的主力；<code>Border::Constant</code> 之外还有 <code>Replicate</code>（复制最边缘像素）和 <code>Wrap</code>（平铺重复），按需要选。</p>
 <h2 id="98-高性能缩放fast_image_resize"><a class="header" href="#98-高性能缩放fast_image_resize">9.8 高性能缩放：fast_image_resize</a></h2>
 <p>缩放是预处理里最耗时的步骤之一——一张 4K 图缩到 640×640，通用实现并不快；视频每秒几十帧时，这点开销会被放大。<code>fast_image_resize</code>（常简称 fir）用 SIMD 指令专门优化缩放，往往比通用实现快好几倍到十几倍，是上线代码的常客。它不认识“图片“，只吃裸字节，所以要手动把 <code>RgbImage</code> 的字节喂进去、再接回来：</p>
-<pre class="playground"><code class="language-rust">use image::{open, RgbImage};
+<pre><code class="language-rust ignore">use image::{open, RgbImage};
 use fast_image_resize::{FilterType, PixelType, ResizeAlg, ResizeOptions, Resizer};
 use fast_image_resize::images::Image;
 

@@ -37,10 +37,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-4d8e5ec0.js";
+            window.path_to_searchindex_js = "searchindex-ba421b3e.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-c1d54236.js"></script>
+        <script src="toc-68b1d651.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -232,7 +232,7 @@
 </code></pre>
 <p>用法和 Sobel 一样，只是换了核里的数字——记住第 7 章那句话：<strong>设计一个算子，就是设计核里的那几个数</strong>。</p>
 <h3 id="用-imageproc-求-sobel"><a class="header" href="#用-imageproc-求-sobel">用 imageproc 求 Sobel</a></h3>
-<pre class="playground"><code class="language-rust">use image::{GrayImage, Luma};
+<pre><code class="language-rust ignore">use image::{GrayImage, Luma};
 use imageproc::gradients::{horizontal_sobel, vertical_sobel, sobel_gradients};
 
 fn main() -&gt; anyhow::Result&lt;()&gt; {
@@ -289,7 +289,7 @@ fn main() -&gt; anyhow::Result&lt;()&gt; {
 </table>
 </div>
 <p>经验比值：高阈值 ≈ 低阈值的 2~3 倍。</p>
-<pre class="playground"><code class="language-rust">use imageproc::edges::canny;
+<pre><code class="language-rust ignore">use imageproc::edges::canny;
 
 fn main() -&gt; anyhow::Result&lt;()&gt; {
     let gray = image::open("test.jpg")?.to_luma8();
@@ -306,7 +306,7 @@ fn main() -&gt; anyhow::Result&lt;()&gt; {
 </code></pre>
 <p>结果只剩黑白两色，图像被“抽象“成了“前景 vs 背景“。难点只有一个：<strong>阈值定多少？</strong> 定高了物体被啃掉，定低了背景混进来。手动试很累，于是有了 <strong>Otsu 自动阈值</strong>。</p>
 <p><strong>Otsu 原理一句话</strong>：把整张图的灰度直方图看成两堆（前景堆 + 背景堆），自动挑一条分界线，让分出来的两堆各自最“抱团“（组内方差最小、等价于组间方差最大）。它替你把最费劲的调参自动化了，光照稳定的场景一用一个准。</p>
-<pre class="playground"><code class="language-rust">use imageproc::contrast::{threshold, otsu_level, ThresholdType};
+<pre><code class="language-rust ignore">use imageproc::contrast::{threshold, otsu_level, ThresholdType};
 
 fn main() -&gt; anyhow::Result&lt;()&gt; {
     let gray = image::open("test.jpg")?.to_luma8();
@@ -365,9 +365,7 @@ fn main() -&gt; anyhow::Result&lt;()&gt; {
 . . . . . . .   . . . . . . .   消失
 </code></pre>
 <p>工程上“二值化 + 开运算去噪“几乎是绑定出现的固定套路。imageproc 的调用：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use imageproc::morphology::{erode, dilate, open, close};
+<pre><code class="language-rust ignore">use imageproc::morphology::{erode, dilate, open, close};
 use imageproc::distance_transform::Norm;
 
 // 参数 k = "啃/长几圈"的距离；Norm 决定结构元形状：
@@ -375,14 +373,11 @@ use imageproc::distance_transform::Norm;
 let eroded  = erode(&amp;bin,  Norm::LInf, 1); // 缩 1 圈
 let dilated = dilate(&amp;bin, Norm::LInf, 1); // 胀 1 圈
 let opened  = open(&amp;bin,   Norm::LInf, 1); // 开：先腐后胀，去小白点
-let closed  = close(&amp;bin,  Norm::LInf, 1); // 闭：先胀后腐，填小黑洞
-<span class="boring">}</span></code></pre>
+let closed  = close(&amp;bin,  Norm::LInf, 1); // 闭：先胀后腐，填小黑洞</code></pre>
 <h2 id="86-连通域与轮廓把白块变成物体"><a class="header" href="#86-连通域与轮廓把白块变成物体">8.6 连通域与轮廓：把白块变成“物体“</a></h2>
 <p>形态学修干净后，图上剩几坨白色区域。但对程序来说这还只是一堆 255，它并不知道“哪些白像素属于同一个物体“。把<strong>连成一片的白色像素</strong>认定为一个整体，就是<strong>连通域（connected components）</strong>。</p>
 <p>打比方：一张地图上几块不相连的陆地，我们给每块岛屿编个号——1 号岛、2 号岛……<strong>连通域标记</strong>就是给图上每一坨白色区域染上一个编号（0 号留给背景）。</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use image::Luma;
+<pre><code class="language-rust ignore">use image::Luma;
 use imageproc::region_labelling::{connected_components, Connectivity};
 
 // 返回一张"标签图"：每个像素的值 = 它所属连通域的编号（0 = 背景）
@@ -391,24 +386,18 @@ let labels = connected_components(&amp;bin, Connectivity::Eight, Luma([0u8]));
 
 // 最大编号 = 连通域个数（编号从 1 连续排到 N）
 let count = labels.pixels().map(|p| p[0]).max().unwrap_or(0);
-println!("找到 {count} 个连通域");
-<span class="boring">}</span></code></pre>
+println!("找到 {count} 个连通域");</code></pre>
 <p>知道“有几个物体“还不够，我们通常想要每个物体的<strong>外轮廓（contour）</strong>——沿着白块的边界描一圈得到的点序列，以及由它派生的<strong>外接矩形（bounding box）<strong>和</strong>面积</strong>。<code>find_contours</code> 用经典的 Suzuki 边界跟踪算法把每条边界描出来：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use imageproc::contours::{find_contours, Contour, BorderType};
+<pre><code class="language-rust ignore">use imageproc::contours::{find_contours, Contour, BorderType};
 
 // 每条 Contour 有三样东西：
 //   points: Vec&lt;Point&lt;i32&gt;&gt;   边界上的像素坐标序列
 //   border_type: BorderType   Outer（物体外轮廓）还是 Hole（内部空洞的边）
 //   parent: Option&lt;usize&gt;     父轮廓编号（用于表达"洞在谁里面"）
 let contours: Vec&lt;Contour&lt;i32&gt;&gt; = find_contours(&amp;bin);
-println!("描出 {} 条轮廓", contours.len());
-<span class="boring">}</span></code></pre>
-<p>有了轮廓上的点，外接矩形就是这些点的 x、y 最小/最大值围成的框。我们用<strong>全书统一的 <code>BBox</code> 类型</strong>（见写作规范，左上-右下像素坐标）来表达它：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use imageproc::contours::Contour;
+println!("描出 {} 条轮廓", contours.len());</code></pre>
+<p>有了轮廓上的点，外接矩形就是这些点的 x、y 最小/最大值围成的框。我们用<strong>全书统一的 <code>BBox</code> 类型</strong>（第 3.8 节引入，左上-右下像素坐标）来表达它：</p>
+<pre><code class="language-rust ignore">use imageproc::contours::Contour;
 
 /// 边界框：左上-右下像素坐标（全书统一类型，后续检测章节复用）
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -434,8 +423,7 @@ fn bbox_of_contour(c: &amp;Contour&lt;i32&gt;) -&gt; BBox {
         x2 = x2.max(p.x); y2 = y2.max(p.y);
     }
     BBox { x1: x1 as f32, y1: y1 as f32, x2: x2 as f32, y2: y2 as f32 }
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
 <blockquote>
 <p>小提醒：<code>BBox::area()</code> 算的是<strong>外接矩形</strong>面积。物体<strong>真实像素面积</strong>（形状占了多少个白点）要去数连通域里该编号的像素个数，二者对细长或弯曲的物体差别很大——筛选时按需选用。</p>
 </blockquote>
@@ -445,7 +433,7 @@ fn bbox_of_contour(c: &amp;Contour&lt;i32&gt;) -&gt; BBox {
 ─────    ───────────    ──────────────────     ────────    ──────────────────    ──────────
 去颜色    分前景/背景      清掉零星噪点            描出每块      淘汰噪声块和奇形怪状     输出结果
 </code></pre>
-<pre class="playground"><code class="language-rust">use image::{GrayImage, Luma};
+<pre><code class="language-rust ignore">use image::{GrayImage, Luma};
 use imageproc::contrast::{otsu_level, threshold, ThresholdType};
 use imageproc::morphology::open;
 use imageproc::distance_transform::Norm;

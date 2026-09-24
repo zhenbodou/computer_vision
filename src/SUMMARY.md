@@ -44,7 +44,7 @@
 
 - [第 21 章 · 多目标跟踪：SORT、卡尔曼与 ByteTrack](ch21-tracking.md)
 - [第 22 章 · 空间过滤器：ROI、Mask 与静态过滤](ch22-roi-mask.md)
-- [第 23 章 · 拌线检测：单拌线、双拌线与方向判断](ch23-tripwire.md)
+- [第 23 章 · 绊线检测：单绊线、双绊线与方向判断](ch23-tripwire.md)
 - [第 24 章 · 时间与去重过滤器：Cooldown、Window 与去重](ch24-cooldown-window.md)
 - [第 25 章 · 脸人绑定与跨模型关联](ch25-face-person-binding.md)
 

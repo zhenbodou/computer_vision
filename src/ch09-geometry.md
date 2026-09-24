@@ -84,7 +84,7 @@ $$
 
 预处理里的缩放插值，直接改写了喂给模型的每一个像素值——它不是"无所谓的小细节"。两个常见的坑：
 
-- **训练和推理用了不同插值**：训练时用双线性、上线推理时图快用了最近邻，喂进模型的像素分布就和训练时对不上，检测框会莫名偏移、置信度掉点。**经验法则：推理侧的插值方法尽量和训练时保持一致（通常是双线性）。**
+- **训练和推理用了不同插值**：训练时用双线性、上线推理时图库用了最近邻，喂进模型的像素分布就和训练时对不上，检测框会莫名偏移、置信度掉点。**经验法则：推理侧的插值方法尽量和训练时保持一致（通常是双线性）。**
 - **下采样时用了太糙的插值**：把一张 4K 图缩到 640，最近邻会直接"跳采样"，产生锯齿和摩尔纹，把远处小车、小人脸这类**小目标**的细节抹掉——而小目标本来就最难检。缩小场景优先双线性甚至 Lanczos。
 
 这是"预处理不一致"这个大坑最常见的来源之一，第 10 章会系统展开。先记住结论：**插值不是随便选的**。
@@ -93,7 +93,7 @@ $$
 
 `image` 的 `DynamicImage::resize` 用 `FilterType` 选插值算法，一次把四种都存出来对比：
 
-```rust
+```rust,ignore
 use image::{open, imageops::FilterType};
 
 fn main() -> anyhow::Result<()> {
@@ -128,7 +128,7 @@ fn main() -> anyhow::Result<()> {
 - **翻转（flip）**：水平镜像就是 `x' = w−1−x`，垂直翻转就是 `y' = h−1−y`。训练时"左右翻转"是最常用的数据增强。
 - **90° 整数倍旋转**：`rotate90/180/270` 也只是像素重排，无损。
 
-```rust
+```rust,ignore
 use image::{open, imageops};
 
 fn main() -> anyhow::Result<()> {
@@ -252,7 +252,7 @@ $$
 
 `imageproc::geometric_transformations` 把上面几种变换都实现好了。核心是 `Projection`（一个 3×3 投影，仿射是它的特例）和 `warp`（按反向映射 + 插值真正搬像素）。`Interpolation` 选插值（`Nearest` / `Bilinear` / `Bicubic`），`Border` 指定越界处怎么填。
 
-```rust
+```rust,ignore
 use image::{open, Rgb, RgbImage};
 use imageproc::geometric_transformations::{
     rotate_about_center, warp, Border, Interpolation, Projection,
@@ -297,7 +297,7 @@ fn main() -> anyhow::Result<()> {
 
 缩放是预处理里最耗时的步骤之一——一张 4K 图缩到 640×640，通用实现并不快；视频每秒几十帧时，这点开销会被放大。`fast_image_resize`（常简称 fir）用 SIMD 指令专门优化缩放，往往比通用实现快好几倍到十几倍，是上线代码的常客。它不认识"图片"，只吃裸字节，所以要手动把 `RgbImage` 的字节喂进去、再接回来：
 
-```rust
+```rust,ignore
 use image::{open, RgbImage};
 use fast_image_resize::{FilterType, PixelType, ResizeAlg, ResizeOptions, Resizer};
 use fast_image_resize::images::Image;

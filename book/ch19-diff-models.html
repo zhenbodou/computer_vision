@@ -37,10 +37,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-4d8e5ec0.js";
+            window.path_to_searchindex_js = "searchindex-ba421b3e.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-c1d54236.js"></script>
+        <script src="toc-68b1d651.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -215,9 +215,7 @@ mask:     0    0  255  255    0    0        （&gt; 30 → 255，否则 0）
 </div>
 <p>前两个毛病是帧差法的天性（它只对“正在变化“敏感），后一个可以靠三帧差改善（下一节）。</p>
 <p><strong>用 Rust 实现两帧差</strong>。输入是相邻两帧的灰度图（<code>GrayImage</code> 即第 2/3 章的 <code>Luma&lt;u8&gt;</code> 图，彩色帧先用 <code>to_luma8()</code> 转灰度——我们只关心亮度变化）：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use image::{GrayImage, Luma};
+<pre><code class="language-rust ignore">use image::{GrayImage, Luma};
 
 /// 两帧差：输入相邻两帧灰度图，输出运动掩膜（255=动，0=静）
 /// prev、curr 尺寸必须相同，复用第 2/3 章的逐像素访问
@@ -235,8 +233,7 @@ fn frame_diff(prev: &amp;GrayImage, curr: &amp;GrayImage, thresh: u8) -&gt; Gray
         }
     }
     mask
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
 <p>注意那个 <code>as i16</code>：<code>u8</code> 直接相减会下溢，这是新手写帧差最常见的第一个坑。<strong>工程上通常会</strong>把这层循环换成对底层 <code>&amp;[u8]</code> 缓冲区的顺序遍历、甚至用 SIMD 一次算 16 个像素，速度还能再上一个台阶——但看得懂优先，先把逻辑理清。</p>
 <h2 id="193-三帧差治一治拖影"><a class="header" href="#193-三帧差治一治拖影">19.3 三帧差：治一治拖影</a></h2>
 <p>两帧差最烦人的是<strong>拖影</strong>：物体从 A 移到 B，差分图会把 A（它刚离开的空位）和 B（它现在所在）<strong>同时</strong>点亮，于是一个物体报成一团横跨 A、B 的“糊影“，其中 A 处根本已经没东西了。</p>
@@ -252,9 +249,7 @@ db=|f2-f3|:   . . . . ▓ ▓ ▓ ▓     B(还在) + C(将到) 都亮
 da AND db:    . . . . ▓ ▓ . .     只剩 B ← A 的拖影、C 的"未来位置"都被交集消掉了
 </code></pre>
 <p>直觉：A 处只在“和前帧比“时变了（后帧那里也是空的，不亮），C 处只在“和后帧比“时变了，一取交集，这两处各自落单的就被剔除，留下的正是物体在中间帧的真实位置。代价是：需要<strong>缓存三帧</strong>、且对纯平移的大物体内部空洞更明显。</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>/// 三帧差：判断中间帧 f2。两次差都为"动"才算真运动
+<pre><code class="language-rust ignore">/// 三帧差：判断中间帧 f2。两次差都为"动"才算真运动
 fn three_frame_diff(f1: &amp;GrayImage, f2: &amp;GrayImage, f3: &amp;GrayImage, thresh: u8) -&gt; GrayImage {
     let da = frame_diff(f1, f2, thresh); // |f2 - f1|：当前帧相对前一帧
     let db = frame_diff(f2, f3, thresh); // |f3 - f2|：当前帧相对后一帧（绝对值，方向不影响）
@@ -267,8 +262,7 @@ fn three_frame_diff(f1: &amp;GrayImage, f2: &amp;GrayImage, f3: &amp;GrayImage, 
         }
     }
     mask
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
 <h2 id="194-背景建模和干净的背景比"><a class="header" href="#194-背景建模和干净的背景比">19.4 背景建模：和“干净的背景“比</a></h2>
 <p>帧差法有个绕不过的硬伤：<strong>物体一停就消失</strong>——因为它总是和“上一帧“比，而停住的物体和上一帧完全一样。要让停住的东西也能被持续发现，就得换个参照物：不和上一帧比，而和一张<strong>干净的空场景背景</strong>比。这类方法叫<strong>背景减除（background subtraction）</strong>，也叫<strong>背景建模</strong>。</p>
 <p>最天真的做法是“拍一张空场景当背景，每帧减它“。但真实背景是会<strong>缓慢变化</strong>的：日光渐移、云影飘过、树影摇动、摄像头自动增益跳变……一张拍死的背景很快就对不上号，导致<strong>全屏误报</strong>。所以背景必须“活“起来，能跟着环境慢慢更新。</p>
@@ -287,9 +281,7 @@ fn three_frame_diff(f1: &amp;GrayImage, f2: &amp;GrayImage, f3: &amp;GrayImage, 
 </code></pre>
 <p>背景与目标值 200 的差距，每帧乘以 <code>(1-α)=0.9</code>，所以 <code>0.9ⁿ = 0.5</code> 时差距减半——解得 <code>n ≈ 7</code>：$\alpha=0.1$ 时，一个停住的物体大约 <strong>7 帧</strong>后就被背景“吃掉一半“，十几帧后基本溶进背景，前景差随之变小。换成 $\alpha=0.01$，半衰期约 <strong>69 帧</strong>（25fps 下近 3 秒），物体能“存在“久得多。<strong>这就是调 $\alpha$ 的直接后果：想让停住的目标赖得久，就把 $\alpha$ 调小。</strong></p>
 <p>有了背景，前景就是 $|frame - bg| &gt; T$。用 Rust 实现一个滑动平均背景建模器（背景用 <code>f32</code> 存，因为 <code>α·frame</code> 会产生小数）：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use image::{GrayImage, Luma};
+<pre><code class="language-rust ignore">use image::{GrayImage, Luma};
 
 /// 滑动平均背景建模器：维护一张 f32 背景图，逐帧更新并输出前景掩膜
 struct RunningAvgBg {
@@ -323,8 +315,7 @@ impl RunningAvgBg {
         }
         mask
     }
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
 <p>一个进阶细节：上面对<strong>所有</strong>像素都更新背景，包括前景像素。讲究的做法是对判为前景的像素<strong>慢更新甚至不更新</strong>（叫 <strong>selective update</strong>，选择性更新），否则停住的目标会被快速学进背景。点到为止，读者按需加。</p>
 <p><strong>更高级的背景建模：MOG2 与 KNN。</strong> 滑动平均给每个像素只记“一个背景值“，遇到<strong>会晃动的背景</strong>（风吹树叶、水面波光、闪烁的屏幕）就抓瞎——那个像素一会儿是叶子绿、一会儿是天空蓝，用一个平均值根本描述不了。工业界常用的 **MOG2（Mixture of Gaussians，高斯混合模型）**换了个思路：给每个像素记住“它平时会出现哪几种值“（用几个高斯分布表示），新来的值只要落在这些“常见值“里就算背景，否则算前景，因此扛得住摇摆背景，还自带阴影检测。<strong>KNN</strong> 思路类似，用最近邻判断新像素像不像最近见过的背景样本。二者 OpenCV 都有现成：<code>cv::createBackgroundSubtractorMOG2()</code> / <code>createBackgroundSubtractorKNN()</code>，Rust 的 <code>opencv</code> 绑定同名可用。思想懂了即可，数学不深挖。</p>
 <div class="table-wrapper">
@@ -351,9 +342,7 @@ impl RunningAvgBg {
 <li><strong>闭运算（close，先膨胀后腐蚀）</strong>：填掉物体内部空洞、把断裂的运动块连成一整块。</li>
 </ul>
 <p>常见顺序是“先开去噪，再闭补洞“。清理干净后，用第 8 章的 <code>find_contours</code> 找轮廓、取外接矩形，产出全书统一的 <code>BBox</code>（左上-右下像素坐标），再按面积滤掉太小的残渣：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use image::GrayImage;
+<pre><code class="language-rust ignore">use image::GrayImage;
 use imageproc::morphology::{open, close};
 use imageproc::distance_transform::Norm;
 use imageproc::contours::{find_contours, Contour, BorderType};
@@ -375,8 +364,7 @@ fn motion_boxes(mask: &amp;GrayImage, min_area: f32) -&gt; Vec&lt;BBox&gt; {
         boxes.push(b);
     }
     boxes
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
 <p>得到的这组 <code>BBox</code> 就是“画面里哪几块在动“，它能直接：画在录像上高亮、当作 ROI 裁给检测模型（下一节）、或作为多目标跟踪（第 21 章）的初始框。<strong>注意本章的差分只告诉你“这块在动“，并不知道“动的是人还是猫“——那要靠后面的识别模型补上。</strong></p>
 <blockquote>
 <p>小提醒：<code>min_area</code> 不是一个可以到处照搬的魔法数字。同一个人，站在镜头近处占几万像素，走到画面深处可能只剩几百像素——阈值定死了，近处正常、远处全漏。工程上要么按分辨率和目标“最远处该有多大“来估算，要么干脆分区域设不同的 <code>min_area</code>。</p>
@@ -446,7 +434,7 @@ f2:   50 200 200  50  50  50
 f3:   50  50 200 200  50  50
 </code></pre>
 </li>
-<li><strong>帧差 vs 背景减除</strong>：录一段“人走进来、站定约 10 秒、再走出去“的视频，抽帧（第 6 章）后分别跑 <code>frame_diff</code> 和 <code>RunningAvgBg</code>（用小 $\alpha$，如 0.01）。观察：帧差里人一站定就消失，而背景减除里人还持续被框住。解释两者行为差异的根源。</li>
+<li><strong>帧差 vs 背景减除</strong>：录一段“人走进来、站定约 10 秒、再走出去“的视频，抽帧（第 6 章）后分别跑 <code>frame_diff</code> 和 <code>RunningAvgBg</code>（用小 $\alpha$，如 0.01）。观察：帧差里人一站定就很快消失；背景减除会多保留一段时间，但由于本节实现会更新前景像素，最终也会把静止的人逐渐吸收到背景中。记录两种方法分别多久低于阈值，并解释差异。</li>
 <li><strong>$\alpha$ 半衰期实验</strong>：用 <code>RunningAvgBg</code> 对同一段视频分别取 $\alpha=0.5, 0.05, 0.005$，数“一个停下的物体大约多少帧后从前景里消失“，和 19.4 用 <code>0.9ⁿ=0.5</code> 推出的半衰期公式对一对，验证 $\alpha$ 越小目标赖得越久。</li>
 <li><strong>搭一个触发器</strong>：以 <code>motion_boxes</code> 返回的所有框总面积 <code>&gt; 画面面积的 1%</code> 作为“有动静“信号，打印出视频里哪些帧被触发；再想想（不必真跑模型）如何把它接成“只在触发帧才调用 YOLO（第 16 章）“的级联管线，估算相比每帧都跑 YOLO 能省下多少次推理。</li>
 </ol>

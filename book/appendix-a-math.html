@@ -37,10 +37,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-4d8e5ec0.js";
+            window.path_to_searchindex_js = "searchindex-ba421b3e.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-c1d54236.js"></script>
+        <script src="toc-68b1d651.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -210,12 +210,12 @@ cosθ  = 4 / (3 × 2.236) ≈ 0.596
 <h2 id="a4-叉积2d判断点在线的哪一侧"><a class="header" href="#a4-叉积2d判断点在线的哪一侧">A.4 叉积（2D）：判断点在线的哪一侧</a></h2>
 <p>二维叉积把两个向量变成一个数，符号告诉你它们的<strong>转向关系</strong>：</p>
 <p>$$\text{cross}(\vec{a}, \vec{b}) = a_x b_y - a_y b_x$$</p>
-<p><strong>拌线检测</strong>（第 23 章）就靠它。一条有向拌线从 $P_1$ 指向 $P_2$，方向向量 $\vec{d} = P_2 - P_1$。要判断点 $Q$ 在线的哪一侧，就算 $\text{cross}(\vec{d},; Q - P_1)$：结果为正在一侧，为负在另一侧，为 0 说明正好落在线上。</p>
-<p><strong>手算例子</strong>：拌线 $P_1=(0,0) \to P_2=(4,0)$（沿 x 轴向右），$\vec{d}=(4,0)$：</p>
+<p><strong>绊线检测</strong>（第 23 章）就靠它。一条有向绊线从 $P_1$ 指向 $P_2$，方向向量 $\vec{d} = P_2 - P_1$。要判断点 $Q$ 在线的哪一侧，就算 $\text{cross}(\vec{d},; Q - P_1)$：结果为正时在一侧，为负时在另一侧，为 0 说明正好落在线上。</p>
+<p><strong>手算例子</strong>：绊线 $P_1=(0,0) \to P_2=(4,0)$（沿 x 轴向右），$\vec{d}=(4,0)$：</p>
 <pre><code class="language-text">Q = (2,  3)（上方）: cross = 4×3 − 0×2 = 12 &gt; 0  → 一侧
 Q = (2, −1)（下方）: cross = 4×(−1) − 0×2 = −4 &lt; 0 → 另一侧
 </code></pre>
-<p>一个目标从上一帧到这一帧，中心点的叉积符号如果<strong>由负翻正</strong>（或由正翻负），就说明它穿过了拌线——这正是第 23 章计数与方向判断的核心判据。</p>
+<p>一个目标从上一帧到这一帧，中心点的叉积符号如果<strong>由负翻正</strong>（或由正翻负），就说明它穿过了绊线——这正是第 23 章计数与方向判断的核心判据。</p>
 <h2 id="a5-求和平均加权平均"><a class="header" href="#a5-求和平均加权平均">A.5 求和、平均、加权平均</a></h2>
 <p><strong>求和</strong>（Σ 符号）：$\sum_{i=1}^{n} x_i$ 读作“把 $x_1$ 一直加到 $x_n$“，就是 <code>x.iter().sum()</code>。</p>
 <p><strong>平均</strong>：所有数加起来除以个数。全班平均分就是总分 ÷ 人数。</p>
@@ -253,7 +253,7 @@ Q = (2, −1)（下方）: cross = 4×(−1) − 0×2 = −4 &lt; 0 → 另一�
 <p>把一个任意实数“压“进 (0, 1) 区间，形状是 S 形曲线：</p>
 <p>$$\sigma(x) = \frac{1}{1 + e^{-x}}$$</p>
 <p>关键取值：$\sigma(0) = 0.5$；$x$ 很大时接近 1；$x$ 很小时接近 0。</p>
-<p>应用：把模型输出解释成“概率“。第 15 章的二分类、第 16 章 YOLOv8 的类别分数，都要过 sigmoid 才变成 0~1 的可信度。</p>
+<p>应用：把模型输出的 logits 解释成 0~1 的分数，例如第 15 章的二分类。Ultralytics 常见导出的 YOLOv8 ONNX 已把 Sigmoid 放进模型图，输出类别分数可以直接使用；只有拿到未激活 logits 时才需要在后处理补做，不能重复做。</p>
 <h2 id="a10-softmax"><a class="header" href="#a10-softmax">A.10 Softmax</a></h2>
 <p>Sigmoid 的“多分类版“。把 K 个数变成 K 个和为 1 的数，可以解释为“属于每个类别的概率“：</p>
 <p>$$\text{softmax}(x_i) = \frac{e^{x_i}}{\sum_{j=1}^{K} e^{x_j}}$$</p>
@@ -265,13 +265,10 @@ softmax = [2.72/30.20, 7.39/30.20, 20.09/30.20]
 </code></pre>
 <p>最大的数 3 拿到的概率最大（0.665），且优势被指数放大。</p>
 <p><strong>数值稳定问题</strong>：如果输入里有 100，<code>e^100</code> 会溢出（大到 float 装不下）。工程上的标准解法：先减去最大值再算，结果不变：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>let max = logits.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
+<pre><code class="language-rust ignore">let max = logits.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
 let exps: Vec&lt;f32&gt; = logits.iter().map(|x| (x - max).exp()).collect();
 let sum: f32 = exps.iter().sum();
-let probs: Vec&lt;f32&gt; = exps.iter().map(|e| e / sum).collect();
-<span class="boring">}</span></code></pre>
+let probs: Vec&lt;f32&gt; = exps.iter().map(|e| e / sum).collect();</code></pre>
 <p>这就是第 15 章分类模型里“为什么先减 max“的原因。</p>
 <h2 id="a11-面积与-iou"><a class="header" href="#a11-面积与-iou">A.11 面积与 IoU</a></h2>
 <p>矩形面积 = 宽 × 高。两个矩形的<strong>交集</strong>：重叠部分的宽和高分别是</p>

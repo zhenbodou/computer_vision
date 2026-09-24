@@ -88,7 +88,7 @@ Scharr Gx：             Scharr Gy：
 
 ### 用 imageproc 求 Sobel
 
-```rust
+```rust,ignore
 use image::{GrayImage, Luma};
 use imageproc::gradients::{horizontal_sobel, vertical_sobel, sobel_gradients};
 
@@ -151,7 +151,7 @@ fn main() -> anyhow::Result<()> {
 
 经验比值：高阈值 ≈ 低阈值的 2~3 倍。
 
-```rust
+```rust,ignore
 use imageproc::edges::canny;
 
 fn main() -> anyhow::Result<()> {
@@ -177,7 +177,7 @@ fn main() -> anyhow::Result<()> {
 
 **Otsu 原理一句话**：把整张图的灰度直方图看成两堆（前景堆 + 背景堆），自动挑一条分界线，让分出来的两堆各自最"抱团"（组内方差最小、等价于组间方差最大）。它替你把最费劲的调参自动化了，光照稳定的场景一用一个准。
 
-```rust
+```rust,ignore
 use imageproc::contrast::{threshold, otsu_level, ThresholdType};
 
 fn main() -> anyhow::Result<()> {
@@ -255,7 +255,7 @@ fn main() -> anyhow::Result<()> {
 
 工程上"二值化 + 开运算去噪"几乎是绑定出现的固定套路。imageproc 的调用：
 
-```rust
+```rust,ignore
 use imageproc::morphology::{erode, dilate, open, close};
 use imageproc::distance_transform::Norm;
 
@@ -273,7 +273,7 @@ let closed  = close(&bin,  Norm::LInf, 1); // 闭：先胀后腐，填小黑洞
 
 打比方：一张地图上几块不相连的陆地，我们给每块岛屿编个号——1 号岛、2 号岛……**连通域标记**就是给图上每一坨白色区域染上一个编号（0 号留给背景）。
 
-```rust
+```rust,ignore
 use image::Luma;
 use imageproc::region_labelling::{connected_components, Connectivity};
 
@@ -288,7 +288,7 @@ println!("找到 {count} 个连通域");
 
 知道"有几个物体"还不够，我们通常想要每个物体的**外轮廓（contour）**——沿着白块的边界描一圈得到的点序列，以及由它派生的**外接矩形（bounding box）**和**面积**。`find_contours` 用经典的 Suzuki 边界跟踪算法把每条边界描出来：
 
-```rust
+```rust,ignore
 use imageproc::contours::{find_contours, Contour, BorderType};
 
 // 每条 Contour 有三样东西：
@@ -299,9 +299,9 @@ let contours: Vec<Contour<i32>> = find_contours(&bin);
 println!("描出 {} 条轮廓", contours.len());
 ```
 
-有了轮廓上的点，外接矩形就是这些点的 x、y 最小/最大值围成的框。我们用**全书统一的 `BBox` 类型**（见写作规范，左上-右下像素坐标）来表达它：
+有了轮廓上的点，外接矩形就是这些点的 x、y 最小/最大值围成的框。我们用**全书统一的 `BBox` 类型**（第 3.8 节引入，左上-右下像素坐标）来表达它：
 
-```rust
+```rust,ignore
 use imageproc::contours::Contour;
 
 /// 边界框：左上-右下像素坐标（全书统一类型，后续检测章节复用）
@@ -343,7 +343,7 @@ fn bbox_of_contour(c: &Contour<i32>) -> BBox {
 去颜色    分前景/背景      清掉零星噪点            描出每块      淘汰噪声块和奇形怪状     输出结果
 ```
 
-```rust
+```rust,ignore
 use image::{GrayImage, Luma};
 use imageproc::contrast::{otsu_level, threshold, ThresholdType};
 use imageproc::morphology::open;

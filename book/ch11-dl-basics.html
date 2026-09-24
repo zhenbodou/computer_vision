@@ -37,10 +37,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-4d8e5ec0.js";
+            window.path_to_searchindex_js = "searchindex-ba421b3e.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-c1d54236.js"></script>
+        <script src="toc-68b1d651.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -285,7 +285,7 @@
 <p>下面用 Rust 把它<strong>从零写一遍</strong>，不借任何模型、不借任何魔法，你会看到推理真的就是小学算术的堆叠。</p>
 <h3 id="手写一个迷你神经元和全连接层"><a class="header" href="#手写一个迷你神经元和全连接层">手写一个迷你神经元和全连接层</a></h3>
 <p>先用最朴素的 <code>Vec&lt;f32&gt;</code> + 点积 + ReLU 实现单个神经元，再把一排神经元凑成一层“全连接层“：</p>
-<pre class="playground"><code class="language-rust">/// ReLU 激活函数：负数归零，正数原样通过
+<pre><code class="language-rust ignore">/// ReLU 激活函数：负数归零，正数原样通过
 fn relu(x: f32) -&gt; f32 {
     x.max(0.0)
 }
@@ -331,7 +331,7 @@ fn main() {
 <p>跑起来输出 <code>[1.3, 0.0]</code>：第一个神经元和我们 11.2 手算的完全一致；第二个神经元加权和是 <code>0.1×2 + 0.2×1 + (-0.6)×3 + 0.5 = -0.9</code>，被 ReLU 压成了 0。<strong>这就是一层全连接的全部秘密</strong>——没有任何你看不懂的东西。把这样的层一层接一层，就是一个（简化版的）神经网络在做推理。</p>
 <h3 id="用-ndarray-把一层写成一次矩阵乘法"><a class="header" href="#用-ndarray-把一层写成一次矩阵乘法">用 ndarray 把“一层“写成一次矩阵乘法</a></h3>
 <p>上面的 <code>dense_layer</code> 是一个神经元一个神经元地循环算的，直观但慢。工程上会把整层打包成<strong>一次矩阵乘法</strong>，交给高度优化的库去算。用第 3 章的 <code>ndarray</code> 演示同一层：</p>
-<pre class="playground"><code class="language-rust">use ndarray::{array, Array2};
+<pre><code class="language-rust ignore">use ndarray::{array, Array2};
 
 fn main() {
     // 输入向量 x，看成 1×3 的行向量（1 个样本、3 个特征）
@@ -374,7 +374,7 @@ fn main() {
 </tbody>
 </table>
 </div>
-<p>特别点一句<strong>卷积层</strong>，因为它是图像模型的主力：第 7 章你已经手写过卷积——一个固定的 3×3 核在图上滑窗、对应相乘再求和。卷积层的运算<strong>一模一样</strong>，唯一的区别是那 9 个（或更多）权重不是你填的，而是模型从数据里学出来的。所以你早就理解了 CNN 最核心的操作，只是当时没往“深度学习“上想而已。至于 Softmax 具体怎么把分数变概率、为什么要先减最大值防溢出，附录 A.6 有手算例子，第 15 章正式用它。</p>
+<p>特别点一句<strong>卷积层</strong>，因为它是图像模型的主力：第 7 章你已经手写过卷积——一个固定的 3×3 核在图上滑窗、对应相乘再求和。卷积层的运算<strong>一模一样</strong>，唯一的区别是那 9 个（或更多）权重不是你填的，而是模型从数据里学出来的。所以你早就理解了 CNN 最核心的操作，只是当时没往“深度学习“上想而已。至于 Softmax 具体怎么把分数变概率、为什么要先减最大值防溢出，附录 A.10 有手算例子，第 15 章正式用它。</p>
 <h2 id="117-训练-vs-推理本书只做后者"><a class="header" href="#117-训练-vs-推理本书只做后者">11.7 训练 vs 推理：本书只做后者</a></h2>
 <p>到这里可以把全书最重要的一组概念钉死了。神经网络的一生分两个阶段：</p>
 <div class="table-wrapper">
@@ -434,7 +434,7 @@ fn main() {
               ↓
         输入张量 ──► 推理引擎 ──► 输出张量
 </code></pre>
-<p>推理引擎负责：解析模型文件、把每种层映射成真正的运算、调度 CPU/GPU/NPU 把矩阵乘法算得飞快、管好中间张量的内存。Rust 生态里就有现成的引擎——纯 Rust 的 <code>tract-onnx</code>、性能更强还能上 GPU/NPU 的 <code>ort</code>（都在写作规范的 crate 表里）。<strong>第 14 章我们就用它们，把一个真实的 ONNX 模型在 Rust 里真正跑起来</strong>，接住第一个真实的输出张量。</p>
+<p>推理引擎负责：解析模型文件、把每种层映射成真正的运算、调度 CPU/GPU/NPU 把矩阵乘法算得飞快、管好中间张量的内存。Rust 生态里就有现成的引擎——纯 Rust 的 <code>tract-onnx</code>、性能更强还能上 GPU/NPU 的 <code>ort</code>（依赖版本见附录 B 的 crate 表）。<strong>第 14 章我们就用它们，把一个真实的 ONNX 模型在 Rust 里真正跑起来</strong>，接住第一个真实的输出张量。</p>
 <p>在那之前，第 12 章会先教你“读懂“一个模型文件：不急着跑，先把它的输入输出形状、数据类型、元数据看明白——就像施工前先把图纸看懂。</p>
 <h2 id="1110-小结"><a class="header" href="#1110-小结">11.10 小结</a></h2>
 <ul>

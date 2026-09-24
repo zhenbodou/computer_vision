@@ -37,10 +37,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-4d8e5ec0.js";
+            window.path_to_searchindex_js = "searchindex-ba421b3e.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-c1d54236.js"></script>
+        <script src="toc-68b1d651.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -178,10 +178,10 @@
                     <main>
                         <h1 id="第-24-章--时间与去重过滤器cooldownwindow-与去重"><a class="header" href="#第-24-章--时间与去重过滤器cooldownwindow-与去重">第 24 章 · 时间与去重过滤器：Cooldown、Window 与去重</a></h1>
 <blockquote>
-<p><strong>本章导读</strong>：第 22 章的空间过滤器解决了“事件发生在<strong>哪里</strong>、该不该算“，第 23 章的拌线告诉我们“有没有越界、往哪个方向越“。但它们都是<strong>逐帧</strong>工作的——模型每秒吐几十帧，跟踪偶尔还会抖，于是<strong>同一件事会被触发几十次</strong>。把这些原始触发直接丢给报警或计数系统，结果就是<strong>报警刷屏、重复计数</strong>。本章补上业务过滤的最后一块拼图：<strong>时间维度的过滤</strong>。我们用 <strong>Cooldown（冷却 / 防抖）</strong>、<strong>Window（滑动时间窗）</strong> 和 <strong>去重（dedup）</strong> 三件套，把“脏、乱、刷屏的原始触发“整理成“干净、不重复的业务事件“，并用一个 <code>EventFilter</code> 把它们串成一条流水线。读完你能亲手写出一个不刷屏、不重复计数的事件过滤器。</p>
+<p><strong>本章导读</strong>：第 22 章的空间过滤器解决了“事件发生在<strong>哪里</strong>、该不该算“，第 23 章的绊线告诉我们“有没有越界、往哪个方向越“。但它们都是<strong>逐帧</strong>工作的——模型每秒吐几十帧，跟踪偶尔还会抖，于是<strong>同一件事会被触发几十次</strong>。把这些原始触发直接丢给报警或计数系统，结果就是<strong>报警刷屏、重复计数</strong>。本章补上业务过滤的最后一块拼图：<strong>时间维度的过滤</strong>。我们用 <strong>Cooldown（冷却 / 防抖）</strong>、<strong>Window（滑动时间窗）</strong> 和 <strong>去重（dedup）</strong> 三件套，把“脏、乱、刷屏的原始触发“整理成“干净、不重复的业务事件“，并用一个 <code>EventFilter</code> 把它们串成一条流水线。读完你能亲手写出一个不刷屏、不重复计数的事件过滤器。</p>
 </blockquote>
 <h2 id="241-为什么要在时间维度上过滤"><a class="header" href="#241-为什么要在时间维度上过滤">24.1 为什么要在时间维度上过滤</a></h2>
-<p>先看一个真实场景。摄像头 25 fps，一个人走到拌线上停了 2 秒才迈过去。这 2 秒 = <strong>50 帧</strong>，每一帧模型都检测到这个人、跟踪都给他一个稳定 ID、拌线判断“他在线附近反复横跳“。于是：</p>
+<p>先看一个真实场景。摄像头 25 fps，一个人走到绊线上停了 2 秒才迈过去。这 2 秒 = <strong>50 帧</strong>，每一帧模型都检测到这个人、跟踪都给他一个稳定 ID、绊线判断“他在线附近反复横跳“。于是：</p>
 <ul>
 <li>如果<strong>每次触发就 <code>+1</code> 计数</strong>：一个人过线，你数出了 30 多次。</li>
 <li>如果<strong>每次触发就报警</strong>：2 秒内弹了 30 多条“有人越界“，值班员直接崩溃。</li>
@@ -201,7 +201,7 @@
 </table>
 </div>
 <p>这三件套处在整条视频分析流水线的末端，把上游的“原始触发“收拾干净再交给下游：</p>
-<pre><code class="language-text">逐帧检测 ─▶ 跟踪(第21章) ─▶ 空间过滤(第22章) ─▶ 拌线(第23章)
+<pre><code class="language-text">逐帧检测 ─▶ 跟踪(第21章) ─▶ 空间过滤(第22章) ─▶ 绊线(第23章)
                                                      │
                                           原始触发（几十次/秒，会抖动、会重复）
                                                      │
@@ -217,12 +217,10 @@
                                         报警 / 计数系统（第27章）
 </code></pre>
 <p>先把本章统一用到的<strong>事件类型</strong>定义出来，后面所有代码都复用它。它带着上游给的 <code>track_id</code>（第 21 章的跟踪 ID）、<code>class_id</code>（COCO 类别）和 <code>direction</code>（第 23 章的越线方向）：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>/// 事件类型（来源见第 22、23 章）
+<pre><code class="language-rust ignore">/// 事件类型（来源见第 22、23 章）
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum EventKind {
-    LineCross,  // 拌线越界（第 23 章）
+    LineCross,  // 绊线越界（第 23 章）
     RoiIntrude, // 区域入侵（第 22 章）
     Loiter,     // 徘徊
 }
@@ -234,8 +232,7 @@ pub struct Event {
     pub track_id: u64,   // 谁触发的（第 21 章的跟踪 ID）
     pub class_id: usize, // COCO 类别（如 person=0）
     pub direction: i8,   // 方向：+1 进 / -1 出 / 0 无（第 23 章）
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
 <h2 id="242-时间基准用帧号还是墙钟"><a class="header" href="#242-时间基准用帧号还是墙钟">24.2 时间基准：用帧号还是墙钟？</a></h2>
 <p>三件套全都要回答“<strong>现在是什么时候、距上次过了多久</strong>“。这个“时间“从哪来，直接决定算得对不对。</p>
 <p>Rust 标准库给了两把尺子：</p>
@@ -256,22 +253,17 @@ pub struct Event {
 </table>
 </div>
 <p>这是新手最容易踩的坑：<strong>离线批量分析时用 <code>Instant::now()</code></strong>。你 5 分钟跑完 1 小时的录像，一个 3 秒冷却会把视频里相隔 30 秒的两次真实事件当成“同一秒“全压掉。回放<strong>必须</strong>用帧号换算的视频时间。换算很简单：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use std::time::Duration;
+<pre><code class="language-rust ignore">use std::time::Duration;
 
 /// 把"帧号 + 帧率"换算成从视频开头起算的时间
 fn frame_to_media_time(frame_index: u64, fps: f64) -&gt; Duration {
     Duration::from_secs_f64(frame_index as f64 / fps) // 25 fps 下，第 75 帧 = 3.0 秒
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
 <p>小数字换一遍：<code>fps = 25</code> 时<strong>每帧 40 ms</strong>；一个 <strong>3 秒</strong>冷却 = <strong>75 帧</strong>。所以帧号和时间是可以互相翻译的。</p>
 <p>本章后面的实现统一用 <code>Instant</code> 演示（贴近实时流）。<strong>要用在回放上，只需把每个 <code>now: Instant</code> 换成 <code>media_time: Duration</code>——比较逻辑一模一样，都是“做减法、比大小“。</strong> 工程上通常会把过滤器对时间类型做成泛型，或干脆统一传一个“从流开始起算的 <code>Duration</code>“，让实时和回放走同一套代码。</p>
 <h2 id="243-cooldown冷却与防抖"><a class="header" href="#243-cooldown冷却与防抖">24.3 Cooldown：冷却与防抖</a></h2>
 <p><strong>Cooldown（冷却）</strong> 的规则一句话：<strong>某类事件触发一次后，在 <code>T</code> 时间内屏蔽同类事件。</strong> 做法也一句话：记住“上次触发时刻 <code>last_fire</code>“，新事件来了先看 <code>now - last_fire &lt; T</code>，是就丢弃。</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use std::collections::HashMap;
+<pre><code class="language-rust ignore">use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
 /// 冷却器：某个 key 触发后，在 cooldown 时间内屏蔽同 key 的事件。
@@ -297,8 +289,7 @@ impl&lt;K: std::hash::Hash + Eq + Clone&gt; Cooldown&lt;K&gt; {
         self.last_fire.insert(key, now); // 记下这次放行时刻
         true
     }
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
 <blockquote>
 <p>小提示：用 <code>now.saturating_duration_since(last)</code> 而不是 <code>now - last</code>。后者在 <code>now</code> 早于 <code>last</code> 时会 <strong>panic</strong>（合成时间戳、多线程乱序时可能发生），前者会安全地返回 0。</p>
 </blockquote>
@@ -320,7 +311,7 @@ t=2.4s  → 2.4 - 2.1 = 0.3 &lt; 2 → 丢弃
 <tbody>
 <tr><td><strong>全局</strong></td><td><code>EventKind</code></td><td>整个画面这类事 <code>T</code> 秒只报一次</td><td>单点、简单场景</td></tr>
 <tr><td><strong>按 track</strong></td><td><code>(u64, EventKind)</code></td><td>每个目标各自冷却</td><td>多人同时越线，各报各的，互不压制</td></tr>
-<tr><td><strong>按区域</strong></td><td><code>(u32, EventKind)</code></td><td>每条拌线 / 每个 ROI 各自冷却</td><td>多区域周界</td></tr>
+<tr><td><strong>按区域</strong></td><td><code>(u32, EventKind)</code></td><td>每条绊线 / 每个 ROI 各自冷却</td><td>多区域周界</td></tr>
 <tr><td><strong>区域 + 目标</strong></td><td><code>(u32, u64, EventKind)</code></td><td>最细粒度</td><td>复杂场景</td></tr>
 </tbody>
 </table>
@@ -344,9 +335,7 @@ t=2.4s  → 2.4 - 2.1 = 0.3 &lt; 2 → 丢弃
 <p>Cooldown 是“报过就压住一段时间“，比较粗暴。很多业务需要更聪明的判断：<strong>看一段时间窗里的整体情况再决定</strong>。这就是 <strong>Window（滑动时间窗）</strong>。它有两类最常见的用法。</p>
 <h3 id="用法一计数窗n-秒内-m-次才算数"><a class="header" href="#用法一计数窗n-秒内-m-次才算数">用法一：计数窗——“N 秒内 M 次才算数”</a></h3>
 <p>比如“<strong>1 分钟内越界 ≥3 次才算入侵</strong>“（偶尔蹭一下不报，反复试探才报）。做法：用一个<strong>时间戳队列</strong>记住窗内的每次命中，新事件进队尾，过期的从队头丢，队列长度就是“窗内命中数”。<code>VecDeque</code>（双端队列）天生适合这活。</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use std::collections::VecDeque;
+<pre><code class="language-rust ignore">use std::collections::VecDeque;
 use std::time::{Duration, Instant};
 
 /// 滑动计数窗：统计"最近 window 时间内"发生了多少次
@@ -377,8 +366,7 @@ impl CountWindow {
             }
         }
     }
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
 <p><strong>进窗 / 出窗</strong>是滑动窗的灵魂：新事件永远从<strong>队尾进</strong>；每次操作都从<strong>队头往外丢</strong>过期项。因为时间戳单调递增、队列天然有序，一旦队头没过期就可以 <code>break</code>，不用扫全队列。</p>
 <p>小数字走一遍（<code>window = 60s</code>，阈值 <code>= 3</code>）：</p>
 <pre><code class="language-text">t=10s 越界 → 窗内 [10]        count=1 &lt;3  不报
@@ -389,9 +377,7 @@ t=75s 越界 → 先丢过期：75-10=65&gt;60，丢掉 10；25、40 保留
 </code></pre>
 <h3 id="用法二确认窗--n-of-m抗单帧误检"><a class="header" href="#用法二确认窗--n-of-m抗单帧误检">用法二：确认窗 / N-of-M——抗单帧误检</a></h3>
 <p>模型偶尔会<strong>单帧误检</strong>（这一帧突然把柱子认成人）。如果一帧命中就报，噪声全放进来了。<strong>N-of-M 确认窗</strong>的规则：<strong>最近 M 次判定里至少 N 次命中，才算“确认“。</strong> 它吃掉孤立的抖动。这类窗常按<strong>帧</strong>算（每帧喂一个“命中 / 未命中“），用定长队列即可：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use std::collections::VecDeque;
+<pre><code class="language-rust ignore">use std::collections::VecDeque;
 
 /// N-of-M 确认窗：最近 M 帧里 ≥N 帧命中才算"确认"
 pub struct ConfirmWindow {
@@ -414,8 +400,7 @@ impl ConfirmWindow {
         let hits = self.recent.iter().filter(|&amp;&amp;b| b).count();
         hits &gt;= self.n
     }
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
 <p>小数字（<code>3-of-5</code>：最近 5 帧 ≥3 帧命中才确认）：</p>
 <pre><code class="language-text">稳定目标：  ...1 0 1 1 0...  最近5帧 [1,0,1,1,0] → 3 命中 ≥3 → 确认 ✓
 单帧误检：  ...0 0 1 0 0...  最近5帧 [0,0,1,0,0] → 1 命中 &lt;3 → 噪声被吃掉 ✗
@@ -423,9 +408,7 @@ impl ConfirmWindow {
 <p>计数窗回答“够不够频繁“，确认窗回答“够不够稳定“，按业务选用或叠加。</p>
 <h2 id="245-去重同一件事只算一次"><a class="header" href="#245-去重同一件事只算一次">24.5 去重：同一件事只算一次</a></h2>
 <p>计数场景最怕<strong>重复计数</strong>。核心手段是<strong>去重（dedup）</strong>：用一个键唯一标识“这件事“，记进 <code>HashSet</code>，见过就不再算。这个键的核心是 <strong><code>track_id</code> + 事件类型</strong>——同一个跟踪目标的同一类事件，只算第一次。</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use std::collections::HashSet;
+<pre><code class="language-rust ignore">use std::collections::HashSet;
 
 /// 去重器：同一个 (track_id, 事件类型) 只算一次
 #[derive(Default)]
@@ -438,14 +421,11 @@ impl Dedup {
     pub fn first_time(&amp;mut self, track_id: u64, kind: EventKind) -&gt; bool {
         self.seen.insert((track_id, kind)) // insert 返回 true 表示"原来没有"
     }
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
 <p><code>HashSet::insert</code> 的返回值直接就是我们要的语义：<strong>插入成功（原来没有）= 第一次见 = 放行</strong>。一行搞定。</p>
 <h3 id="进出计数按方向去重"><a class="header" href="#进出计数按方向去重">进出计数：按方向去重</a></h3>
-<p>第 23 章的双拌线会给出<strong>方向</strong>（<code>+1</code> 进 / <code>-1</code> 出）。一个人可能先进后出，进要计一次、出也要计一次，但各自都只算一次。把<strong>方向也放进键</strong>即可：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use std::collections::HashSet;
+<p>第 23 章的双绊线会给出<strong>方向</strong>（<code>+1</code> 进 / <code>-1</code> 出）。一个人可能先进后出，进要计一次、出也要计一次，但各自都只算一次。把<strong>方向也放进键</strong>即可：</p>
+<pre><code class="language-rust ignore">use std::collections::HashSet;
 
 /// 进出双向计数器：每个 track 的"进"和"出"各自只算一次
 #[derive(Default)]
@@ -456,7 +436,7 @@ pub struct GateCounter {
 }
 
 impl GateCounter {
-    /// 处理一次拌线事件（direction: +1 进 / -1 出）
+    /// 处理一次绊线事件（direction: +1 进 / -1 出）
     pub fn on_cross(&amp;mut self, track_id: u64, direction: i8) {
         if self.seen.insert((track_id, direction)) {
             match direction {
@@ -466,8 +446,7 @@ impl GateCounter {
             }
         }
     }
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
 <h3 id="去重的软肋跟踪-id-跳变"><a class="header" href="#去重的软肋跟踪-id-跳变">去重的软肋：跟踪 ID 跳变</a></h3>
 <p>去重的全部可靠性都押在 <strong><code>track_id</code> 稳定</strong>上。可第 21 章讲过：目标被遮挡后重新出现，跟踪器往往给它一个<strong>新 ID</strong>；两个目标交叉时 ID 还可能<strong>互换</strong>。这会直接击穿去重：</p>
 <ul>
@@ -489,9 +468,7 @@ impl GateCounter {
           放行上报
 </code></pre>
 <p>用一个 <code>struct EventFilter</code> 把状态和逻辑收在一起，对外只暴露一个 <code>accept</code>：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use std::collections::{HashMap, HashSet, VecDeque};
+<pre><code class="language-rust ignore">use std::collections::{HashMap, HashSet, VecDeque};
 use std::time::{Duration, Instant};
 // 复用 24.1 定义的 Event / EventKind
 
@@ -580,8 +557,7 @@ impl EventFilter {
             self.windows.retain(|(tid, _), _| *tid != id);
         }
     }
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
 <p>配置一变，同一套代码就能表达不同业务：</p>
 <div class="table-wrapper">
 <table>

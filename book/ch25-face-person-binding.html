@@ -37,10 +37,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-4d8e5ec0.js";
+            window.path_to_searchindex_js = "searchindex-ba421b3e.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-c1d54236.js"></script>
+        <script src="toc-68b1d651.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -232,7 +232,7 @@
           每个人 = 一条轨迹 + 一个身份
 </code></pre>
 <h2 id="252-前提两个框必须在同一套坐标系"><a class="header" href="#252-前提两个框必须在同一套坐标系">25.2 前提：两个框必须在同一套坐标系</a></h2>
-<p>绑定的本质是<strong>比两个框的位置</strong>——脸框和人体框谁套着谁。既然要比位置，那前提就是：<strong>两套框必须落在同一套坐标系里</strong>。全书早就把这套坐标系钉死了（写作规范第 6 节）：<strong>原图像素坐标，左上-右下 <code>(x1, y1, x2, y2)</code></strong>。</p>
+<p>绑定的本质是<strong>比两个框的位置</strong>——脸框和人体框谁套着谁。既然要比位置，那前提就是：<strong>两套框必须落在同一套坐标系里</strong>。全书早就把这套坐标系钉死了（见第 3.8、16.5 节）：<strong>原图像素坐标，左上-右下 <code>(x1, y1, x2, y2)</code></strong>。</p>
 <p>这里藏着新手的<strong>头号坑</strong>。人体检测器和人脸模型是<strong>各跑各的</strong>：各自做自己的 letterbox（等比缩放加灰边，第 10 章）、各自的输入尺寸、各自的后处理。人体检测器可能吃 <code>640×640</code>，人脸检测器可能吃别的尺寸，甚至人脸走的是“先把人抠出来放大再检测“的小图。<strong>只要每个模型都正确地把框还原回了同一张原图的像素坐标</strong>（letterbox 逆变换，第 10 章），两套框就活在同一个坐标系里，可以直接比。</p>
 <p>反过来，最常见的翻车是：人脸框还停留在人脸模型 <code>640×640</code> 的<strong>输入空间</strong>里，就直接拿去和原图像素的人体框比——数值风马牛不相及，绑定全错，而且错得“看起来还挺像那么回事“，极难排查。</p>
 <pre><code class="language-text">  ✗ 错：脸框在模型输入空间(640×640)，人体框在原图(1920×1080) —— 不可比
@@ -273,9 +273,7 @@
 \text{containment} = \frac{\text{脸框与人体框的交集面积}}{\text{脸框面积}}
 $$</p>
 <p>分母换成<strong>脸框自己的面积</strong>，而不是并集。还是上面那组数：<code>containment = 2400 / 2400 = 1.0</code>——脸 100% 在人体框内，一目了然。范围永远是 <code>0 ~ 1</code>，<code>1.0</code> 是完全包住，<code>0</code> 是完全在外，阈值特别好设（比如 <code>≥ 0.6</code> 才认）。</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use crate::BBox; // 全书统一边界框：{ x1, y1, x2, y2 }，坐标为原图像素
+<pre><code class="language-rust ignore">use crate::BBox; // 全书统一边界框：{ x1, y1, x2, y2 }，坐标为原图像素
 
 /// 包含比例：人脸框「落进」人体框的比例 = 交集面积 / 人脸框面积，范围 0~1
 /// 1.0 = 脸完全在人体框内；0 = 完全在外
@@ -289,21 +287,17 @@ pub fn containment(face: &amp;BBox, body: &amp;BBox) -&gt; f32 {
     let ih = (iy2 - iy1).max(0.0);
     let inter = iw * ih;
     inter / face.area().max(1e-6) // 复用 BBox::area()，加 1e-6 防除 0
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
 <h3 id="再加一道位置先验脸得靠上"><a class="header" href="#再加一道位置先验脸得靠上">再加一道位置先验：脸得靠上</a></h3>
 <p>光有包含比还不够。想象一个人站在另一个人<strong>正前方</strong>，后面那个高个子的脸，可能正好落进前面人的人体框里——包含比很高，却绑错了人。真正属于某人的脸，应该在他人体框的<strong>上部</strong>，而不是腰部、腿部。</p>
 <p>于是补一个<strong>竖直位置比例</strong>：脸的中心点在人体框里“从上往下“的相对位置，<code>0</code> 是头顶、<code>1</code> 是脚底。正常人脸这个值应该很小（脑袋在最上面，通常 <code>&lt; 0.35</code>）。</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>/// 脸中心落在人体框「从上往下」的相对位置：0=顶部，1=底部
+<pre><code class="language-rust ignore">/// 脸中心落在人体框「从上往下」的相对位置：0=顶部，1=底部
 /// 正常脸应该在上部，这个值很小；偏大多半是绑错了
 pub fn vertical_ratio(face: &amp;BBox, body: &amp;BBox) -&gt; f32 {
     let (_, fcy) = face.center();          // 复用 BBox::center()，取脸的中心 y
     let h = body.height().max(1e-6);       // 复用 BBox::height()
     ((fcy - body.y1) / h).clamp(0.0, 1.0)  // 相对人体框顶边的位置，夹到 0~1
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
 <p>判定一对“脸-人“是否成立，就用这两条：<strong>包含比够高</strong>（<code>≥ 0.6</code>）<strong>且脸够靠上</strong>（<code>vertical_ratio ≤ 0.4</code>）。前者保证“脸在这个人身上“，后者保证“是他的脸而不是穿帮进来的别人的脸“。</p>
 <h2 id="254-一对多消歧拥挤场景怎么择优"><a class="header" href="#254-一对多消歧拥挤场景怎么择优">25.4 一对多消歧：拥挤场景怎么择优</a></h2>
 <p>人稀疏时，一张脸只落进一个人体框，绑定毫无悬念。可<strong>人一挤，麻烦就来了</strong>：人体框互相重叠，一张脸可能同时落进两个人体框，到底算谁的？</p>
@@ -318,9 +312,7 @@ pub fn vertical_ratio(face: &amp;BBox, body: &amp;BBox) -&gt; f32 {
 <p><strong>脸对 B 的包含比</strong>：交集 <code>(max(160,150), max(55,60))=(160,60)</code> 到 <code>(min(260,190), min(405,120))=(190,120)</code>，面积 <code>30 × 60 = 1800</code>，<code>containment_B = 1800 / 2400 = 0.75</code>。</p>
 <p>脸的左边一小条（<code>x</code> 从 150 到 160）伸出了 B 的左边界，所以只有 75% 落进 B，却 100% 落进 A。<strong>结论：这张脸属于 A</strong>（1.0 &gt; 0.75）。这正是包含比的价值——它给出了一个可比较的<strong>分数</strong>，让“择优“有据可依。</p>
 <p>工程做法是把它变成一个<strong>一对一贪心匹配</strong>（思路和第 21 章跟踪里的关联一模一样）：算出所有“脸-人“组合的分数，过滤掉不达标的，然后从高分往低分挑，每张脸、每个 track 都只能用一次。</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use crate::Track; // 第 21 章统一跟踪目标：{ id, bbox, class_id, score }
+<pre><code class="language-rust ignore">use crate::Track; // 第 21 章统一跟踪目标：{ id, bbox, class_id, score }
 
 /// 单帧脸人匹配：把每张人脸绑到最合适的人体 track（一对一贪心）
 /// 返回若干 (人脸下标, track 下标) 的绑定对
@@ -356,15 +348,12 @@ pub fn bind_faces_to_tracks(
         }
     }
     pairs
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
 <p>一对一约束很重要：它天然防住了“一张脸绑到两个人““两张脸绑到同一个人“这类矛盾。剩下没配上的脸（可能是路人、误检），或没配上脸的 track（背对镜头、脸太小），本帧就先不绑，交给下一帧和时序机制处理。</p>
 <h2 id="255-时序稳定结合-track-做多帧身份投票"><a class="header" href="#255-时序稳定结合-track-做多帧身份投票">25.5 时序稳定：结合 Track 做多帧身份投票</a></h2>
 <p>单帧绑定 + 单帧识别，有个绕不开的毛病：<strong>抖</strong>。人脸识别本就随光照、角度波动，这一帧认成“张三“（相似度 0.62），下一帧可能因为一个侧头就认成“李四“（0.51），再下一帧又变回“张三“。如果每帧都直接信，屏幕上的名字就会疯狂跳变，没法用。</p>
 <p>救星正是第 21 章的 <strong><code>track_id</code></strong>。人体轨迹是<strong>连续稳定</strong>的：同一个人在画面里走，<code>track_id</code> 从头到尾不变。我们不必每帧都相信识别结果，而是<strong>为每个 <code>track_id</code> 开一个投票箱</strong>，把它这些帧里被识别成的身份都投进去，<strong>票数够多、够集中时才确认</strong>。某个 track 连着好多帧都被认成“张三“，我们才敢说它是张三；偶尔一帧的“李四“淹没在多数票里，翻不了盘。</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use std::collections::HashMap;
+<pre><code class="language-rust ignore">use std::collections::HashMap;
 
 /// 单个 track 的身份投票箱
 #[derive(Default, Clone)]
@@ -416,8 +405,7 @@ impl IdentityRegistry {
     pub fn remove(&amp;mut self, track_id: u64) {
         self.table.remove(&amp;track_id);
     }
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
 <p>这套机制的好处，用一个例子体会：某 track 走过 10 帧，其中 8 帧识别成“张三“、2 帧误识成“李四“。到第 5 帧攒够 5 票且张三占比超 60% 时，身份<strong>确认为张三</strong>；那 2 帧“李四“始终是少数，撼不动结论。<strong>多帧投票把“偶尔认错“变成了“整体认对“</strong>，这就是时序一致性的力量。</p>
 <blockquote>
 <p><strong>工程上通常会</strong>再加两条：① 人脸模型不必每帧都跑（识别很贵），可以每隔几帧、或只对“还没确认身份“的 track 跑，省算力；② track 消失后调用 <code>remove</code> 清掉投票箱，否则跑一整天，表会越堆越大。</p>
@@ -425,21 +413,16 @@ impl IdentityRegistry {
 <h2 id="256-完整数据结构以人体-track-为主体"><a class="header" href="#256-完整数据结构以人体-track-为主体">25.6 完整数据结构：以人体 Track 为主体</a></h2>
 <p>绑定和投票都有了，该把它们组织成一个清爽的数据结构。核心设计思想一句话：<strong>以人体 <code>Track</code> 为主体，把人脸带来的身份当作“挂在它身上的一个属性“</strong>。</p>
 <p>为什么主体是人体而不是人脸？因为人体在画面里<strong>连续、稳定、可跟踪</strong>——人转个身、低个头，脸没了，但人还在、轨迹还在。身份只是这条轨迹上一个“识别到了就填、没识别到就空着“的可选字段。</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>/// 画面里的一个人：以人体 Track 为主体，挂上人脸带来的身份
+<pre><code class="language-rust ignore">/// 画面里的一个人：以人体 Track 为主体，挂上人脸带来的身份
 #[derive(Clone, Debug)]
 pub struct Person {
     pub track: Track,             // 人体跟踪目标（第 21 章）：id / bbox / class_id / score
     pub identity: Option&lt;String&gt;, // 已「确认」的身份；没脸或没确认时为 None
     pub face_bbox: Option&lt;BBox&gt;,  // 本帧绑定到的人脸框；背对镜头时为 None
     pub id_confidence: f32,       // 身份可信度 = 多帧投票占比 0~1
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
 <p><code>Option&lt;String&gt;</code> 这个类型选得很讲究：它诚实地表达了“<strong>这个人一定在（track 在），但他是谁未必知道</strong>“。把前面几节拼起来，一帧的完整处理就是：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>/// 把「人体 tracks」和「已识别人脸」组装成带身份的 Person 列表
+<pre><code class="language-rust ignore">/// 把「人体 tracks」和「已识别人脸」组装成带身份的 Person 列表
 pub fn assemble_people(
     tracks: &amp;[Track],        // 本帧人体跟踪结果（第 21 章）
     faces: &amp;[BBox],          // 本帧人脸框（已还原到原图像素）
@@ -475,8 +458,7 @@ pub fn assemble_people(
             }
         })
         .collect()
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
 <p>注意 ③：<strong>遍历的是 <code>tracks</code>，每个 track 都变成一个 <code>Person</code></strong>——哪怕这一帧没绑到脸、身份还是 <code>None</code>。这正是“人体为主体“的体现：人始终在列表里，身份只是慢慢往上填。画到屏幕上就是：每个人头上永远有框和 <code>track_id</code>，认出来了再多一行名字。</p>
 <h2 id="257-推广跨模型关联的通用套路"><a class="header" href="#257-推广跨模型关联的通用套路">25.7 推广：跨模型关联的通用套路</a></h2>
 <p>脸人绑定不是个孤例，它是一大类问题的代表。把上面的思路抽象一层，你会发现<strong>只要是“用一个模型的输出去补充另一个模型的输出“，都是同一套路</strong>：</p>

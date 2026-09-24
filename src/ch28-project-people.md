@@ -1,6 +1,6 @@
 # 第 28 章 · 实战三：人流统计与人脸抓拍
 
-> **本章导读**：这是本部分综合最难的一个项目。它同时压上两条要求都很硬的子任务：一边要用**拌线**统计进出人数——计数必须**准，不重、不漏**；一边要给视野里的每个人**抓拍一张最清晰、最正的脸**存档，而人脸框和人体框来自两个不同模型，得**跨模型绑定**（人体框 ↔ 人脸框）。这一章把第七部分几乎所有过滤器都用上：ROI 之外的**拌线**（第 23 章）、**去重/冷却**（第 24 章）、**脸人绑定 containment**（第 25 章），再叠上检测（第 26 章）与跟踪（第 21 章）。读完你会得到一个能上线的 `PeopleSystem`：一个主循环把"检测 → 跟踪 → 计数 → 人脸绑定 → 抓拍 → 落盘"串成一条流水线。
+> **本章导读**：这是本部分综合最难的一个项目。它同时压上两条要求都很硬的子任务：一边要用**绊线**统计进出人数——计数必须**准，不重、不漏**；一边要给视野里的每个人**抓拍一张最清晰、最正的脸**存档，而人脸框和人体框来自两个不同模型，得**跨模型绑定**（人体框 ↔ 人脸框）。这一章把第七部分几乎所有过滤器都用上：ROI 之外的**绊线**（第 23 章）、**去重/冷却**（第 24 章）、**脸人绑定 containment**（第 25 章），再叠上检测（第 26 章）与跟踪（第 21 章）。读完你会得到一个能上线的 `PeopleSystem`：一个主循环把"检测 → 跟踪 → 计数 → 人脸绑定 → 抓拍 → 落盘"串成一条流水线。
 
 ---
 
@@ -65,19 +65,19 @@
 
 把"记录每个 track 的上一帧中心 → 判相交 → 定方向 → 去重计数"串成完整逻辑：
 
-```rust
+```rust,ignore
 use std::collections::HashMap;
 use crate::{Track, side, segments_intersect}; // 第21章 Track，第23章 side/相交
 use crate::GateCounter;                        // 第24章：按 (track_id, 方向) 去重的闸机计数器
 
-/// 穿越方向：呼应第 23/24 章对方向的定义
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum Dir { In, Out } // In=进(从上往下), Out=出(从下往上)
+// 方向约定：这里不自定义枚举，直接用第 24 章 GateCounter::on_cross 认的 i8——
+//   +1 = 进（本例「从上往下」）， -1 = 出（「从下往上」）。
+// 于是几何层用第 23 章的 side / segments_intersect，计数层用第 24 章的 i8，一路无缝对接。
 
 type P = (f32, f32);
 
-/// 判断一个 track 从 prev 走到 cur，是否穿过计数线；穿了就返回方向
-fn cross_direction(line: (P, P), prev: P, cur: P) -> Option<Dir> {
+/// 判断一个 track 从 prev 走到 cur，是否穿过计数线；穿了就返回方向（+1 进 / -1 出）
+fn cross_direction(line: (P, P), prev: P, cur: P) -> Option<i8> {
     let (a, b) = line;
     // 1) 两帧中心的「运动线段」是否真的和计数线段相交（第 23 章）
     if !segments_intersect(a, b, prev, cur) {
@@ -87,9 +87,9 @@ fn cross_direction(line: (P, P), prev: P, cur: P) -> Option<Dir> {
     let s_prev = side(a, b, prev); // 上帧在线的哪侧
     let s_cur = side(a, b, cur);   // 本帧在线的哪侧
     if s_prev < 0.0 && s_cur > 0.0 {
-        Some(Dir::In) // 负→正：本例约定「从上往下 = 进」
+        Some(1) // 负→正：本例约定「从上往下 = 进」
     } else if s_prev > 0.0 && s_cur < 0.0 {
-        Some(Dir::Out) // 正→负：从下往上 = 出
+        Some(-1) // 正→负：从下往上 = 出
     } else {
         None // 符号没真正翻转（擦着线、停在线上），不计
     }
@@ -107,7 +107,7 @@ fn count_crossings(
         if let Some(&prev) = last_center.get(&tk.id) {
             if let Some(dir) = cross_direction(line, prev, cur) {
                 // GateCounter 内部按 (track_id, dir) 去重：同一人同方向只计一次
-                counter.record(tk.id, dir);
+                counter.on_cross(tk.id, dir);
             }
         }
         last_center.insert(tk.id, cur); // 本帧中心存起来，供下一帧当「上一帧」
@@ -115,10 +115,10 @@ fn count_crossings(
 }
 ```
 
-**去重那一步是灵魂**。`cross_direction` 只判断"这两帧之间有没有穿"，但一个人穿线那一刻，可能连着两三帧的运动线段都压在计数线上，触发多次。所以最后交给第 24 章的 `GateCounter`：它内部维护一张"**这个 `track_id` 这个方向是不是已经计过**"的记录（一个 `HashSet<(u64, Dir)>`），`record` 时若已存在就忽略。这样"同一个人同一个方向"永远只 +1。显示时读 `counter` 的字段即可（本例约定 `down` 字段=进、`up` 字段=出）：
+**去重那一步是灵魂**。`cross_direction` 只判断"这两帧之间有没有穿"，但一个人穿线那一刻，可能连着两三帧的运动线段都压在计数线上，触发多次。所以最后交给第 24 章的 `GateCounter`：它内部维护一张"**这个 `track_id` 这个方向是不是已经计过**"的记录（一个 `HashSet<(u64, i8)>`），`on_cross` 时若已存在就忽略。这样"同一个人同一个方向"永远只 +1。显示时读 `counter` 的字段即可（`entered` 字段=进、`exited` 字段=出）：
 
-```rust
-println!("进 {} / 出 {}", counter.down, counter.up);
+```rust,ignore
+println!("进 {} / 出 {}", counter.entered, counter.exited);
 ```
 
 ## 28.3 计数的坑：为什么"看起来对"却数不准
@@ -157,7 +157,7 @@ $$
 
 三项相乘的意思是"**一票否决**"：脸再大，只要是侧脸（正脸程度低）总分也上不去；正得再标准，只要太小太糊也不行。前两项现成（`face.bbox.area()` 和 `face.score`），"正脸程度"用第 17 章那样的 **5 点关键点**估计左右偏转（yaw）：正脸时鼻尖大致在两眼的正中间，侧脸时鼻尖会偏向一边。
 
-```rust
+```rust,ignore
 use crate::{BBox, Face}; // 第20章 Face{ bbox, score, landmarks:[(f32,f32);5] }
 
 /// 正脸程度：用 5 点关键点估计左右偏转(yaw)，正脸≈1，侧脸→0
@@ -182,7 +182,7 @@ fn face_quality(face: &Face) -> f32 {
 
 给每个 track 存一份快照，只有新来的脸**质量分更高**才替换。这就是要落盘的东西：
 
-```rust
+```rust,ignore
 /// 一个 track 到目前为止「最好的那张脸」的快照
 pub struct FaceSnapshot {
     pub track_id: u64,
@@ -230,7 +230,7 @@ fn update_best_face(
 
 那"离开视野"由谁判定？由第 21 章的跟踪器：一个 track 连续多帧没匹配上检测，达到 `max_age` 阈值，跟踪器就认定它**彻底消失**并移除。我们**订阅这个事件**：跟踪器报告某 track 消失时，触发一次落盘。这就是"**抓拍在 track 结束时提交**"的生命周期配合——计数在"穿越那一刻"提交，抓拍在"track 结束那一刻"提交，两者节奏不同。
 
-```rust
+```rust,ignore
 /// track 消失（max_age 到）时调用：把它这一趟的最佳脸落盘并清理状态
 fn on_track_lost(
     track_id: u64,
@@ -263,7 +263,7 @@ fn on_track_lost(
 
 把两条支路和上游拼进一个结构体，就是可以逐帧喂视频的完整系统。
 
-```rust
+```rust,ignore
 use std::collections::HashMap;
 use crate::{Detector, Tracker, Track, GateCounter};
 
@@ -290,11 +290,12 @@ impl PeopleSystem {
         }
     }
 
-    /// 处理一帧：检测 → 跟踪 → 计数 → 人脸绑定 → 抓拍 → （track 结束）落盘
-    pub fn process_frame(&mut self, frame: &image::RgbImage) {
+    /// 处理一帧：检测 → 跟踪 → 计数 → 人脸绑定 → 抓拍 → （track 结束）落盘。
+    /// detect 可能失败（推理出错），故返回 Result；主循环记一笔、跳过坏帧，不崩整条流水线。
+    pub fn process_frame(&mut self, frame: &image::RgbImage) -> anyhow::Result<()> {
         // ── 上游：检测 + 跟踪 ───────────────────────────────
-        let mut dets = self.detector.detect(frame);
-        dets.retain(|d| d.class_id == 0); // 只要 person（第6节类别约定：person=0）
+        let mut dets = self.detector.detect(frame)?;
+        dets.retain(|d| d.class_id == 0); // 只要 person（COCO 类别约定：person=0）
         let tracks: Vec<Track> = self.tracker.update(&dets); // 每个人一个稳定 track_id
 
         // ── 子任务①：过线计数 ──────────────────────────────
@@ -302,7 +303,7 @@ impl PeopleSystem {
             let cur = tk.bbox.center();
             if let Some(&prev) = self.last_center.get(&tk.id) {
                 if let Some(dir) = cross_direction(self.line, prev, cur) {
-                    self.counter.record(tk.id, dir); // 同一 track 同方向只计一次
+                    self.counter.on_cross(tk.id, dir); // 同一 track 同方向只计一次
                 }
             }
             self.last_center.insert(tk.id, cur); // 更新「上一帧中心」
@@ -324,11 +325,14 @@ impl PeopleSystem {
         }
 
         // ── 生命周期：跟踪器报告哪些 track 到达 max_age 彻底消失（第21章）──
-        for gone in self.tracker.just_removed() { // 假设跟踪器暴露「本帧被移除的 id」
+        // just_removed() 返回本帧被清理的 id（第 21 章为此暴露的接口，见接口契约）；
+        // 返回 owned Vec，好让循环体里能接着 &mut 借 self 的其他字段而不冲突。
+        for gone in self.tracker.just_removed() {
             on_track_lost(gone, &mut self.last_center, &mut self.best_face);
         }
 
         self.frame_idx += 1;
+        Ok(())
     }
 
     /// 是否还有 track 需要跑人脸：只要有人「还没攒到足够好的脸」就跑（28.7）
@@ -338,9 +342,9 @@ impl PeopleSystem {
         })
     }
 
-    /// 实时读数，画到屏幕上（约定 down=进、up=出）
+    /// 实时读数，画到屏幕上（entered=进、exited=出）
     pub fn readout(&self) -> (u64, u64) {
-        (self.counter.down, self.counter.up) // (进, 出)
+        (self.counter.entered, self.counter.exited) // (进, 出)
     }
 }
 
@@ -350,10 +354,14 @@ const GOOD_ENOUGH: f32 = 5.0e4;  // 质量分够高就不再为这个 track 跑�
 
 这段代码把本章所有零件串了起来，`process_frame` 一帧只需一次遍历就完成计数与抓拍两件事。上层拿到解码后的帧（第 6 章）循环喂进来即可：
 
-```rust
+```rust,ignore
 let mut sys = PeopleSystem::new(detector, tracker, ((0.0, 540.0), (1920.0, 540.0)));
 for frame in video_frames { // 第6章解码出的 RgbImage 流
-    sys.process_frame(&frame);
+    // 单帧检测失败只记一笔、跳过这帧，别让一帧坏数据杀死长跑服务
+    if let Err(e) = sys.process_frame(&frame) {
+        eprintln!("处理帧失败: {:#}", e);
+        continue;
+    }
     let (into, out) = sys.readout();
     // draw_line + draw_text：把计数线和「进 into / 出 out」叠加到画面上
 }
@@ -377,7 +385,7 @@ for frame in video_frames { // 第6章解码出的 RgbImage 流
 
 ## 28.8 小结
 
-- 本系统是**两条平行子任务**共用"检测 + 跟踪"上游：①拌线**过线计数**，②每人一张**最佳脸抓拍**；先看懂 28.1 那张数据流图再看代码。
+- 本系统是**两条平行子任务**共用"检测 + 跟踪"上游：①绊线**过线计数**，②每人一张**最佳脸抓拍**；先看懂 28.1 那张数据流图再看代码。
 - 计数**必须基于 `track_id`**（第 21 章），不能逐帧数框——否则一次穿越被数很多次。穿越判定 = **上帧中心↔本帧中心**的运动线段与**计数线段相交**（`segments_intersect`），方向由 **`side()` 符号翻转**（负→正=进 / 正→负=出）决定，再用 **`GateCounter` 按 (track_id, 方向) 去重**保证同人同向只 +1。
 - 计数的坑几乎都在"几何 + 跟踪质量"：**ID 跳变**（调好跟踪、线放稳区）、**线画在拥挤处**（改画到画面中部人流分散处）、**擦线/斜穿**（要求符号真翻转）、**线上横跳**（第 24 章冷却/状态机去抖）、**方向记反**（按 y 轴校准一次）。
 - 人脸抓拍三步：用第 25 章 **`containment` 把脸绑到人体 track**（脸框小、必须用包含比而非 IoU）；用**质量分 = 面积 × 检测分 × 正脸程度**（5 点关键点估偏转）比较优劣；每个 track 只留**目前最好**的一张（更好才替换）。
@@ -386,7 +394,7 @@ for frame in video_frames { // 第6章解码出的 RgbImage 流
 
 ## 28.9 练习
 
-1. **双拌线让进出判定更稳**：单条计数线在"擦线/横跳"时容易误判。仿照第 23 章的**双拌线**思路，在主流向上并排画**两条**线 L1、L2，规定必须**先穿 L1 再穿 L2**（顺序对上）才算一次"进"，反过来才算"出"。改写 `cross_direction` 与状态记录，想清楚每个 track 要多存什么状态（提示：记"已经穿过哪条线、朝哪个方向"），并说明它为什么能把徘徊者的横跳过滤掉。
+1. **双绊线让进出判定更稳**：单条计数线在"擦线/横跳"时容易误判。仿照第 23 章的**双绊线**思路，在主流向上并排画**两条**线 L1、L2，规定必须**先穿 L1 再穿 L2**（顺序对上）才算一次"进"，反过来才算"出"。改写 `cross_direction` 与状态记录，想清楚每个 track 要多存什么状态（提示：记"已经穿过哪条线、朝哪个方向"），并说明它为什么能把徘徊者的横跳过滤掉。
 
 2. **按小时统计人流**：给 `PeopleSystem` 增加"分时段计数"。每记一次进/出时带上**时间戳**，把 `GateCounter` 换成 `HashMap<u8 /*小时*/, (u64, u64)>`。跑完一段视频后打印一张"每小时进/出"表，并画出哪个时段最挤（可结合本书 dataviz 思路做个简单柱状）。
 

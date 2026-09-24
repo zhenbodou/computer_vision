@@ -37,10 +37,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-4d8e5ec0.js";
+            window.path_to_searchindex_js = "searchindex-ba421b3e.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-c1d54236.js"></script>
+        <script src="toc-68b1d651.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -183,14 +183,14 @@
 <hr>
 <h2 id="161-检测-vs-分类多回答一个在哪"><a class="header" href="#161-检测-vs-分类多回答一个在哪">16.1 检测 vs 分类：多回答一个“在哪“</a></h2>
 <p>先分清两件事。</p>
-<p><strong>分类（Classification）</strong> 回答的是“<strong>这张图是什么</strong>“：喂进一张图，模型吐出“猫 92%、狗 5%、……”，一张图一个答案。这就像考试的单选题——整张图只给一个标签。第 15 章讲的就是它，输出是一个走过 Softmax 的概率向量。</p>
+<p><strong>分类（Classification）</strong> 回答的是“<strong>这张图是什么</strong>“：喂进一张图，模型吐出“猫 92%、狗 5%、……”，一张图一个答案。这就像考试的单选题——整张图只给一个标签。第 15 章讲的就是它，模型通常先输出 logits，再由后处理用 Softmax 转成概率向量。</p>
 <p><strong>检测（Detection）</strong> 要同时回答两件事：“<strong>有什么</strong>”+“<strong>在哪</strong>”。喂进一张监控画面，模型要告诉你：“左上角有 1 个人（框在这），中间有 2 辆车（框在这、这），右下角有 1 条狗（框在这）”。它不是给整张图一个标签，而是给图里<strong>每一个物体</strong>一个“类别 + 位置框 + 置信度“。</p>
 <p>打个比方：</p>
 <ul>
 <li>分类像<strong>门口的刷脸闸机</strong>——只判断“是不是员工“，一个是非题。</li>
 <li>检测像<strong>保安巡逻点名</strong>——扫一眼大厅，指出“那边站着 3 个人、门口停了 2 辆车“，每个都要圈出来、说清是什么。</li>
 </ul>
-<p>多出来的这个“在哪“，就是本章所有麻烦的来源：模型没法只输出一个标签，它得输出<strong>一大堆候选框</strong>，我们再从中筛出真正的物体。位置用<strong>边界框（Bounding Box，简称 bbox）</strong> 表示，全书统一约定用<strong>左上角-右下角</strong> <code>(x1, y1, x2, y2)</code> 四个像素坐标（见第 6 章统一类型）。本章的终点，就是把那 70 万个数字变成一小把干净的 <code>Detection</code>。</p>
+<p>多出来的这个“在哪“，就是本章所有麻烦的来源：模型没法只输出一个标签，它得输出<strong>一大堆候选框</strong>，我们再从中筛出真正的物体。位置用<strong>边界框（Bounding Box，简称 bbox）</strong> 表示，全书统一约定用<strong>左上角-右下角</strong> <code>(x1, y1, x2, y2)</code> 四个像素坐标（这个 <code>BBox</code> 类型最早见第 3.8 节）。本章的终点，就是把那 70 万个数字变成一小把干净的 <code>Detection</code>。</p>
 <hr>
 <h2 id="162-yolo-家族简史从看两眼到看一眼"><a class="header" href="#162-yolo-家族简史从看两眼到看一眼">16.2 YOLO 家族简史：从“看两眼“到“看一眼“</a></h2>
 <p>检测算法早年是<strong>两阶段（two-stage）</strong> 的天下，代表是 <strong>R-CNN</strong> 系列（R-CNN → Fast R-CNN → Faster R-CNN）。它的思路很像人找东西：</p>
@@ -256,7 +256,7 @@
 第 83 个属性: 类别79 的分数
 </code></pre>
 <p><strong>关键点 1：前 4 个是 <code>cx, cy, w, h</code>（中心 x、中心 y、宽、高），不是 <code>x1,y1,x2,y2</code>。</strong> 这是新手第一个大坑，后面 16.5 专门转换。</p>
-<p><strong>关键点 2：YOLOv8 没有单独的 objectness（有无物体）分数。</strong> 对比一下：YOLOv5 的属性是 85 = 4 框 + <strong>1 个 objectness</strong> + 80 类，置信度要算 <code>objectness × 类别分</code>；而 v8 是 84 = 4 框 + 80 类，<strong>直接取 80 类里的最大分</strong>当作这个候选的置信度。别把 v5 的公式套到 v8 上。</p>
+<p><strong>关键点 2：YOLOv8 没有单独的 objectness（有无物体）分数。</strong> 对比一下：YOLOv5 的属性是 85 = 4 框 + <strong>1 个 objectness</strong> + 80 类，置信度要算 <code>objectness × 类别分</code>；而 v8 是 84 = 4 框 + 80 类。Ultralytics 常见导出的 ONNX 已在图内对类别 logits 做了 Sigmoid，后处理可<strong>直接取 80 类里的最大分</strong>当作这个候选的置信度。若使用其他导出链，先用 Netron 确认输出是否已经激活，避免漏做或重复做 Sigmoid。别把 v5 的公式套到 v8 上。</p>
 <h3 id="最坑的地方内存布局"><a class="header" href="#最坑的地方内存布局">最坑的地方：内存布局</a></h3>
 <p><code>[1, 84, 8400]</code> 在内存里是**行主序（C 连续）**排列的，也就是“<strong>84 在外、8400 在内</strong>“。摊平成一维数组后，是这样：</p>
 <pre><code class="language-text">内存里连续排列（属性优先，同一属性的 8400 个值挨在一起）：
@@ -278,9 +278,7 @@ flat 下标： 0        1        ...   8399  8400   8401 ...
 flat[i * 84 + c]       ❌ 错误：这是 [1,8400,84] 布局的取法
 </code></pre>
 <p>用错这个下标，取出来的全是张冠李戴的乱数，框会飞得到处都是，还特别难 debug（不报错、只是结果不对）。记住口诀：<strong>属性乘 8400，再加候选号</strong>。</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>const NUM_ANCHORS: usize = 8400; // 候选框个数
+<pre><code class="language-rust ignore">const NUM_ANCHORS: usize = 8400; // 候选框个数
 const NUM_CLASSES: usize = 80;   // COCO 类别数
 const NUM_ATTRS:   usize = 4 + NUM_CLASSES; // = 84
 
@@ -289,17 +287,14 @@ const NUM_ATTRS:   usize = 4 + NUM_CLASSES; // = 84
 #[inline]
 fn at(output: &amp;[f32], c: usize, i: usize) -&gt; f32 {
     output[c * NUM_ANCHORS + i] // 属性 c 的块起点是 c*8400，再偏移 i
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
 <blockquote>
 <p>极少数导出工具会把输出转成 <code>[1, 8400, 84]</code>（84 在最后一维），那时取法就变成 <code>flat[i*84 + c]</code>。上线前务必先打印一次 shape 确认布局（怎么读 shape / 元数据见第 12 章），别凭记忆写死。</p>
 </blockquote>
 <hr>
 <h2 id="164-解码一个候选框"><a class="header" href="#164-解码一个候选框">16.4 解码一个候选框</a></h2>
 <p>有了正确的取值方式，解码单个候选就水到渠成了：取出 <code>cx,cy,w,h</code>，再在 80 个类别分里找最大值（<strong>argmax</strong>），最大值就是这个候选的<strong>置信度</strong>，对应的下标就是 <strong>class_id</strong>。</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>/// 从展平的 [1,84,8400] 里解码第 i 个候选
+<pre><code class="language-rust ignore">/// 从展平的 [1,84,8400] 里解码第 i 个候选
 /// 返回 (cx, cy, w, h, class_id, score)，坐标此刻还在 640 letterbox 坐标系里
 fn decode_one(output: &amp;[f32], i: usize) -&gt; (f32, f32, f32, f32, usize, f32) {
     // 框：cx, cy, w, h —— 每跳一个属性，下标要跨 8400 个元素
@@ -319,8 +314,7 @@ fn decode_one(output: &amp;[f32], i: usize) -&gt; (f32, f32, f32, f32, usize, f3
         }
     }
     (cx, cy, w, h, class_id, score)
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
 <p>几个要点：</p>
 <ul>
 <li><strong>类别分就是置信度</strong>：v8 无 objectness，<code>score</code> 直接是 80 类里的最大分，不用再乘任何东西。</li>
@@ -348,10 +342,8 @@ fn decode_one(output: &amp;[f32], i: usize) -&gt; (f32, f32, f32, f32, usize, f3
 <li>去 letterbox：<code>x1' = (270-0)/0.5 = 540</code>，<code>y1' = (80-140)/0.5 = -120</code>，<code>x2' = (370-0)/0.5 = 740</code>，<code>y2' = (280-140)/0.5 = 280</code>。</li>
 </ul>
 <p>得到原图坐标 <code>(540, -120, 740, 280)</code>。注意 <code>y1</code> 成了负数——框顶超出了图像上边界，这在贴边物体上很常见，生产里会再 clamp（裁剪）到图像范围内。</p>
-<p>统一用第 6 节的 <code>BBox</code>（左上右下），写出反算函数：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>/// 边界框：左上-右下像素坐标（全书统一类型，见第 6 节）
+<p>统一用第 3.8 节引入的 <code>BBox</code>（左上右下），写出反算函数：</p>
+<pre><code class="language-rust ignore">/// 边界框：左上-右下像素坐标（全书统一类型，见第 3.8 节）
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct BBox {
     pub x1: f32,
@@ -375,21 +367,17 @@ fn to_original_bbox(cx: f32, cy: f32, w: f32, h: f32, scale: f32, pad: (f32, f32
         x2: (x2 - pad_x) / scale,
         y2: (y2 - pad_y) / scale,
     }
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
 <blockquote>
 <p>生产环境里通常还会把结果 <strong>clamp 到 <code>[0, 原宽] × [0, 原高]</code></strong>，避免出现上面那种负坐标或超出右/下边界的框（那需要额外传入原图宽高，见本章练习）。这里先保持反算逻辑纯粹。</p>
 </blockquote>
 <hr>
 <h2 id="166-置信度阈值先砍掉一大片垃圾"><a class="header" href="#166-置信度阈值先砍掉一大片垃圾">16.6 置信度阈值：先砍掉一大片垃圾</a></h2>
 <p>8400 个候选里，绝大多数是“这里啥也没有“的背景，分数极低（0.01、0.03……）。全部留着送进 NMS 又慢又没意义。所以解码时顺手做<strong>置信度阈值过滤</strong>：分数低于阈值（常用 <code>conf = 0.25</code>）的直接扔掉。</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>// 伪代码示意，完整版见 16.8
+<pre><code class="language-rust ignore">// 伪代码示意，完整版见 16.8
 if score &lt; conf {
     continue; // 这个候选不要了
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
 <p>这一刀通常能把 8400 个砍到几十到几百个，NMS 的负担骤降。阈值怎么定是个工程权衡：</p>
 <div class="table-wrapper">
 <table>
@@ -431,10 +419,8 @@ if score &lt; conf {
 <li><strong>IoU = 8000 / 12000 = 0.667</strong></li>
 </ul>
 <p>0.667 是个很高的重叠度——这俩框八成指着同一辆车。若 NMS 阈值取 0.5，B 就会被分数更高的 A 压制掉。反过来，如果两个框只是稍微擦边（IoU 0.1），说明是两个不同物体，谁也不该压制谁。</p>
-<p>给统一类型 <code>BBox</code> 补上方法（<code>width/height/area/center/iou</code>，命名遵循第 6 节）：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>impl BBox {
+<p>给统一类型 <code>BBox</code> 补上方法（<code>width/height/area/center/iou</code>）：</p>
+<pre><code class="language-rust ignore">impl BBox {
     pub fn width(&amp;self)  -&gt; f32 { (self.x2 - self.x1).max(0.0) } // 退化框宽记 0
     pub fn height(&amp;self) -&gt; f32 { (self.y2 - self.y1).max(0.0) }
     pub fn area(&amp;self)   -&gt; f32 { self.width() * self.height() }
@@ -459,8 +445,7 @@ if score &lt; conf {
         let union = self.area() + other.area() - inter;
         inter / union
     }
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
 <h3 id="标准-nms-的四步"><a class="header" href="#标准-nms-的四步">标准 NMS 的四步</a></h3>
 <ol>
 <li>把所有框<strong>按置信度从高到低排序</strong>。</li>
@@ -468,10 +453,8 @@ if score &lt; conf {
 <li>计算它与其余每个框的 <strong>IoU</strong>，把 IoU <strong>超过阈值</strong>的框全部删掉（它们和代表指向同一物体）。</li>
 <li>在剩下的框里回到第 2 步，直到没有框剩下。</li>
 </ol>
-<p>用统一的 <code>Detection</code> 类型（第 6 节）实现，写法上换个等价的贪心角度：<strong>按分数降序遍历，每个框只和“已保留“的比，若和任一已保留框重叠过高就丢弃</strong>（能丢它的一定分更高，逻辑等价、还更好读）：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>/// 一个检测结果（全书统一类型，见第 6 节）
+<p>用本章统一的 <code>Detection</code> 类型实现，写法上换个等价的贪心角度：<strong>按分数降序遍历，每个框只和“已保留“的比，若和任一已保留框重叠过高就丢弃</strong>（能丢它的一定分更高，逻辑等价、还更好读）：</p>
+<pre><code class="language-rust ignore">/// 一个检测结果（从本章起供后续章节复用）
 #[derive(Clone, Debug)]
 pub struct Detection {
     pub bbox: BBox,
@@ -495,13 +478,10 @@ fn nms_single_class(mut dets: Vec&lt;Detection&gt;, iou_thr: f32) -&gt; Vec&lt;D
         keep.push(det); // 没和任何代表冲突，它自己也当代表
     }
     keep
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
 <h3 id="按类-nms-vs-全局-nms"><a class="header" href="#按类-nms-vs-全局-nms">按类 NMS vs 全局 NMS</a></h3>
 <p>上面处理的是<strong>同一类别</strong>。为什么要分类别？想象一个人牵着一条狗，人框和狗框可能高度重叠（IoU 0.7）——但它们是<strong>两个不同类别的真实物体</strong>，绝不能因为重叠就删掉一个。所以通用检测都用<strong>按类 NMS</strong>：先按 <code>class_id</code> 分组，<strong>每一类各做各的 NMS</strong>，组间互不干扰。</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use std::collections::HashMap;
+<pre><code class="language-rust ignore">use std::collections::HashMap;
 
 /// 按类别分别做 NMS：不同类别的框互不抑制
 fn nms_per_class(dets: Vec&lt;Detection&gt;, iou_thr: f32) -&gt; Vec&lt;Detection&gt; {
@@ -516,8 +496,7 @@ fn nms_per_class(dets: Vec&lt;Detection&gt;, iou_thr: f32) -&gt; Vec&lt;Detectio
         result.extend(nms_single_class(group, iou_thr));
     }
     result
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
 <p><strong>全局 NMS（不分类别）</strong> 只在特定场景用——比如“同一个位置物理上只可能有一个物体“，此时跨类别的重叠框也该去重。通用检测请默认按类。</p>
 <h3 id="顺带一提soft-nms"><a class="header" href="#顺带一提soft-nms">顺带一提：Soft-NMS</a></h3>
 <p>标准 NMS 是“一刀切“：重叠超阈值就<strong>直接删</strong>。在极拥挤场景（一堆人挤在一起）里，两个真人的框本就重叠很高，硬删会<strong>误杀</strong>、导致漏检。<strong>Soft-NMS</strong> 改成“温柔一点“：不直接删，而是<strong>按 IoU 给重叠框的分数打个折</strong>（IoU 越大，分数衰减越多），让它降权而不消失，最后再靠分数阈值收尾。密集人群里能少漏几个。知道有这么个变体即可，工程上先用标准 NMS 起步。</p>
@@ -539,9 +518,7 @@ fn nms_per_class(dets: Vec&lt;Detection&gt;, iou_thr: f32) -&gt; Vec&lt;Detectio
                     最终几个干净的框 → Vec&lt;Detection&gt;
 </code></pre>
 <p>对应任务给定的函数签名，一把梭：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>const NUM_ANCHORS: usize = 8400;
+<pre><code class="language-rust ignore">const NUM_ANCHORS: usize = 8400;
 const NUM_CLASSES: usize = 80;
 const NUM_ATTRS:   usize = 4 + NUM_CLASSES; // = 84
 
@@ -590,18 +567,14 @@ fn postprocess(
 
     // 第四步：按类别 NMS 去重
     nms_per_class(dets, iou_thr)
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
 <p>把本章的 <code>BBox</code>（含 <code>impl</code>）、<code>Detection</code>、<code>to_original_bbox</code>、<code>nms_single_class</code>、<code>nms_per_class</code>、<code>postprocess</code> 放进一个模块就能编译。调用方拿到的 <code>Vec&lt;Detection&gt;</code>，每个都是<strong>原图像素坐标、类别明确、去过重</strong>的干净结果——可以直接画框（<code>imageproc</code> 画矩形）、送去跟踪（第 21 章）或喂给业务过滤器。一个典型调用：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>// scale、pad 来自第 10 章 letterbox 预处理时记下的值；output 来自第 14 章推理
+<pre><code class="language-rust ignore">// scale、pad 来自第 10 章 letterbox 预处理时记下的值；output 来自第 14 章推理
 let dets = postprocess(&amp;output, scale, pad, 0.25, 0.45);
 for d in &amp;dets {
     println!("class={} score={:.2} box=({:.0},{:.0},{:.0},{:.0})",
              d.class_id, d.score, d.bbox.x1, d.bbox.y1, d.bbox.x2, d.bbox.y2);
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
 <blockquote>
 <p>工程上通常还会在解码循环里用<strong>预分配 + 迭代器</strong>减少分配，或按类别用<strong>数组分桶</strong>替代 <code>HashMap</code> 提速；NMS 也有基于面积排序的加速写法。这些优化在候选量大、要跑高帧率时再上，先保证上面这版<strong>正确、看得懂</strong>。</p>
 </blockquote>

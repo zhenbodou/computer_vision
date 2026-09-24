@@ -37,10 +37,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-4d8e5ec0.js";
+            window.path_to_searchindex_js = "searchindex-ba421b3e.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-c1d54236.js"></script>
+        <script src="toc-68b1d651.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -403,7 +403,7 @@ metadata = {'task': 'detect', 'names': "{0: 'person', ...}", ...}
 <pre><code class="language-bash">cargo new inspect_model &amp;&amp; cd inspect_model
 cargo add ort
 </code></pre>
-<pre class="playground"><code class="language-rust">// src/main.rs —— 用 ort 打印每个输入/输出的 name、dtype、shape
+<pre><code class="language-rust ignore">// src/main.rs —— 用 ort 打印每个输入/输出的 name、dtype、shape
 use ort::session::Session;
 use ort::value::ValueType;
 
@@ -453,7 +453,7 @@ fn print_io(name: &amp;str, ty: &amp;ValueType) {
 <p><strong>方式 B（可选）：用 <code>tract</code> 查 fact。</strong> <code>tract</code> 是纯 Rust 的引擎，它把“某个张量的形状+类型“叫做 <strong>fact（事实）</strong>，用 <code>input_fact()</code> / <code>output_fact()</code> 按序号查询：</p>
 <pre><code class="language-bash">cargo add tract-onnx
 </code></pre>
-<pre class="playground"><code class="language-rust">// 用 tract 查询输入/输出的 fact（形状 + dtype）
+<pre><code class="language-rust ignore">// 用 tract 查询输入/输出的 fact（形状 + dtype）
 use tract_onnx::prelude::*;
 
 fn main() -&gt; TractResult&lt;()&gt; {

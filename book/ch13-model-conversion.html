@@ -37,10 +37,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-4d8e5ec0.js";
+            window.path_to_searchindex_js = "searchindex-ba421b3e.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-c1d54236.js"></script>
+        <script src="toc-68b1d651.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -476,23 +476,25 @@ assert max_err &lt; 1e-3, "误差过大，转换可能出错了！"
 <p><strong>两个验证坑</strong>：① 别只用随机输入——随机数可能碰不到真实数据才会触发的分支，务必<strong>补几张真实图</strong>再比一遍。② 别忘了<strong>预处理要一致</strong>（第 10 章的 letterbox、归一化），输入都没对齐，比出来的误差没有意义。</p>
 </blockquote>
 <h3 id="rust-侧加载转换后-onnx-的冒烟测试"><a class="header" href="#rust-侧加载转换后-onnx-的冒烟测试">Rust 侧：加载转换后 ONNX 的冒烟测试</a></h3>
-<p>转换、验证都在 Python 里做完了，最后在 Rust 里确认一下——<strong>这个 ONNX 能被我们的推理引擎加载、能前向、输出形状对</strong>。用写作规范里的 <code>ort</code>（ONNX Runtime 的 Rust 绑定）写一个最小冒烟测试：</p>
-<pre class="playground"><code class="language-rust">use ndarray::Array4;
-use ort::{session::Session, value::Tensor};
+<p>转换、验证都在 Python 里做完了，最后在 Rust 里确认一下——<strong>这个 ONNX 能被我们的推理引擎加载、能前向、输出形状对</strong>。用第 14 章介绍的 <code>ort</code>（ONNX Runtime 的 Rust 绑定）写一个最小冒烟测试：</p>
+<pre><code class="language-rust ignore">use ndarray::Array4;
+use ort::{session::Session, value::TensorRef};
 
 fn main() -&gt; ort::Result&lt;()&gt; {
     // 1) 加载转换/导出好的 onnx
-    let session = Session::builder()?.commit_from_file("yolov8n.onnx")?;
+    let mut session = Session::builder()?.commit_from_file("yolov8n.onnx")?;
 
     // 2) 造一个假输入：全 0 的 [1,3,640,640]，只为验证"能跑通"，不关心结果对不对
     let x = Array4::&lt;f32&gt;::zeros((1, 3, 640, 640));
 
     // 3) 按导出时起的输入名 "images" 喂进去（怎么查输入名？第 12 章教过）
-    let outputs = session.run(ort::inputs!["images" =&gt; Tensor::from_array(x)?]?)?;
+    let outputs = session.run(ort::inputs![
+        "images" =&gt; TensorRef::from_array_view(&amp;x)?
+    ])?;
 
     // 4) 取出名为 "output0" 的输出，打印形状，确认是我们期待的 [1, 84, 8400]
-    let (shape, _data) = outputs["output0"].try_extract_tensor::&lt;f32&gt;()?;
-    println!("跑通了！输出形状 = {shape:?}"); // 期望 [1, 84, 8400]
+    let output = outputs["output0"].try_extract_array::&lt;f32&gt;()?;
+    println!("跑通了！输出形状 = {:?}", output.shape()); // 期望 [1, 84, 8400]
     Ok(())
 }</code></pre>
 <p>跑通并打印出 <code>[1, 84, 8400]</code>，就说明这个转换后的模型<strong>能被 Rust 加载、能前向、形状符合预期</strong>——转换链路到此闭环。</p>

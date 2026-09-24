@@ -163,7 +163,7 @@ cargo add image anyhow
 
 下面这个程序做两件事：**①** 解码一张图并打印它的尺寸/通道；**②** 用不同 `quality` 重新编码成 JPEG，比较字节数。
 
-```rust
+```rust,ignore
 use anyhow::Result;
 use image::GenericImageView;            // 提供 .dimensions() 等方法
 use image::codecs::jpeg::JpegEncoder;   // 可精确控制质量的 JPEG 编码器
@@ -250,7 +250,7 @@ JPEG/PNG 是"老将"，近十年冒出一批压缩比更高的新格式，一句
 
 处理办法：解码后读出 EXIF Orientation，再把图转正。用 `kamadak-exif` 读方向：
 
-```rust
+```rust,ignore
 // cargo add kamadak-exif
 use std::fs::File;
 use std::io::BufReader;
@@ -271,7 +271,7 @@ fn read_orientation(path: &str) -> u32 {
 
 拿到值后按下表旋正（`DynamicImage` 自带 `rotate90/180/270`、`fliph/flipv`）：
 
-```rust
+```rust,ignore
 use image::DynamicImage;
 
 /// 按 EXIF Orientation 把图像"摆正"

@@ -37,10 +37,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-4d8e5ec0.js";
+            window.path_to_searchindex_js = "searchindex-ba421b3e.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-c1d54236.js"></script>
+        <script src="toc-68b1d651.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -254,9 +254,7 @@
 <p>新手最容易忽略边界，随手一个“跳过最外圈不处理“，结果图像四周留了一圈没滤波的毛边，或者用补零把边缘搞黑了还纳闷。<strong>记住：边界必须处理，且处理方式会影响结果。</strong> 下一节我们手写卷积函数时，就把这三种模式都实现出来。</p>
 <h2 id="75-手写一个-33-卷积函数"><a class="header" href="#75-手写一个-33-卷积函数">7.5 手写一个 3×3 卷积函数</a></h2>
 <p>现在把 7.2~7.4 的道理落成一段能跑的代码。为了看清底层，我们<strong>不依赖任何图像库</strong>，直接对一个“行优先排列的灰度数组 <code>&amp;[f32]</code>“做卷积，把边界处理也一并做对。</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>/// 边界填充方式：滑窗探出图像外时，用什么值补上（对应 7.4 的三种）
+<pre><code class="language-rust ignore">/// 边界填充方式：滑窗探出图像外时，用什么值补上（对应 7.4 的三种）
 #[derive(Clone, Copy)]
 enum Padding {
     Zero,      // 补 0（黑）
@@ -316,12 +314,9 @@ fn convolve3x3(src: &amp;[f32], w: usize, h: usize, kernel: &amp;[f32; 9], pad: 
         }
     }
     out
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
 <p>配两个和 <code>image</code> crate 打通的小工具，把灰度图和 <code>Vec&lt;f32&gt;</code> 互相转换（<code>GrayImage</code> 内部就是行优先的 <code>Vec&lt;u8&gt;</code>，正好对得上）：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use image::{GrayImage, Luma};
+<pre><code class="language-rust ignore">use image::{GrayImage, Luma};
 
 /// 灰度图 → f32 数组（顺带返回宽高）
 fn gray_to_f32(img: &amp;GrayImage) -&gt; (Vec&lt;f32&gt;, usize, usize) {
@@ -337,8 +332,7 @@ fn f32_to_gray(data: &amp;[f32], w: usize, h: usize) -&gt; GrayImage {
         *p = Luma([data[i].round().clamp(0.0, 255.0) as u8]);
     }
     img
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
 <p>有了这台“卷积引擎“，接下来的滤波器<strong>只是换核里的数字</strong>而已。</p>
 <h2 id="76-均值滤波box-blur"><a class="header" href="#76-均值滤波box-blur">7.6 均值滤波（box blur）</a></h2>
 <p>**均值滤波（mean filter / box blur，方框模糊）**就是 7.3 手算的那个核——9 个格子全是 <code>1/9</code>：</p>
@@ -350,13 +344,10 @@ fn f32_to_gray(data: &amp;[f32], w: usize, h: usize) -&gt; GrayImage {
 <p>为什么是 1/9 而不是 1？因为要让<strong>核里所有数字加起来等于 1</strong>。这样滤波前后图像<strong>整体亮度不变</strong>（否则会整体变亮或变暗）。任何“模糊类“的核都遵守这条：权重之和为 1。</p>
 </blockquote>
 <p>用我们的引擎跑一次均值滤波：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>let (buf, w, h) = gray_to_f32(&amp;gray);            // gray 是一张 GrayImage
+<pre><code class="language-rust ignore">let (buf, w, h) = gray_to_f32(&amp;gray);            // gray 是一张 GrayImage
 let box_kernel = [1.0 / 9.0; 9];                 // 均值核
 let blurred = convolve3x3(&amp;buf, w, h, &amp;box_kernel, Padding::Replicate);
-f32_to_gray(&amp;blurred, w, h).save("box_blur.png")?;
-<span class="boring">}</span></code></pre>
+f32_to_gray(&amp;blurred, w, h).save("box_blur.png")?;</code></pre>
 <p>均值滤波的优点是<strong>快、简单</strong>，能压掉轻微的随机噪声。缺点也很直接：<strong>所有邻居一视同仁</strong>，包括那些本该保留的边缘像素——边缘正是“和邻居不一样“的地方，而均值最讨厌与众不同，一平均就把边糊掉了。所以均值滤波适合快速预览，不适合“既要降噪又要保住边“的正经场合。</p>
 <h2 id="77-高斯滤波gaussian-blur"><a class="header" href="#77-高斯滤波gaussian-blur">7.7 高斯滤波（Gaussian blur）</a></h2>
 <p>均值核的毛病在于“正对着中心的邻居“和“斜对角的邻居“权重一样大——这不合直觉：离得越近的像素，显然越该说得上话。**高斯滤波（Gaussian blur）**修正了这一点：核里的权重按一座“小山“（钟形曲线）分布，<strong>中间大、四周小、越远越小</strong>。</p>
@@ -377,14 +368,11 @@ f32_to_gray(&amp;blurred, w, h).save("box_blur.png")?;
 <li><strong>σ 越小</strong>，山越尖，权重几乎全压在中心 → 几乎不模糊。</li>
 </ul>
 <p>工程上通常不手填核里的数字，而是给一个 σ，让库去生成核。<code>imageproc</code> 直接提供了高斯模糊（内部按 f32 计算，精度好）：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use imageproc::filter::gaussian_blur_f32;
+<pre><code class="language-rust ignore">use imageproc::filter::gaussian_blur_f32;
 
 let gray = image::open("test.jpg")?.to_luma8();
 let g = gaussian_blur_f32(&amp;gray, 1.5);   // σ = 1.5，值越大越糊
-g.save("gaussian.png")?;
-<span class="boring">}</span></code></pre>
+g.save("gaussian.png")?;</code></pre>
 <p>高斯模糊是几乎所有视觉流水线的“开胃菜“：噪声是杂乱的高频信号，高斯这种“低通“正好把它压下去，同时又比均值温柔。第 8 章讲边缘检测时，第一步就是它。</p>
 <h2 id="78-中值滤波median-filter"><a class="header" href="#78-中值滤波median-filter">7.8 中值滤波（median filter）</a></h2>
 <p>有一种噪声，均值和高斯都拿它没办法——<strong>椒盐噪声（salt-and-pepper noise）</strong>：图上随机撒的一撮**纯黑（0）和纯白（255）**的点，像撒了盐和胡椒，常见于老照片的霉斑、传感器坏点、信号传输误码。</p>
@@ -395,14 +383,11 @@ g.save("gaussian.png")?;
 </code></pre>
 <p>极端的黑点白点总是排在队首队尾，取中位数时自动被“投票出局“，一点都影响不到结果。而且中值滤波是<strong>非线性</strong>的（没有一个固定的核矩阵能表示“排序取中“这个动作），它还天生<strong>保边缘</strong>：一条边两侧各自的中位数还是各归各，边不会被抹平。所以它是“去孤立噪点又不想糊图“的首选。代价是排序比乘加慢一些。</p>
 <p><code>imageproc</code> 提供了中值滤波，参数是 x、y 两个方向的<strong>半径</strong>，窗口大小是 <code>(2·x_radius+1) × (2·y_radius+1)</code>：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use imageproc::filter::median_filter;
+<pre><code class="language-rust ignore">use imageproc::filter::median_filter;
 
 let gray = image::open("salt_pepper.jpg")?.to_luma8();
 let m = median_filter(&amp;gray, 1, 1);   // 半径都取 1 → 3×3 窗口
-m.save("median.png")?;
-<span class="boring">}</span></code></pre>
+m.save("median.png")?;</code></pre>
 <p>一句话对比：<strong>高斯专治“细密的沙沙噪声“，中值专治“一撮黑白点“，且中值比高斯更保边。</strong></p>
 <h2 id="79-双边滤波bilateral"><a class="header" href="#79-双边滤波bilateral">7.9 双边滤波（bilateral）</a></h2>
 <p>高斯滤波只看一个维度——<strong>空间距离</strong>：离中心越近，权重越大。可这样一来，隔着一条边缘的像素只要“离得近“也会被拉进来平均，于是边的两侧互相污染，脸被磨平了、眼睛也糊了。</p>
@@ -434,9 +419,7 @@ m.save("median.png")?;
 </ol>
 <p>$$\text{锐化图} = \text{原图} + \text{amount} \times (\text{原图} - \text{模糊图})$$</p>
 <p><code>amount</code> 是锐化强度。用 <code>imageproc</code> 的高斯模糊就能实现一版 USM：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use imageproc::filter::gaussian_blur_f32;
+<pre><code class="language-rust ignore">use imageproc::filter::gaussian_blur_f32;
 use image::{GrayImage, Luma};
 
 /// USM 锐化：out = clamp( 原图 + amount·(原图 − 模糊图) )
@@ -453,21 +436,17 @@ fn unsharp_mask(gray: &amp;GrayImage, sigma: f32, amount: f32) -&gt; GrayImage {
         }
     }
     out
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
 <p>如果不想模糊两次，还有一个等价的“<strong>一步到位</strong>“锐化核，可以直接喂给 7.5 的 <code>convolve3x3</code>：</p>
 <pre><code class="language-text"> 0  -1   0
 -1   5  -1        中心 5、上下左右各 −1，权重和 = 5 − 4 = 1（亮度不变）
  0  -1   0
 </code></pre>
 <p>直觉：中心那个 5，可以拆成 <code>1（原图本身） + 4</code>，多出来的 <code>4·中心 − 4·邻居</code> 正是“中心比邻居突出多少“。平坦区邻居和中心一样，这一项为 0，不变；边缘处中心和邻居差得多，这一项就把差异放大，边缘随之凸显。</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>let (buf, w, h) = gray_to_f32(&amp;gray);
+<pre><code class="language-rust ignore">let (buf, w, h) = gray_to_f32(&amp;gray);
 let sharpen = [0.0, -1.0, 0.0, -1.0, 5.0, -1.0, 0.0, -1.0, 0.0];
 let s = convolve3x3(&amp;buf, w, h, &amp;sharpen, Padding::Replicate);
-f32_to_gray(&amp;s, w, h).save("sharpen.png")?;
-<span class="boring">}</span></code></pre>
+f32_to_gray(&amp;s, w, h).save("sharpen.png")?;</code></pre>
 <p><strong>坑提醒</strong>：锐化本质是“高通“——它放大差异，也<strong>连带放大噪声</strong>。所以顺序通常是<strong>先降噪、再锐化</strong>；<code>amount</code> 也别开太大，否则边缘旁会出现一圈难看的白边（振铃 / halo）。</p>
 <h2 id="711-工程落地降噪好用但别糊掉小目标"><a class="header" href="#711-工程落地降噪好用但别糊掉小目标">7.11 工程落地：降噪好用，但别糊掉小目标</a></h2>
 <p>降噪在真实项目里最常见的身份是<strong>预处理的一环</strong>：二值化之前、边缘检测之前（第 8 章）、模板匹配之前，先来一发轻度平滑，能少踩很多“噪点被当成目标“的坑。</p>

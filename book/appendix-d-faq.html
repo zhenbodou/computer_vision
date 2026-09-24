@@ -37,10 +37,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-4d8e5ec0.js";
+            window.path_to_searchindex_js = "searchindex-ba421b3e.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-c1d54236.js"></script>
+        <script src="toc-68b1d651.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -198,12 +198,9 @@
 <h2 id="d3-预处理"><a class="header" href="#d3-预处理">D.3 预处理</a></h2>
 <p><strong>Q：</strong> letterbox 之后检测框位置全偏、比例也不对？
 <strong>A：</strong> letterbox 做了等比缩放 + 灰边填充，但后处理没把缩放比和填充记下来，直接拿 640 坐标当原图坐标用。<strong>做 letterbox 时就存下 <code>scale</code>、<code>pad_x</code>、<code>pad_y</code></strong>，还原时按下面逆变换：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>// 还原到原图：先减填充，再除以缩放比例
+<pre><code class="language-rust ignore">// 还原到原图：先减填充，再除以缩放比例
 let x_orig = (x - pad_x) / scale;
-let y_orig = (y - pad_y) / scale;
-<span class="boring">}</span></code></pre>
+let y_orig = (y - pad_y) / scale;</code></pre>
 <p>（第 10、16 章）</p>
 <p><strong>Q：</strong> 归一化方式和训练不一致，能检出但分数偏低、框不准？
 <strong>A：</strong> 训练用的是 <code>/255</code>（缩放到 0~1）还是 <code>mean-std</code>（减均值除标准差，如 ImageNet 那套）没对齐。<strong>本书主模型 YOLOv8：RGB、只 <code>/255</code>、不做 mean-std</strong>。务必查模型来源的预处理并严格照抄。（第 10 章）</p>
@@ -242,16 +239,13 @@ let y_orig = (y - pad_y) / scale;
 <h2 id="d6-后处理"><a class="header" href="#d6-后处理">D.6 后处理</a></h2>
 <p><strong>Q：</strong> 框画出来又小又挤在左上角？
 <strong>A：</strong> 模型输出的框是 <code>cxcywh</code>（中心点 + 宽高），被当成 <code>xyxy</code>（左上-右下）直接用了。先转成统一的 <code>BBox</code>：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>// YOLOv8 输出是 中心点+宽高，先转成 BBox 的左上-右下坐标
+<pre><code class="language-rust ignore">// YOLOv8 输出是 中心点+宽高，先转成 BBox 的左上-右下坐标
 let bbox = BBox {
     x1: cx - w / 2.0,
     y1: cy - h / 2.0,
     x2: cx + w / 2.0,
     y2: cy + h / 2.0,
-};
-<span class="boring">}</span></code></pre>
+};</code></pre>
 <p>（第 16 章）</p>
 <p><strong>Q：</strong> 同一个物体上叠了好几个框，或不同类别互相压制？
 <strong>A：</strong> NMS 没有<strong>按类别分组</strong>：要么根本没做，要么跨类别一起做把不同类的框也抑制了。正确做法是按 <code>class_id</code> 分组、各自做 NMS（或用“类别偏移“技巧让不同类互不干扰）。（第 16 章）</p>
@@ -262,8 +256,8 @@ let bbox = BBox {
 <h2 id="d7-视频分析业务过滤器"><a class="header" href="#d7-视频分析业务过滤器">D.7 视频分析业务过滤器</a></h2>
 <p><strong>Q：</strong> 跟踪 ID 频繁跳变，导致同一个人被重复计数？
 <strong>A：</strong> 检测漏帧或遮挡时轨迹断了又新建，<code>max_age</code>、匹配阈值设得太严。调大 <code>max_age</code>（容忍连续几帧丢失），用 ByteTrack 的二次匹配把低分框也捞回来，适当放宽 IoU/距离阈值。（第 21 章）</p>
-<p><strong>Q：</strong> 跑得快的目标一下跨过拌线，却没触发？
-<strong>A：</strong> 只判断“目标中心点在线的哪一侧“，两帧之间目标已经跳过了线，单帧采样漏掉。要用“<strong>上一帧中心 → 这一帧中心</strong>“连成的线段和拌线做<strong>线段相交</strong>判断，而不是逐帧看点位置。（第 23 章）</p>
+<p><strong>Q：</strong> 跑得快的目标一下跨过绊线，却没触发？
+<strong>A：</strong> 只判断“目标中心点在线的哪一侧“，两帧之间目标已经跳过了线，单帧采样漏掉。要用“<strong>上一帧中心 → 这一帧中心</strong>“连成的线段和绊线做<strong>线段相交</strong>判断，而不是逐帧看点位置。（第 23 章）</p>
 <p><strong>Q：</strong> 一个事件报警疯狂刷屏，一秒几十条？
 <strong>A：</strong> 每帧只要满足条件就报，没有去抖。加 <strong>Cooldown 冷却</strong>（同一目标/同一区域 N 秒内只报一次），或用事件窗口去重。（第 24 章）</p>
 <p><strong>Q：</strong> 没人的时候，树影、旗帜、广告牌被反复误检？

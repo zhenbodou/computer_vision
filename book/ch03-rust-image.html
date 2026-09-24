@@ -37,10 +37,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-4d8e5ec0.js";
+            window.path_to_searchindex_js = "searchindex-ba421b3e.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-c1d54236.js"></script>
+        <script src="toc-68b1d651.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -214,7 +214,7 @@ cargo add anyhow          # 示例里用它做简洁的错误处理（可选）
 <p>上面这条竖线，从磁盘一路走到“模型能吃的张量“。本章 3.2~3.5 讲上半段（image），3.6 讲 ndarray，3.7 打通中间那道最重要的转换。</p>
 <h2 id="32-image-入门读图尺寸像素保存"><a class="header" href="#32-image-入门读图尺寸像素保存">3.2 image 入门：读图、尺寸、像素、保存</a></h2>
 <p>先把最常用的四件事跑通。准备一张 <code>test.jpg</code> 放在项目根目录（沿用第 1 章约定的那张测试图）：</p>
-<pre class="playground"><code class="language-rust">use image::{open, Rgb};
+<pre><code class="language-rust ignore">use image::{open, Rgb};
 
 fn main() -&gt; anyhow::Result&lt;()&gt; {
     // 读图：得到"万金油"类型 DynamicImage
@@ -246,13 +246,13 @@ fn main() -&gt; anyhow::Result&lt;()&gt; {
 </ul>
 <h2 id="33-遍历像素转灰度与通道分离"><a class="header" href="#33-遍历像素转灰度与通道分离">3.3 遍历像素：转灰度与通道分离</a></h2>
 <p>逐像素遍历，最省心的是 <code>enumerate_pixels()</code> 迭代器，它一次给你 <code>(x, y, 像素)</code>，不用自己写双重循环下标。两个常见操作：</p>
-<pre class="playground"><code class="language-rust">use image::{open, GrayImage, Luma};
+<pre><code class="language-rust ignore">use image::{open, GrayImage, Luma};
 
 fn main() -&gt; anyhow::Result&lt;()&gt; {
     let img = open("test.jpg")?.to_rgb8();
     let (w, h) = img.dimensions();
 
-    // (A) 转灰度：加权公式 Gray = 0.299R + 0.587G + 0.114B（原理见第 2 章 2.3.1）
+    // (A) 转灰度：加权公式 Gray = 0.299R + 0.587G + 0.114B（原理见第 2 章 2.3 节与附录 A.5）
     //     其实 img.to_luma8() 一行就能得到灰度图，这里手写是为了看清过程
     let mut gray = GrayImage::new(w, h);
     for (x, y, p) in img.enumerate_pixels() {
@@ -273,7 +273,7 @@ fn main() -&gt; anyhow::Result&lt;()&gt; {
 <p>一句提醒：像素运算要当心 <code>u8</code> 溢出。<code>200u8 + 100</code> 在 debug 模式下会直接 panic。要给整图提亮，别 <code>*c = *c + 50</code>，用 <code>c.saturating_add(50)</code>（到 255 就封顶）。这类“会不会超 255、会不会低于 0“的判断，是图像代码最常见的错误来源。</p>
 <h2 id="34-裁剪与缩放"><a class="header" href="#34-裁剪与缩放">3.4 裁剪与缩放</a></h2>
 <p>裁剪取 ROI（感兴趣区域，第 2 章 2.7 节），缩放改尺寸——两个高频几何操作：</p>
-<pre class="playground"><code class="language-rust">use image::{open, imageops, imageops::FilterType};
+<pre><code class="language-rust ignore">use image::{open, imageops, imageops::FilterType};
 
 fn main() -&gt; anyhow::Result&lt;()&gt; {
     let dyn_img = open("test.jpg")?;
@@ -297,7 +297,7 @@ fn main() -&gt; anyhow::Result&lt;()&gt; {
 </ul>
 <h2 id="35-into_raw把图像就是一串字节落到实处"><a class="header" href="#35-into_raw把图像就是一串字节落到实处">3.5 into_raw：把“图像就是一串字节“落到实处</a></h2>
 <p>上一章反复强调：一张 RGB 图在内存里就是一个 <code>Vec&lt;u8&gt;</code>，一行一行、每像素三字节地排着。现在用 <code>into_raw()</code> 亲眼验证：</p>
-<pre class="playground"><code class="language-rust">use image::open;
+<pre><code class="language-rust ignore">use image::open;
 
 fn main() -&gt; anyhow::Result&lt;()&gt; {
     let img = open("test.jpg")?.to_rgb8();
@@ -326,7 +326,7 @@ fn main() -&gt; anyhow::Result&lt;()&gt; {
 <p><strong>张量 = 多维数组。</strong> 0 维是一个数，1 维是一条数组，2 维是表格，3 维是“一叠表格“（比如一张 <code>高×宽×通道</code> 的图），4 维是“一摞纸“（比如 <code>批×通道×高×宽</code> 的一批图）。</p>
 </blockquote>
 <p><code>ndarray</code> 就是操作这种多维数组的库。核心 API 一次演示清楚：</p>
-<pre class="playground"><code class="language-rust">use ndarray::{s, Array3, ArrayView3, Axis};
+<pre><code class="language-rust ignore">use ndarray::{s, Array3, ArrayView3, Axis};
 
 fn main() {
     // 创建：Array3::&lt;f32&gt; 表示"3 维、元素是 f32"；括号里是形状 (高, 宽, 通道)
@@ -381,9 +381,7 @@ CHW 字节流（把三个通道各自拢到一起）：
    R: 255,0,0,255   G: 0,255,0,255   B: 0,0,255,255
 </code></pre>
 <p>同样 12 个字节，只是换了顺序。<code>ndarray</code> 的 <code>permuted_axes</code> 就是干这个换轴的活儿。下面写一个“图 → 模型输入张量“的标准函数——把 <code>RgbImage</code> 变成 <code>[1, 3, H, W]</code> 的 f32 张量（batch=1、通道在前、归一化到 0~1），这正是 YOLOv8 模型要的输入（第 1 章设定的 <code>1×3×640×640</code>）：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use image::RgbImage;
+<pre><code class="language-rust ignore">use image::RgbImage;
 use ndarray::{Array3, Array4, Axis};
 
 /// RgbImage → [1, 3, H, W] 的 f32 张量（像素值归一化到 0~1）
@@ -405,14 +403,13 @@ fn img_to_tensor(img: &amp;RgbImage) -&gt; Array4&lt;f32&gt; {
 
     // 第 5 步：最前面插一个长度为 1 的 batch 维 → [1, 3, H, W]
     chw_f32.insert_axis(Axis(0))
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
 <p><code>permuted_axes([2, 0, 1])</code> 怎么读？它说“新数组的第 0 轴 = 旧的第 2 轴、第 1 轴 = 旧的第 0 轴、第 2 轴 = 旧的第 1 轴“，于是 <code>[H, W, C]</code> 变成 <code>[C, H, W]</code>。这条转换链——<code>into_raw → from_shape_vec → permuted_axes → mapv → insert_axis</code>——会伴随你整个职业生涯，务必吃透。第 10 章的 letterbox、归一化、组 batch，全都建在它之上。</p>
 <h2 id="38-在图上画一个矩形框"><a class="header" href="#38-在图上画一个矩形框">3.8 在图上画一个矩形框</a></h2>
 <p>有了检测结果，最后一步总是“在原图上把框画出来“。这里先热个身：手动描点画一个空心矩形。顺便引入全书统一的<strong>边界框</strong>类型 <code>BBox</code>（左上-右下像素坐标），第 16 章画真正的检测框时会直接复用它：</p>
-<pre class="playground"><code class="language-rust">use image::{Rgb, RgbImage};
+<pre><code class="language-rust ignore">use image::{Rgb, RgbImage};
 
-/// 边界框：左上-右下像素坐标（全书统一类型，见写作规范第 6 节）
+/// 边界框：左上-右下像素坐标（全书统一类型，见第 3.8 节）
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct BBox {
     pub x1: f32,
@@ -450,7 +447,7 @@ fn main() -&gt; anyhow::Result&lt;()&gt; {
 <p>真实项目里不必自己描点——<code>imageproc</code> 这个 crate 的 <code>draw_hollow_rect_mut</code> 一行就能画框、<code>draw_text_mut</code> 还能写类别文字。但自己写一遍，你会更清楚“画框“本质上就是往特定坐标写像素。到了第 16 章，我们画的将是一批 <code>Detection</code>（内含 <code>BBox</code> + 置信度 + 类别号），把模型输出可视化成人能看懂的框。</p>
 <h2 id="39-串起来一个完整可跑的例子"><a class="header" href="#39-串起来一个完整可跑的例子">3.9 串起来：一个完整可跑的例子</a></h2>
 <p>把本章的主线走一遍：<strong>读图 → 打印尺寸 → 转 ndarray → 改成 CHW → 再存回图</strong>。最后存出来的图应当和原图一模一样，这就证明我们的布局变换没搞错：</p>
-<pre class="playground"><code class="language-rust">use image::{open, RgbImage};
+<pre><code class="language-rust ignore">use image::{open, RgbImage};
 use ndarray::Array3;
 
 fn main() -&gt; anyhow::Result&lt;()&gt; {

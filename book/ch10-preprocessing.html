@@ -37,10 +37,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-4d8e5ec0.js";
+            window.path_to_searchindex_js = "searchindex-ba421b3e.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-c1d54236.js"></script>
+        <script src="toc-68b1d651.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -382,9 +382,7 @@ R G B  R G B  R G B ...        R R R R ... (整张红平面)
 <p>最后一个容易被忽略、但一旦踩到就很懵的点：<strong>内存必须连续</strong>。</p>
 <p>推理引擎（第 14 章的 <code>tract</code> / <code>ort</code>）拿到张量后，往往直接把它当成<strong>一段连续的内存</strong>来读。它默认这段内存是<strong>行主序（row-major，C 顺序）连续排列</strong>的：最后一个维度变化最快，一行接一行铺下去。</p>
 <p>如果你用 <code>ndarray</code> 的 <code>permuted_axes</code> 来做 HWC→CHW，会有个陷阱——<strong>它只是换了“看数据的角度“，底层内存一个字节都没动</strong>，得到的是一个<strong>非连续视图</strong>：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use ndarray::Array3;
+<pre><code class="language-rust ignore">use ndarray::Array3;
 
 // 假设已有一个 HWC 的 f32 数组，形状 [640, 640, 3]
 let hwc: Array3&lt;f32&gt; = /* ... */;
@@ -393,8 +391,7 @@ let hwc: Array3&lt;f32&gt; = /* ... */;
 let chw_view = hwc.permuted_axes([2, 0, 1]); // 形状变成 [3, 640, 640]，但不连续
 
 // 引擎要的是连续内存，所以要真正拷贝、整理成标准行主序布局
-let chw = chw_view.as_standard_layout();     // 现在内存是连续的 CHW，可以放心喂了
-<span class="boring">}</span></code></pre>
+let chw = chw_view.as_standard_layout();     // 现在内存是连续的 CHW，可以放心喂了</code></pre>
 <p><code>as_standard_layout()</code> 会在需要时把数据<strong>真正拷贝</strong>成标准行主序连续布局（已经连续就零成本返回）。如果跳过这一步，直接把非连续视图的内存交给引擎，引擎按“连续“去读，读到的就是<strong>乱序的字节</strong>——结果全错，还是那句话：<strong>不报错</strong>。</p>
 <p>好在，本书 10.8 节的 <code>preprocess</code> 采用另一种写法：直接 <code>Array4::from_elem</code> 建好 <code>[1,3,640,640]</code> 的连续张量，再<strong>按 CHW 的位置逐个写入</strong>。这样建出来的数组<strong>天生就是标准连续布局</strong>，压根不需要 <code>as_standard_layout</code>。两种思路都对，但显式写入更省一次拷贝，也更不容易踩连续性的坑。</p>
 <hr>
@@ -404,9 +401,7 @@ let chw = chw_view.as_standard_layout();     // 现在内存是连续的 CHW，�
 <pre><code class="language-bash">cargo add image ndarray
 </code></pre>
 <p>然后是完整实现（可编译）：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use image::{imageops::FilterType, RgbImage};
+<pre><code class="language-rust ignore">use image::{imageops::FilterType, RgbImage};
 use ndarray::Array4;
 
 /// letterbox 变换的"回执"：预处理时怎么缩放、怎么填边，都记在这里。
@@ -436,9 +431,12 @@ pub fn preprocess(img: &amp;RgbImage, target: u32) -&gt; (Array4&lt;f32&gt;, Let
     let new_w = (orig_w as f32 * scale).round() as u32;
     let new_h = (orig_h as f32 * scale).round() as u32;
 
-    // ③ 居中放置：左右/上下各留多少灰边
-    let pad_x = (target as f32 - new_w as f32) / 2.0;
-    let pad_y = (target as f32 - new_h as f32) / 2.0;
+    // ③ 居中放置：左/上边距取整；若总边距为奇数，多出的 1 像素放到右/下。
+    //    记录的 pad 必须和真正写入画布的整数偏移完全一致，否则反算坐标会偏半个像素。
+    let off_x = ((target - new_w) / 2) as usize;
+    let off_y = ((target - new_h) / 2) as usize;
+    let pad_x = off_x as f32;
+    let pad_y = off_y as f32;
 
     // ④ 等比缩放(插值算法原理见第 9 章；这里用双线性 Triangle，和 YOLO 默认一致)
     let resized = image::imageops::resize(img, new_w, new_h, FilterType::Triangle);
@@ -450,8 +448,6 @@ pub fn preprocess(img: &amp;RgbImage, target: u32) -&gt; (Array4&lt;f32&gt;, Let
 
     // ⑥ 把缩放后的像素写入张量：一次遍历同时完成
     //    HWC→CHW 布局转换、u8→f32、/255 归一化、以及居中平移。
-    let off_x = pad_x.round() as usize;
-    let off_y = pad_y.round() as usize;
     for y in 0..new_h as usize {
         for x in 0..new_w as usize {
             let px = resized.get_pixel(x as u32, y as u32); // &amp;Rgb&lt;u8&gt;
@@ -464,10 +460,9 @@ pub fn preprocess(img: &amp;RgbImage, target: u32) -&gt; (Array4&lt;f32&gt;, Let
 
     let info = LetterboxInfo { scale, pad_x, pad_y, orig_w, orig_h };
     (tensor, info)
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
 <p>怎么用它：</p>
-<pre class="playground"><code class="language-rust">fn main() -&gt; Result&lt;(), Box&lt;dyn std::error::Error&gt;&gt; {
+<pre><code class="language-rust ignore">fn main() -&gt; Result&lt;(), Box&lt;dyn std::error::Error&gt;&gt; {
     // 第 3 章：读图并转成 RGB(RgbImage)
     let img = image::open("street.jpg")?.to_rgb8();
 

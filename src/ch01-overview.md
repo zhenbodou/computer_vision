@@ -144,8 +144,8 @@ python3 --version
 每章的代码示例建议新建独立项目练习：
 
 ```bash
-cargo new ch10_practice
-cd ch10_practice
+cargo new ch03_practice
+cd ch03_practice
 cargo add image ndarray imageproc fast_image_resize
 ```
 

@@ -50,7 +50,7 @@ mask:     0    0  255  255    0    0        （> 30 → 255，否则 0）
 
 **用 Rust 实现两帧差**。输入是相邻两帧的灰度图（`GrayImage` 即第 2/3 章的 `Luma<u8>` 图，彩色帧先用 `to_luma8()` 转灰度——我们只关心亮度变化）：
 
-```rust
+```rust,ignore
 use image::{GrayImage, Luma};
 
 /// 两帧差：输入相邻两帧灰度图，输出运动掩膜（255=动，0=静）
@@ -94,7 +94,7 @@ da AND db:    . . . . ▓ ▓ . .     只剩 B ← A 的拖影、C 的"未来位
 
 直觉：A 处只在"和前帧比"时变了（后帧那里也是空的，不亮），C 处只在"和后帧比"时变了，一取交集，这两处各自落单的就被剔除，留下的正是物体在中间帧的真实位置。代价是：需要**缓存三帧**、且对纯平移的大物体内部空洞更明显。
 
-```rust
+```rust,ignore
 /// 三帧差：判断中间帧 f2。两次差都为"动"才算真运动
 fn three_frame_diff(f1: &GrayImage, f2: &GrayImage, f3: &GrayImage, thresh: u8) -> GrayImage {
     let da = frame_diff(f1, f2, thresh); // |f2 - f1|：当前帧相对前一帧
@@ -139,7 +139,7 @@ $$bg \leftarrow \alpha \cdot frame + (1-\alpha)\cdot bg$$
 
 有了背景，前景就是 $|frame - bg| > T$。用 Rust 实现一个滑动平均背景建模器（背景用 `f32` 存，因为 `α·frame` 会产生小数）：
 
-```rust
+```rust,ignore
 use image::{GrayImage, Luma};
 
 /// 滑动平均背景建模器：维护一张 f32 背景图，逐帧更新并输出前景掩膜
@@ -204,7 +204,7 @@ impl RunningAvgBg {
 
 常见顺序是"先开去噪，再闭补洞"。清理干净后，用第 8 章的 `find_contours` 找轮廓、取外接矩形，产出全书统一的 `BBox`（左上-右下像素坐标），再按面积滤掉太小的残渣：
 
-```rust
+```rust,ignore
 use image::GrayImage;
 use imageproc::morphology::{open, close};
 use imageproc::distance_transform::Norm;
@@ -295,6 +295,6 @@ fn motion_boxes(mask: &GrayImage, min_area: f32) -> Vec<BBox> {
    f2:   50 200 200  50  50  50
    f3:   50  50 200 200  50  50
    ```
-2. **帧差 vs 背景减除**：录一段"人走进来、站定约 10 秒、再走出去"的视频，抽帧（第 6 章）后分别跑 `frame_diff` 和 `RunningAvgBg`（用小 $\alpha$，如 0.01）。观察：帧差里人一站定就消失，而背景减除里人还持续被框住。解释两者行为差异的根源。
+2. **帧差 vs 背景减除**：录一段"人走进来、站定约 10 秒、再走出去"的视频，抽帧（第 6 章）后分别跑 `frame_diff` 和 `RunningAvgBg`（用小 $\alpha$，如 0.01）。观察：帧差里人一站定就很快消失；背景减除会多保留一段时间，但由于本节实现会更新前景像素，最终也会把静止的人逐渐吸收到背景中。记录两种方法分别多久低于阈值，并解释差异。
 3. **$\alpha$ 半衰期实验**：用 `RunningAvgBg` 对同一段视频分别取 $\alpha=0.5, 0.05, 0.005$，数"一个停下的物体大约多少帧后从前景里消失"，和 19.4 用 `0.9ⁿ=0.5` 推出的半衰期公式对一对，验证 $\alpha$ 越小目标赖得越久。
 4. **搭一个触发器**：以 `motion_boxes` 返回的所有框总面积 `> 画面面积的 1%` 作为"有动静"信号，打印出视频里哪些帧被触发；再想想（不必真跑模型）如何把它接成"只在触发帧才调用 YOLO（第 16 章）"的级联管线，估算相比每帧都跑 YOLO 能省下多少次推理。

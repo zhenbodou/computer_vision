@@ -289,7 +289,7 @@ cargo new inspect_model && cd inspect_model
 cargo add ort
 ```
 
-```rust
+```rust,ignore
 // src/main.rs —— 用 ort 打印每个输入/输出的 name、dtype、shape
 use ort::session::Session;
 use ort::value::ValueType;
@@ -348,7 +348,7 @@ fn print_io(name: &str, ty: &ValueType) {
 cargo add tract-onnx
 ```
 
-```rust
+```rust,ignore
 // 用 tract 查询输入/输出的 fact（形状 + dtype）
 use tract_onnx::prelude::*;
 

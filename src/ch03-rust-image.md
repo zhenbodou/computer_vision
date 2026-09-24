@@ -46,7 +46,7 @@ image::open(path)  ──►  DynamicImage       "万金油"枚举（还不知�
 
 先把最常用的四件事跑通。准备一张 `test.jpg` 放在项目根目录（沿用第 1 章约定的那张测试图）：
 
-```rust
+```rust,ignore
 use image::{open, Rgb};
 
 fn main() -> anyhow::Result<()> {
@@ -83,14 +83,14 @@ fn main() -> anyhow::Result<()> {
 
 逐像素遍历，最省心的是 `enumerate_pixels()` 迭代器，它一次给你 `(x, y, 像素)`，不用自己写双重循环下标。两个常见操作：
 
-```rust
+```rust,ignore
 use image::{open, GrayImage, Luma};
 
 fn main() -> anyhow::Result<()> {
     let img = open("test.jpg")?.to_rgb8();
     let (w, h) = img.dimensions();
 
-    // (A) 转灰度：加权公式 Gray = 0.299R + 0.587G + 0.114B（原理见第 2 章 2.3.1）
+    // (A) 转灰度：加权公式 Gray = 0.299R + 0.587G + 0.114B（原理见第 2 章 2.3 节与附录 A.5）
     //     其实 img.to_luma8() 一行就能得到灰度图，这里手写是为了看清过程
     let mut gray = GrayImage::new(w, h);
     for (x, y, p) in img.enumerate_pixels() {
@@ -117,7 +117,7 @@ fn main() -> anyhow::Result<()> {
 
 裁剪取 ROI（感兴趣区域，第 2 章 2.7 节），缩放改尺寸——两个高频几何操作：
 
-```rust
+```rust,ignore
 use image::{open, imageops, imageops::FilterType};
 
 fn main() -> anyhow::Result<()> {
@@ -145,7 +145,7 @@ fn main() -> anyhow::Result<()> {
 
 上一章反复强调：一张 RGB 图在内存里就是一个 `Vec<u8>`，一行一行、每像素三字节地排着。现在用 `into_raw()` 亲眼验证：
 
-```rust
+```rust,ignore
 use image::open;
 
 fn main() -> anyhow::Result<()> {
@@ -180,7 +180,7 @@ fn main() -> anyhow::Result<()> {
 
 `ndarray` 就是操作这种多维数组的库。核心 API 一次演示清楚：
 
-```rust
+```rust,ignore
 use ndarray::{s, Array3, ArrayView3, Axis};
 
 fn main() {
@@ -246,7 +246,7 @@ CHW 字节流（把三个通道各自拢到一起）：
 
 同样 12 个字节，只是换了顺序。`ndarray` 的 `permuted_axes` 就是干这个换轴的活儿。下面写一个"图 → 模型输入张量"的标准函数——把 `RgbImage` 变成 `[1, 3, H, W]` 的 f32 张量（batch=1、通道在前、归一化到 0~1），这正是 YOLOv8 模型要的输入（第 1 章设定的 `1×3×640×640`）：
 
-```rust
+```rust,ignore
 use image::RgbImage;
 use ndarray::{Array3, Array4, Axis};
 
@@ -278,10 +278,10 @@ fn img_to_tensor(img: &RgbImage) -> Array4<f32> {
 
 有了检测结果，最后一步总是"在原图上把框画出来"。这里先热个身：手动描点画一个空心矩形。顺便引入全书统一的**边界框**类型 `BBox`（左上-右下像素坐标），第 16 章画真正的检测框时会直接复用它：
 
-```rust
+```rust,ignore
 use image::{Rgb, RgbImage};
 
-/// 边界框：左上-右下像素坐标（全书统一类型，见写作规范第 6 节）
+/// 边界框：左上-右下像素坐标（全书统一类型，见第 3.8 节）
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct BBox {
     pub x1: f32,
@@ -324,7 +324,7 @@ fn main() -> anyhow::Result<()> {
 
 把本章的主线走一遍：**读图 → 打印尺寸 → 转 ndarray → 改成 CHW → 再存回图**。最后存出来的图应当和原图一模一样，这就证明我们的布局变换没搞错：
 
-```rust
+```rust,ignore
 use image::{open, RgbImage};
 use ndarray::Array3;
 

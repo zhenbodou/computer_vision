@@ -37,10 +37,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-4d8e5ec0.js";
+            window.path_to_searchindex_js = "searchindex-ba421b3e.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-c1d54236.js"></script>
+        <script src="toc-68b1d651.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -178,7 +178,7 @@
                     <main>
                         <h1 id="第-4-章--色彩空间与内存布局rgb--bgr--yuv--nv12"><a class="header" href="#第-4-章--色彩空间与内存布局rgb--bgr--yuv--nv12">第 4 章 · 色彩空间与内存布局：RGB / BGR / YUV / NV12</a></h1>
 <blockquote>
-<p><strong>本章导读</strong>：第 2 章我们给 RGB、灰度、HSV、YUV 混了个脸熟，第 3 章学会了在 image 和 ndarray 之间搬运像素。但真到工程现场——从摄像头拿到的一帧往往不是 RGB 而是 <strong>NV12</strong>；用 OpenCV 读到的图通道顺序是 <strong>BGR</strong>；要喂给模型的张量又必须是 <strong>CHW</strong> 排列。本章把“同一堆颜色为什么有这么多种摆法“彻底讲透：<strong>色彩空间</strong>解决“颜色怎么表达“，<strong>内存布局</strong>解决“字节怎么摆放“。学完你能亲手把一帧 NV12 转成 RGB，也能一眼看穿“红蓝反了“这类经典事故。（本章只讲颜色的表示与摆放；JPEG 怎么压缩留到第 5 章，视频码流留到第 6 章，完整的喂模型预处理链留到第 10 章。）</p>
+<p><strong>本章导读</strong>：第 2 章我们给灰度、RGB、RGBA 混了个脸熟（也埋下了 RGB→灰度的加权公式），第 3 章学会了在 image 和 ndarray 之间搬运像素。但真到工程现场——从摄像头拿到的一帧往往不是 RGB 而是 <strong>NV12</strong>；用 OpenCV 读到的图通道顺序是 <strong>BGR</strong>；要喂给模型的张量又必须是 <strong>CHW</strong> 排列。本章把“同一堆颜色为什么有这么多种摆法“彻底讲透：<strong>色彩空间</strong>解决“颜色怎么表达“，<strong>内存布局</strong>解决“字节怎么摆放“。学完你能亲手把一帧 NV12 转成 RGB，也能一眼看穿“红蓝反了“这类经典事故。（本章只讲颜色的表示与摆放；JPEG 怎么压缩留到第 5 章，视频码流留到第 6 章，完整的喂模型预处理链留到第 10 章。）</p>
 </blockquote>
 <p><strong>学习目标</strong>：</p>
 <ul>
@@ -221,7 +221,7 @@
 但如果把 BGR 的 (0, 128, 255) 当成 RGB 去读 →
 就变成 (R=0, G=128, B=255) = 蓝青色！橙色瞬间变蓝。
 </code></pre>
-<p>第 2.3.5 节讲过，<strong>OpenCV 默认用 BGR</strong> 是个历史包袱。这件事的杀伤力在工程里是巨大的：你辛辛苦苦搭好的目标检测流水线，用 OpenCV（或它的 Rust 绑定 <code>opencv</code> crate）读进来一帧 BGR，忘了转换就直接喂给 YOLO 模型。模型训练时看的是 RGB，现在收到的每一张都“红蓝互换“，等于给它戴了副滤镜看世界——<code>person</code> 的肤色发蓝、消防车变青，置信度普遍暴跌，却又不报任何错。这是视觉工程新人排第一名的隐形 bug。</p>
+<p>第 2.3 节讲过，<strong>OpenCV 默认用 BGR</strong> 是个历史包袱。这件事的杀伤力在工程里是巨大的：你辛辛苦苦搭好的目标检测流水线，用 OpenCV（或它的 Rust 绑定 <code>opencv</code> crate）读进来一帧 BGR，忘了转换就直接喂给 YOLO 模型。模型训练时看的是 RGB，现在收到的每一张都“红蓝互换“，等于给它戴了副滤镜看世界——<code>person</code> 的肤色发蓝、消防车变青，置信度普遍暴跌，却又不报任何错。这是视觉工程新人排第一名的隐形 bug。</p>
 <h3 id="怎么判断通道顺序对不对"><a class="header" href="#怎么判断通道顺序对不对">怎么判断通道顺序对不对</a></h3>
 <ol>
 <li><strong>看数据来源</strong>。这是最靠谱的：<code>image::open()</code> 给你 RGB；OpenCV 的 <code>imread</code> / 视频解码给你 BGR；很多硬件相机给你 YUV/NV12（见 4.7）。先问清楚“这帧从哪来“。</li>
@@ -230,16 +230,13 @@
 </ol>
 <h3 id="怎么纠正"><a class="header" href="#怎么纠正">怎么纠正</a></h3>
 <p>纠正非常简单——把每个像素的第 0 和第 2 个字节交换即可：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>/// 把 packed 的 BGR 字节流原地翻转成 RGB（3 通道交错，HWC）。
+<pre><code class="language-rust ignore">/// 把 packed 的 BGR 字节流原地翻转成 RGB（3 通道交错，HWC）。
 /// 原理：每 3 个字节是一个像素 [B, G, R]，交换首尾 → [R, G, B]。
 fn bgr_to_rgb_inplace(buf: &amp;mut [u8]) {
     for px in buf.chunks_exact_mut(3) {
         px.swap(0, 2); // 交换 B 和 R，中间的 G 不动
     }
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
 <p>工程建议：<strong>在系统边界统一色彩空间。</strong> 数据一进来就转成 RGB，整条流水线中间只认 RGB，要输出给 OpenCV 显示时再转回 BGR。别让“这一帧到底是 RGB 还是 BGR“的疑问散落在代码各处——那是灾难的源头。</p>
 <h2 id="43-灰度-gray丢掉颜色只留明暗"><a class="header" href="#43-灰度-gray丢掉颜色只留明暗">4.3 灰度 Gray：丢掉颜色，只留明暗</a></h2>
 <p><strong>灰度图</strong>每个像素只有一个值（0~255，0 黑 255 白），字节数只有 RGB 的三分之一。</p>
@@ -249,9 +246,9 @@ fn bgr_to_rgb_inplace(buf: &amp;mut [u8]) {
 <li><strong>部分模型只吃灰度</strong>：一些 OCR 文字识别、某些人脸特征提取、深度/红外相机的输出，输入就是单通道。</li>
 <li><strong>省资源</strong>：内存和计算量直接砍到 1/3，实时流水线里很值钱。</li>
 </ul>
-<p>第 2.3.1 节给过转换公式（ITU-R BT.601 加权，绿色权重最大是因为人眼对绿光最敏感）：</p>
+<p>灰度常用的转换公式如下（ITU-R BT.601 加权，绿色权重最大是因为人眼对绿光最敏感）：</p>
 <p>$$Gray = 0.299R + 0.587G + 0.114B$$</p>
-<p>一个容易被忽略的坑：<strong>“灰度“不是唯一定义的。</strong> 有的库用上面的加权，有的图快用简单平均 <code>(R+G+B)/3</code>，还有的用 BT.709（高清标准，系数是 0.2126 / 0.7152 / 0.0722）。跨库比对结果时，几个灰度值差一两级往往就是它——不是 bug，是标准不同。工程上认准一个标准从头用到尾即可。</p>
+<p>一个容易被忽略的坑：<strong>“灰度“不是唯一定义的。</strong> 有的库用上面的加权，有的图库用简单平均 <code>(R+G+B)/3</code>，还有的用 BT.709（高清标准，系数是 0.2126 / 0.7152 / 0.0722）。跨库比对结果时，几个灰度值差一两级往往就是它——不是 bug，是标准不同。工程上认准一个标准从头用到尾即可。</p>
 <h2 id="44-hsv--hsl按颜色思考"><a class="header" href="#44-hsv--hsl按颜色思考">4.4 HSV / HSL：按“颜色“思考</a></h2>
 <p>RGB 对显示器友好，对人脑不友好。你想“把这个红调淡一点、暗一点“，在 RGB 里得三个数一起动，几乎没法凭直觉调。<strong>HSV</strong> 把颜色按人的直觉拆成三个独立旋钮：</p>
 <pre><code class="language-text">H (Hue) 色相：       是什么颜色？  红/橙/黄/绿/青/蓝/紫，绕一圈 0°~360°
@@ -284,7 +281,7 @@ H (色相): 0° ─ 60° ─ 120° ─ 180° ─ 240° ─ 300° ─ 360°
 </code></pre>
 <p>这里藏着一个真实的跨库坑：<strong>H 的取值范围各库不一样。</strong> 标准 HSV 的 H 是 0~360°，但 OpenCV 为了把 H 塞进一个 <code>u8</code>，把它压成了 <strong>0~179</strong>（除以 2），S、V 则是 0~255。你在别处查到“红色 H≈0 或 360“的结论，搬到 OpenCV 得记得除以 2。传统颜色分割的完整玩法（形态学清理掩码等）留到第 8 章，这里先建立直觉。</p>
 <h2 id="45-yuv--ycbcr亮度与色度分家"><a class="header" href="#45-yuv--ycbcr亮度与色度分家">4.5 YUV / YCbCr：亮度与色度分家</a></h2>
-<p>第 2.3.3 节讲过黑白电视的兼容故事，这里直接说工程本质。<strong>YUV</strong> 把一个颜色拆成两部分：</p>
+<p>从工程角度看，<strong>YUV</strong> 把一个颜色拆成两部分：</p>
 <ul>
 <li><strong>Y（luma，亮度）</strong>：这个像素有多亮。它基本就是灰度值——Y 的算法和 4.3 的加权灰度几乎一模一样。</li>
 <li><strong>U、V（chroma，色度）</strong>：颜色往哪偏。U 是蓝色差、V 是红色差（“色差”= 颜色减去亮度后剩下的部分）。</li>
@@ -374,7 +371,7 @@ V =  0.439·R - 0.368·G - 0.071·B + 128    ← 红色差，灰色时正好 = 1
 <p>上一节的 planar / semi-planar 其实是一个通用概念，RGB 也有同样的两种摆法。这是本章连接第 10 章的关键，务必吃透。</p>
 <ul>
 <li><strong>packed（打包 / 交错，也叫 interleaved）</strong>：一个像素的几个通道挨在一起，一个像素一个像素地排。RGB 就是 <code>R G B R G B R G B…</code>。这对应张量形状 <strong>HWC</strong>（Height, Width, Channel，通道在最后）。图片文件、相机、image crate 给你的，通常都是这种。</li>
-<li><strong>planar（平面 / 通道分离）</strong>：先把所有像素的 R 排完，再排所有 G，再排所有 B，即 <code>R R R… G G G… B B B…</code>。这对应张量形状 <strong>CHW</strong>（Channel, Height, Width，通道在最前）。<strong>深度学习模型的输入几乎都要 CHW planar</strong>——包括我们的主模型 YOLOv8，输入张量就是 <code>1×3×640×640</code>（第 3.8 节用 <code>permuted_axes</code> 做过这个转换）。</li>
+<li><strong>planar（平面 / 通道分离）</strong>：先把所有像素的 R 排完，再排所有 G，再排所有 B，即 <code>R R R… G G G… B B B…</code>。这对应张量形状 <strong>CHW</strong>（Channel, Height, Width，通道在最前）。<strong>许多以 PyTorch 为基础的视觉模型使用 CHW planar</strong>——包括我们的主模型 YOLOv8，输入张量就是 <code>1×3×640×640</code>（第 3.7 节用 <code>permuted_axes</code> 做过这个转换）。也有模型和运行时使用 NHWC，最终应以模型实际输入 shape 为准。</li>
 </ul>
 <p>用一张 <strong>2×2</strong> 的 RGB 小图手算一遍，把两种布局的字节顺序摆出来。四个像素取好记的值：</p>
 <pre><code class="language-text">      列0            列1
@@ -423,9 +420,7 @@ B = 1.164×134 + 2.017×(-28)
 </code></pre>
 <p>注意 R、G、B 算出来可能超过 255 或小于 0（比如某些极端色度），所以<strong>最后一定要夹紧到 0~255</strong>，否则 <code>as u8</code> 会发生数值回绕（256 变成 0），画面出现诡异的彩色噪点。这是转换代码最容易漏的一步。</p>
 <p>下面是完整的 Rust 实现。它不依赖任何外部 crate，输入 Y 平面和交错 UV 平面的字节切片，输出 packed RGB（HWC）：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>/// 把一帧 NV12 图像转成 packed RGB（HWC，R G B 交错）。
+<pre><code class="language-rust ignore">/// 把一帧 NV12 图像转成 packed RGB（HWC，R G B 交错）。
 ///
 /// NV12 内存布局（4:2:0，半平面）：
 ///   - y_plane ：亮度平面，全分辨率，长度应为 width*height
@@ -468,8 +463,7 @@ fn nv12_to_rgb(y_plane: &amp;[u8], uv_plane: &amp;[u8], width: usize, height: us
         }
     }
     rgb
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
 <p>几点说明：</p>
 <ol>
 <li><strong><code>uv_idx</code> 是全章最绕的一行</strong>，对照 4.7 的图理解：色度平面每行有 <code>width</code> 个字节（<code>width/2</code> 对 U、V），所以第 <code>c_row</code> 行的起点是 <code>c_row * width</code>，第 <code>c_col</code> 对的 U 在 <code>+ c_col*2</code>，V 紧跟其后 <code>+1</code>。</li>

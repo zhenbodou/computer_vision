@@ -37,10 +37,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-4d8e5ec0.js";
+            window.path_to_searchindex_js = "searchindex-ba421b3e.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-c1d54236.js"></script>
+        <script src="toc-68b1d651.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -178,7 +178,7 @@
                     <main>
                         <h1 id="第-29-章--工程化并发性能与部署"><a class="header" href="#第-29-章--工程化并发性能与部署">第 29 章 · 工程化：并发、性能与部署</a></h1>
 <blockquote>
-<p><strong>本章导读</strong>：走到这里，第 26~28 章的三个实战程序都能出正确结果了——检测、跟踪、拌线、抓拍，一样不少。但“能出结果“和“能上线“之间还差一大截：单线程喂不满 GPU，GPU 大把时间在空等；每帧串行跑，总延迟卡在最慢的那一环上；模型没预热，头一帧慢得吓人；程序在你的开发机跑得欢，换到边缘盒子上直接起不来。本章就干一件事：把 demo 升级成能 7×24 小时稳定跑的产品。我们会讲流水线并发（本章重点）、数据并行、推理侧性能、零拷贝、可观测性与稳定性、跨平台部署，最后给一张上线检查清单。这是全书的收尾——把前面所有零件拧成一台能交付的机器。</p>
+<p><strong>本章导读</strong>：走到这里，第 26~28 章的三个实战程序都能出正确结果了——检测、跟踪、绊线、抓拍，一样不少。但“能出结果“和“能上线“之间还差一大截：单线程喂不满 GPU，GPU 大把时间在空等；每帧串行跑，总延迟卡在最慢的那一环上；模型没预热，头一帧慢得吓人；程序在你的开发机跑得欢，换到边缘盒子上直接起不来。本章就干一件事：把 demo 升级成能 7×24 小时稳定跑的产品。我们会讲流水线并发（本章重点）、数据并行、推理侧性能、零拷贝、可观测性与稳定性、跨平台部署，最后给一张上线检查清单。这是全书的收尾——把前面所有零件拧成一台能交付的机器。</p>
 </blockquote>
 <h2 id="291-为什么需要工程化串行流水线的浪费"><a class="header" href="#291-为什么需要工程化串行流水线的浪费">29.1 为什么需要工程化：串行流水线的浪费</a></h2>
 <p>先看看“能跑但不够快“的程序长什么样。第 26 章那个端到端检测程序，一帧的处理是四步顺着来的：<strong>解码 → 预处理 → 推理 → 后处理</strong>。单线程串行跑，时间线是这样的：</p>
@@ -211,9 +211,7 @@ GPU 只在“推理 20ms”里干活，其余 16ms 全在空等 → GPU 利用�
 <p>关键转变：<strong>吞吐不再等于各环节相加，而是取决于最慢的那一环</strong>（这里是推理 20ms）。GPU 从“忙 20 闲 16“变成“基本一直在推理“。注意单帧延迟没变小（甚至因排队略增），但<strong>单位时间处理的帧数翻了倍</strong>——这正是吞吐与延迟的区别（第 14 章讲 batch 时提过）。</p>
 <h3 id="骨架代码crossbeam-channel--线程"><a class="header" href="#骨架代码crossbeam-channel--线程">骨架代码：crossbeam channel + 线程</a></h3>
 <p>Rust 标准库有 <code>std::sync::mpsc</code>，但它只支持“多生产者单消费者“，且没有好用的有界/超时 API。工程上更常用 <strong><code>crossbeam::channel</code></strong>——支持多生产者多消费者、有界通道、<code>try_send</code>/<code>recv_timeout</code>，正好对上我们的需求。先定义流水线里流动的“载体“（复用全书统一类型）：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use crossbeam::channel::{bounded, Receiver, Sender};
+<pre><code class="language-rust ignore">use crossbeam::channel::{bounded, Receiver, Sender};
 use ndarray::{Array3, Array4};
 use std::thread;
 use anyhow::Result;
@@ -227,10 +225,9 @@ struct Prepped { id: u64, input: Array4&lt;f32&gt;, info: LetterboxInfo }
 /// 推理产出的原始输出 [1,84,8400]
 struct Raw    { id: u64, out: Array3&lt;f32&gt;, info: LetterboxInfo }
 /// 最终检测结果
-struct Done   { id: u64, dets: Vec&lt;Detection&gt; }
-<span class="boring">}</span></code></pre>
+struct Done   { id: u64, dets: Vec&lt;Detection&gt; }</code></pre>
 <p>主函数：用 <strong><code>bounded</code> 有界通道</strong>连接各 stage，<code>thread::spawn</code> 起线程。</p>
-<pre class="playground"><code class="language-rust">fn main() -&gt; Result&lt;()&gt; {
+<pre><code class="language-rust ignore">fn main() -&gt; Result&lt;()&gt; {
     // 每段之间用容量很小的有界通道连接 —— 容量小是故意的，见下文“背压”
     let (tx_dec, rx_dec) = bounded::&lt;Decoded&gt;(4);
     let (tx_pre, rx_pre) = bounded::&lt;Prepped&gt;(4);
@@ -251,20 +248,17 @@ struct Done   { id: u64, dets: Vec&lt;Detection&gt; }
     Ok(())
 }</code></pre>
 <p>每个 stage 就是“从上游 <code>recv</code>、干活、往下游 <code>send</code>“的循环。以预处理为例：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>fn preprocess_stage(rx: Receiver&lt;Decoded&gt;, tx: Sender&lt;Prepped&gt;) -&gt; Result&lt;()&gt; {
+<pre><code class="language-rust ignore">fn preprocess_stage(rx: Receiver&lt;Decoded&gt;, tx: Sender&lt;Prepped&gt;) -&gt; Result&lt;()&gt; {
     // for 循环遍历 Receiver：上游把 Sender 全部 drop 后，循环自然结束
     for Decoded { id, img } in rx {
-        let (input, info) = preprocess(&amp;img);        // 复用第 10 章
+        let (input, info) = preprocess(&amp;img, 640);        // 复用第 10 章
         // send 会在下游通道满时【阻塞】——这就是背压（见下）
         if tx.send(Prepped { id, input, info }).is_err() {
             break; // 下游线程没了，收工
         }
     }
     Ok(()) // 循环结束 → tx 被 drop → 下游的 for 也随之结束（优雅收尾链）
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
 <p>推理 stage 是把 Session 建一次、循环里只 <code>run</code> 的地方——完全对应第 14 章“Session 只建一次“的铁律，只是搬进了独立线程。</p>
 <h3 id="背压有界通道满了就顶住上游"><a class="header" href="#背压有界通道满了就顶住上游">背压：有界通道满了就顶住上游</a></h3>
 <p>为什么通道容量设成 <code>4</code> 而不是无限大？这是**背压（backpressure）**的核心。设想推理慢（20ms/帧）、解码快（8ms/帧）：解码疯狂产帧，推理消化不动，帧就堆在通道里。<strong>如果通道无界，内存会一路涨到 OOM（内存耗尽）程序崩溃。</strong></p>
@@ -275,9 +269,7 @@ struct Done   { id: u64, dets: Vec&lt;Detection&gt; }
 <h3 id="丢帧策略实时流处理不过来就主动丢旧帧"><a class="header" href="#丢帧策略实时流处理不过来就主动丢旧帧">丢帧策略：实时流处理不过来，就主动丢旧帧</a></h3>
 <p>背压对<strong>离线任务</strong>是完美的——处理一个视频文件、跑一个图片文件夹，慢就慢点，<strong>一帧都不能少</strong>。但<strong>实时流</strong>（RTSP 摄像头、直播）不一样：摄像头以 25FPS 恒速推帧，你处理不过来时，背压会把解码卡住，导致<strong>积压的是越来越旧的画面</strong>，报警延迟越拖越大——报“3 秒前有人闯入“毫无意义。</p>
 <p>实时场景的正解是<strong>主动丢帧</strong>：与其攒一堆过时的旧帧,不如丢掉旧的、永远处理最新的。用 <strong><code>try_send</code></strong> 代替 <code>send</code>——满了不阻塞，直接丢：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>fn decode_stage_realtime(url: &amp;str, tx: Sender&lt;Decoded&gt;) -&gt; Result&lt;()&gt; {
+<pre><code class="language-rust ignore">fn decode_stage_realtime(url: &amp;str, tx: Sender&lt;Decoded&gt;) -&gt; Result&lt;()&gt; {
     let mut id = 0u64;
     let mut dropped = 0u64;
     loop {
@@ -294,8 +286,7 @@ struct Done   { id: u64, dets: Vec&lt;Detection&gt; }
         }
     }
     Ok(())
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
 <p>离线要全帧、实时可丢帧，这是视频分析特有的工程抉择，一句话总结：</p>
 <div class="table-wrapper">
 <table>
@@ -313,74 +304,59 @@ struct Done   { id: u64, dets: Vec&lt;Detection&gt; }
 <h2 id="293-数据并行一批一起算simd-加速缩放"><a class="header" href="#293-数据并行一批一起算simd-加速缩放">29.3 数据并行：一批一起算，SIMD 加速缩放</a></h2>
 <p>流水线并发是把<strong>不同的活</strong>分给不同线程（任务并行）；数据并行是把<strong>同一种活的一批数据</strong>摊给多核同时算。两者常常叠加使用。</p>
 <p><strong><code>rayon</code></strong> 让数据并行简单到只改一个词：<code>iter()</code> 换成 <code>par_iter()</code>。比如离线要预处理一整个文件夹的图，或后处理时对一批候选框并行算 NMS：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use rayon::prelude::*;
+<pre><code class="language-rust ignore">use rayon::prelude::*;
 
 // 一批图并行预处理：rayon 自动切分给线程池，吃满所有 CPU 核
 let inputs: Vec&lt;(Array4&lt;f32&gt;, LetterboxInfo)&gt; =
     images.par_iter().map(|img| preprocess(img)).collect();
 
 // 一批检测框并行做点独立计算（各框互不依赖，天然可并行）
-detections.par_iter_mut().for_each(|d| d.score = calibrate(d.score));
-<span class="boring">}</span></code></pre>
+detections.par_iter_mut().for_each(|d| d.score = calibrate(d.score));</code></pre>
 <p>预处理里最吃 CPU 的一步是<strong>缩放</strong>（letterbox 要把原图等比缩到 640）。<code>image</code> 自带的 <code>resize</code> 是通用实现，而 <strong><code>fast_image_resize</code></strong> 用 SIMD（单指令多数据，一条指令同时算多个像素）专门优化了缩放，同样质量下常快 <strong>3~10 倍</strong>：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use fast_image_resize::{images::Image, PixelType, Resizer, ResizeOptions};
+<pre><code class="language-rust ignore">use fast_image_resize::{images::Image, PixelType, Resizer, ResizeOptions};
 
 // 把 src（原图）缩放到 dst（640×640）；实际 API 随版本略有差异，以文档为准
 let src = Image::from_vec_u8(w, h, rgb_bytes, PixelType::U8x3)?;
 let mut dst = Image::new(640, 640, PixelType::U8x3);
 let mut resizer = Resizer::new();          // Resizer 可复用，别每帧新建
-resizer.resize(&amp;src, &amp;mut dst, &amp;ResizeOptions::new())?;  // SIMD 加速
-<span class="boring">}</span></code></pre>
+resizer.resize(&amp;src, &amp;mut dst, &amp;ResizeOptions::new())?;  // SIMD 加速</code></pre>
 <p>对比一下：<code>image::imageops::resize</code> 胜在零依赖、够用；<code>fast_image_resize</code> 胜在<strong>快</strong>，实时高分辨率视频里这几毫秒/帧的差距很关键。同理，<strong>CHW 排布转换（HWC→CHW）、<code>u8→f32</code> 归一化</strong>这些逐像素操作，也都能用 SIMD 或 rayon 并行加速——第 10 章埋过伏笔，这里正式兑现。</p>
 <h2 id="294-推理侧性能预热epbatch-与并发-run"><a class="header" href="#294-推理侧性能预热epbatch-与并发-run">29.4 推理侧性能：预热、EP、batch 与并发 run</a></h2>
 <p>推理往往是流水线里最慢、最烧钱的一环，值得单独榨性能。</p>
 <p><strong>1. 预热（warmup）——必做。</strong> 引擎第一次推理往往慢 2~10 倍：图优化、显存分配、计算核首次编译全挤在第一发里（第 14 章讲过）。上线前先拿假输入空跑几次把它“焐热“，别让第一个真实请求当小白鼠：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>// 用真实形状的假输入预热，把冷启动开销吃掉
+<pre><code class="language-rust ignore">// 用真实形状的假输入预热，把冷启动开销吃掉
 let dummy = Array4::&lt;f32&gt;::zeros((1, 3, 640, 640));
 for _ in 0..3 {
     let _ = session.run(ort::inputs!["images" =&gt; TensorRef::from_array_view(&amp;dummy)?])?;
 }
-tracing::info!("模型预热完成，可以接客了");
-<span class="boring">}</span></code></pre>
+tracing::info!("模型预热完成，可以接客了");</code></pre>
 <p><strong>2. 执行提供器（EP）选择。</strong> 有 NVIDIA 显卡上 CUDA/TensorRT，苹果芯片上 CoreML，Intel 平台上 OpenVINO，都没有就 CPU 兜底——这是第 13、14 章的核心内容，<code>ort</code> 里按优先级注册即可：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use ort::session::{builder::GraphOptimizationLevel, Session};
+<pre><code class="language-rust ignore">use ort::session::{builder::GraphOptimizationLevel, Session};
 
-let session = Session::builder()?
+let mut session = Session::builder()?
     .with_optimization_level(GraphOptimizationLevel::Level3)?
     .with_execution_providers([
         #[cfg(feature = "tensorrt")] ort::ep::TensorRT::default().build(),
         #[cfg(feature = "cuda")]     ort::ep::CUDA::default().build(),
         #[cfg(feature = "coreml")]   ort::ep::CoreML::default().build(),
     ])? // 排前面的先试，不支持就自动回退，最后退到 CPU
-    .commit_from_file("yolov8n.onnx")?;
-<span class="boring">}</span></code></pre>
+    .commit_from_file("yolov8n.onnx")?;</code></pre>
 <blockquote>
 <p>⚠️ EP 注册失败默认<strong>静默回退 CPU</strong>（第 14 章的坑）。上线前务必确认“以为在用 GPU、其实在跑 CPU“没发生。</p>
 </blockquote>
 <p><strong>3. batch 推理。</strong> 多路摄像头凑齐 N 帧一次推，输入 <code>[N,3,640,640]</code>、输出 <code>[N,84,8400]</code>。GPU 像大灶台，炒一份和炒十份耗时差不多，凑满了单张成本更低——<strong>吞吐↑，但要等凑齐、单帧延迟↑</strong>。这是吞吐与延迟的经典权衡，细节见第 13、14 章。</p>
 <p><strong>4. FP16/INT8 量化。</strong> 把权重从 float32 降到 float16 甚至 int8，模型更小、算得更快，精度略降——用速度换精度的开关，怎么导出量化模型见第 13 章。</p>
-<p><strong>5. Session 建一次，<code>&amp;Session</code> 多线程并发 run。</strong> ORT 的 <code>session.run()</code> 只借 <code>&amp;self</code>（不可变借用），意味着<strong>多个线程可以共享同一个 Session 并发推理</strong>，无需各建一份（各建一份既费内存又费加载时间）。用 <code>Arc</code> 包起来分发：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use std::sync::Arc;
-
-let session = Arc::new(build_session()?);   // 全进程只建这一个
-for _ in 0..4 {
-    let s = Arc::clone(&amp;session);           // 克隆的是 Arc 指针，不是模型
+<p><strong>5. Session 要复用，但不能在多个线程间直接并发 <code>run</code>。</strong> 本书使用的 <code>ort 2.0.0-rc.13</code> 中，<code>Session::run()</code> 需要 <code>&amp;mut self</code>。官方这样设计，是因为部分 EP 的分配器或统计组件不能安全地并发访问。最简单可靠的结构就是 29.2 的流水线：一个推理线程独占一个 Session，其他线程负责解码、预处理和后处理。确实要开多个推理线程时，每个线程各建并长期复用一个 Session，并评估额外的模型内存：</p>
+<pre><code class="language-rust ignore">for _ in 0..4 {
     thread::spawn(move || {
-        // s.run(...) 只借 &amp;Session，多线程并发调用是安全的
-        let _ = s.run(/* ... */);
+        let mut session = build_session()?; // 每个工作线程创建一次
+        while let Ok(input) = recv_input() {
+            let _ = session.run(input)?;    // 在线程内反复复用
+        }
+        Ok::&lt;(), anyhow::Error&gt;(())
     });
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
+<p>若用 <code>Mutex&lt;Session&gt;</code> 包住单个 Session，代码虽然能共享，但锁会把 <code>run</code> 串行化；它适合统一所有权，不会增加推理并行度。优先先调好 ORT 的内部线程数或使用 batch，再考虑多 Session。</p>
 <h2 id="295-内存与零拷贝别每帧都重新分配"><a class="header" href="#295-内存与零拷贝别每帧都重新分配">29.5 内存与零拷贝：别每帧都重新分配</a></h2>
 <p>高帧率下，“每帧都 new 一个大 buffer、算完就扔“是隐形的性能杀手——内存分配器被反复折腾，还制造 GC 式的抖动。三条省内存的思路（点到为止，深入见第 10 章）：</p>
 <ul>
@@ -391,9 +367,7 @@ for _ in 0..4 {
 <h2 id="296-可观测性与稳定性让程序说话也让它扛揍"><a class="header" href="#296-可观测性与稳定性让程序说话也让它扛揍">29.6 可观测性与稳定性：让程序“说话“，也让它“扛揍“</a></h2>
 <p>demo 崩了你重启一下就行；线上程序崩一次可能就是一起事故。要让它<strong>看得见状态、扛得住异常</strong>。</p>
 <p><strong>结构化日志与分段耗时——用 <code>tracing</code>。</strong> <code>println!</code> 上不了生产。<code>tracing</code> 能打带字段的结构化日志、能给每个 stage 计时、能按 span（跨度）串起一帧的完整轨迹：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use tracing::{info, warn, info_span};
+<pre><code class="language-rust ignore">use tracing::{info, warn, info_span};
 use std::time::Instant;
 
 // 给这一帧开一个 span，后面所有日志自动带上 frame_id
@@ -402,23 +376,17 @@ let _guard = span.enter();
 
 let t = Instant::now();
 let out = session.run(/* ... */)?;
-info!(elapsed_ms = t.elapsed().as_millis(), "推理完成"); // 结构化字段，好检索、好聚合
-<span class="boring">}</span></code></pre>
+info!(elapsed_ms = t.elapsed().as_millis(), "推理完成"); // 结构化字段，好检索、好聚合</code></pre>
 <p><strong>统计端到端 FPS/延迟。</strong> 记录每帧“进流水线“到“出结果“的时间戳，滑动窗口算平均延迟和 FPS，暴露出来（打日志或走 metrics）。没有这个数字，你根本不知道系统是不是在悄悄变慢。</p>
 <p><strong>错误恢复——单点故障别拖垮整机。</strong> 视频流里坏一帧太正常了（网络抖动、解码错误）。<strong>一帧解码失败就跳过，绝不 <code>panic</code></strong>；<code>panic</code> 会让整个线程死掉、流水线断裂。用 <code>anyhow::Result</code> 兜住每一步，坏帧记个 <code>warn</code> 接着跑：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>loop {
+<pre><code class="language-rust ignore">loop {
     match read_next_frame(url) {
         Ok(img) =&gt; { /* 正常送入流水线 */ }
         Err(e) =&gt; { warn!(error = %e, "解码失败，跳过此帧"); continue; } // 不 panic
     }
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
 <p>RTSP <strong>断流重连</strong>同理：读流报错不是终点，是“歇一下重连“的信号——退避重试（sleep 递增），连上了继续跑：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>loop {
+<pre><code class="language-rust ignore">loop {
     match connect_rtsp(url) {
         Ok(stream) =&gt; run_until_error(stream),           // 正常跑，直到断开
         Err(e) =&gt; {
@@ -426,8 +394,7 @@ info!(elapsed_ms = t.elapsed().as_millis(), "推理完成"); // 结构化字段�
             std::thread::sleep(std::time::Duration::from_secs(5)); // 退避重连
         }
     }
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
 <p><strong>优雅退出（graceful shutdown）。</strong> 收到停止信号（Ctrl-C / SIGTERM）别硬杀——那会丢掉在途的帧、留下没落盘的报警。正确姿势：置一个原子标志位，让<strong>最上游停止产帧</strong>，然后 <strong>drop 掉 Sender</strong>；下游的 <code>for rx</code> 循环取空后自然结束，一路把管道里的存货处理完（drain）再退出。crossbeam 通道天然支持这个“Sender 全 drop → Receiver 收尾“的链式收场。</p>
 <h2 id="297-部署与跨平台从我这能跑到哪都能跑"><a class="header" href="#297-部署与跨平台从我这能跑到哪都能跑">29.7 部署与跨平台：从“我这能跑“到“哪都能跑“</a></h2>
 <p><strong>1. <code>cargo build --release</code>——必须！</strong> debug 构建没开优化，推理和图像处理能慢 <strong>10~50 倍</strong>。别拿 debug 版本量性能、更别拿它上线。这是最容易忘、代价最大的一条：</p>
@@ -472,7 +439,7 @@ cargo build --release --target aarch64-unknown-linux-gnu
 <ul>
 <li><input disabled="" type="checkbox"> <strong>Release 编译</strong>：<code>cargo build --release</code>，绝不拿 debug 版上线。</li>
 <li><input disabled="" type="checkbox"> <strong>预热</strong>：服务启动先空跑几次，避免首帧超慢。</li>
-<li><input disabled="" type="checkbox"> <strong>Session 单例</strong>：模型只加载一次，<code>Arc&lt;Session&gt;</code> 多线程共享，别放进循环。</li>
+<li><input disabled="" type="checkbox"> <strong>Session 复用</strong>：单推理线程只建一个；多推理线程则每线程各建一个并长期复用，别按帧重建。</li>
 <li><input disabled="" type="checkbox"> <strong>有界通道防爆内存</strong>：stage 间用 <code>bounded</code>，靠背压把内存钉在可控上限。</li>
 <li><input disabled="" type="checkbox"> <strong>丢帧策略</strong>：实时流用 <code>try_send</code> 满了丢旧帧；离线用 <code>send</code> 一帧不丢。</li>
 <li><input disabled="" type="checkbox"> <strong>断流重连</strong>：RTSP 断开能自动退避重连；单帧失败跳过不 <code>panic</code>。</li>
@@ -483,7 +450,7 @@ cargo build --release --target aarch64-unknown-linux-gnu
 </ul>
 <h2 id="299-全书结语从像素到端到端产品"><a class="header" href="#299-全书结语从像素到端到端产品">29.9 全书结语：从像素到端到端产品</a></h2>
 <p>到这里，全书的链路就闭合了。回头看这一路——</p>
-<p>第一部分我们从<strong>一个像素</strong>讲起：一张 JPG 在内存里不过是一串数字，色彩空间、编解码、RTSP 流，把“图像的本质“摸透（第 1~6 章）。第二部分学<strong>传统视觉算法</strong>：滤波、边缘、形态学、几何变换，这些不依赖模型的老功夫，至今仍是预处理和后处理的骨干（第 7~9 章）。第三、四部分进入<strong>深度学习推理侧</strong>：letterbox 预处理、模型文件、shape 与元数据、格式转换，最后用 tract/ort 把模型真正跑起来，吐出那串 <code>[1,84,8400]</code>（第 10~14 章）。第五部分把这串数字<strong>解码成有意义的结果</strong>：分类、检测+NMS、关键点、分割、人脸——各类模型的后处理逐个拿下（第 15~20 章）。第六、七部分从“单帧“迈向“<strong>视频与业务</strong>“：多目标跟踪、ROI/拌线/时间去重等过滤器、跨模型关联，把检测框变成“有人翻越了周界“这样的业务事件（第 21~25 章）。第八部分三个<strong>实战</strong>把零件拼成整机（第 26~28 章），而本章，把整机<strong>送上了生产线</strong>。</p>
+<p>第一、二部分我们从<strong>一个像素</strong>讲起：先理解图像与 Rust 工具，再学习编解码和 RTSP 流，把“图像的本质“与数据进出摸透（第 1~6 章）。第三部分学<strong>传统视觉算法</strong>：滤波、边缘、形态学、几何变换，这些不依赖模型的老功夫，至今仍是预处理和后处理的骨干（第 7~9 章）。第四、五部分进入<strong>深度学习推理侧</strong>：letterbox 预处理、模型文件、shape 与元数据、格式转换，最后用 tract/ort 把模型真正跑起来，吐出那串 <code>[1,84,8400]</code>（第 10~14 章）。第六部分把模型输出<strong>解码成有意义的结果</strong>：分类、检测+NMS、关键点、分割、人脸——各类模型的后处理逐个拿下（第 15~20 章）。第七部分从“单帧“迈向“<strong>视频与业务</strong>“：多目标跟踪、ROI/绊线/时间去重等过滤器、跨模型关联，把检测框变成“有人翻越了周界“这样的业务事件（第 21~25 章）。第八部分用三个实战把零件拼成整机，再在本章完成并发、性能与部署（第 26~29 章）。</p>
 <p>一条完整的链路：<strong>像素 → 张量 → 模型输出 → 检测框 → 跟踪轨迹 → 业务事件 → 稳定上线的产品</strong>。你现在手里有的，不是几段能跑的 demo，而是一套从底层原理到工程落地的完整心智地图。</p>
 <p><strong>下一步学什么？</strong> 几个方向供参考：往<strong>训练侧</strong>走，学会自己标注数据、微调模型（本书专注推理侧，训练是另一片天地）；往<strong>更极致的性能</strong>走，深入 TensorRT/量化/算子级优化；往<strong>更大的系统</strong>走，多机多路调度、消息队列、云边协同；或者干脆挑一个真实场景（你家的猫、小区的车、产线的瑕疵），把本书的链路端到端跑通一遍——<strong>纸上得来终觉浅，绝知此事要躬行</strong>。附录 A~D 是你随时可查的数学、crate、术语和踩坑手册。</p>
 <p>祝你在机器视觉的工程路上，看得懂图像，也看得懂模型。</p>
@@ -491,7 +458,7 @@ cargo build --release --target aarch64-unknown-linux-gnu
 <ul>
 <li>串行流水线的总延迟是各环节相加、且 GPU 大量空闲；<strong>流水线并发</strong>把解码/预处理/推理/后处理拆成多线程用 channel 连接，吞吐取决于最慢环节而非相加，GPU 几乎不停歇。</li>
 <li><strong>背压</strong>（有界通道满了阻塞上游）把内存钉在可控上限，防止 OOM；实时流处理不过来时用 <code>try_send</code> <strong>主动丢旧帧</strong>保新鲜——离线要全帧、实时可丢帧，是视频分析特有的抉择。</li>
-<li><strong>数据并行</strong>（rayon 一批并行、fast_image_resize 的 SIMD 缩放）与流水线并发叠加；推理侧靠<strong>预热、EP 选择、batch、量化、Session 单例并发 run</strong> 榨性能。</li>
+<li><strong>数据并行</strong>（rayon 一批并行、fast_image_resize 的 SIMD 缩放）与流水线并发叠加；推理侧靠<strong>预热、EP 选择、batch、量化和 Session 复用</strong>榨性能；<code>ort 2.0.0-rc.13</code> 的同一个 Session 不能直接跨线程并发 <code>run</code>。</li>
 <li>稳定性靠<strong>可观测性</strong>（tracing 结构化日志 + FPS/延迟统计）和<strong>错误恢复</strong>（坏帧跳过不 panic、RTSP 断流重连、信号触发优雅 drain 退出）。</li>
 <li>部署第一铁律是 <strong><code>--release</code> 编译</strong>；再管好动态库分发（<code>LD_LIBRARY_PATH</code>/rpath）、交叉编译到 ARM（<code>--target</code>）、容器化、模型与配置版本管理。上线前对着<strong>检查清单</strong>逐项打勾。</li>
 <li>全书链路闭合：<strong>像素 → 张量 → 模型输出 → 检测框 → 轨迹 → 业务事件 → 上线产品</strong>，从原理到工程落地的完整地图已经在你手上。</li>
@@ -500,7 +467,7 @@ cargo build --release --target aarch64-unknown-linux-gnu
 <ol>
 <li><strong>改成三线程流水线</strong>：把第 26 章的端到端检测程序，用 <code>crossbeam::channel::bounded</code> 拆成“解码预处理 / 推理 / 后处理“三个线程连接起来。跑同一个视频，对比改造前后的 FPS，验证吞吐提升。</li>
 <li><strong>加实时丢帧</strong>：给上题的解码环节换成 <code>try_send</code>，通道满时丢帧并累计 <code>dropped</code> 计数。把通道容量从 16 逐步调到 1，观察丢帧率和端到端延迟怎么变——体会“容量越小越新鲜、但丢得越多“。</li>
-<li><strong>用 tracing 统计各 stage 耗时</strong>：给每个 stage 包一个 <code>info_span!</code> 并打 <code>elapsed_ms</code>，跑一段视频后找出瓶颈在哪一环。再想想：如果瓶颈是推理，给它开两个推理线程共享 <code>Arc&lt;Session&gt;</code> 能不能缓解？</li>
+<li><strong>用 tracing 统计各 stage 耗时</strong>：给每个 stage 包一个 <code>info_span!</code> 并打 <code>elapsed_ms</code>，跑一段视频后找出瓶颈在哪一环。若瓶颈是推理，比较两种方案：增大 batch；或开两个推理线程、每线程各持有一个 Session。记录吞吐、延迟和内存占用后再决定。</li>
 <li><strong>给推理加 warmup 并对比首帧延迟</strong>：在正式处理前用假输入空跑 3 次预热，记录“预热版“和“不预热版“的<strong>第一帧</strong>处理耗时，看看首帧慢了多少倍——这正是“上线要预热“的实证。</li>
 </ol>
 

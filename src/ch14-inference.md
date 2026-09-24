@@ -65,7 +65,7 @@ Rust 世界里跑 ONNX，主流是两条路。它们的"喂→跑→取"三步�
 好在两者接口高度相似，学会一个另一个照猫画虎。下面各写一个完整可编译的例子，模型统一用第 13 章导出的 `yolov8n.onnx`，输入统一用第 10 章的 `preprocess()`。
 
 > **复用第 10 章的接口约定**：本章所有例子都调用第 10 章造好的预处理函数，签名是
-> `pub fn preprocess(img: &RgbImage) -> (Array4<f32>, LetterboxInfo)`。
+> `pub fn preprocess(img: &RgbImage, target: u32) -> (Array4<f32>, LetterboxInfo)`。
 > 它吃一张 `image::RgbImage`，吐出两样东西：`ndarray::Array4<f32>`（形状正好 `[1,3,640,640]`、已 letterbox、已归一化到 `0~1`）和一个 `LetterboxInfo`（记着缩放比例和填充量，留给第 16 章把框还原回原图用）。本章用不到 `LetterboxInfo`，先用 `_` 接住。
 
 ## 14.3 tract：纯 Rust 跑通第一个模型
@@ -79,13 +79,13 @@ cargo add tract-onnx ndarray image
 
 完整程序如下，四步走：加载 → 喂张量 → `run()` → 取输出。逐行有注释：
 
-```rust
+```rust,ignore
 use image::RgbImage;
 use ndarray::Array4;
 use tract_onnx::prelude::*;
 
 // 第 10 章造好的预处理，签名照搬过来即可：
-// pub fn preprocess(img: &RgbImage) -> (Array4<f32>, LetterboxInfo);
+// pub fn preprocess(img: &RgbImage, target: u32) -> (Array4<f32>, LetterboxInfo);
 
 fn main() -> TractResult<()> {
     // ① 加载模型：解析 onnx → 固定输入形状 → 图优化 → 编译成可执行计划
@@ -99,7 +99,7 @@ fn main() -> TractResult<()> {
 
     // ② 预处理：复用第 10 章的 preprocess，拿到标准 ndarray 的 Array4<f32>
     let img: RgbImage = image::open("test.jpg")?.to_rgb8();
-    let (input, _info): (Array4<f32>, _) = preprocess(&img); // 形状 [1,3,640,640]
+    let (input, _info): (Array4<f32>, _) = preprocess(&img, 640); // 形状 [1,3,640,640]
 
     // ③ 把 ndarray 里的数据搬进 tract 的张量。
     //    张量的本质就是“形状 + 一串连续的数字”，from_shape 正是照这个模型造的：
@@ -130,7 +130,7 @@ run             → 真跑，喂 tvec![张量...]，拿回 outputs
 
 如果第 16 章的后处理想要一个标准 `ndarray` 的 owned 数组，同样一句话搬回来：
 
-```rust
+```rust,ignore
 // 把输出的 [1,84,8400] 变成标准 ndarray::Array3<f32>，交给第 16 章
 let out3 = ndarray::Array3::from_shape_vec(
     (1, 84, 8400),
@@ -148,7 +148,7 @@ println!("转成 ndarray: {:?}", out3.dim());   // (1, 84, 8400)
 ```toml
 [dependencies]
 ort = "=2.0.0-rc.13"   # 默认会自动下载官方预编译的 onnxruntime 动态库
-ndarray = "0.16"
+ndarray = "0.17"
 image = "0.25"
 # 想用 NVIDIA 显卡，就打开对应 feature（还需机器上装好 CUDA/cuDNN）：
 # ort = { version = "=2.0.0-rc.13", features = ["cuda"] }
@@ -158,14 +158,14 @@ image = "0.25"
 
 完整程序：
 
-```rust
+```rust,ignore
 use image::RgbImage;
 use ndarray::Array4;
 use ort::session::{builder::GraphOptimizationLevel, Session};
 use ort::value::TensorRef;
 
 // 同样复用第 10 章的 preprocess：
-// pub fn preprocess(img: &RgbImage) -> (Array4<f32>, LetterboxInfo);
+// pub fn preprocess(img: &RgbImage, target: u32) -> (Array4<f32>, LetterboxInfo);
 
 fn main() -> ort::Result<()> {
     // ① 建会话(Session)：图优化拉满 + 设线程数 + 注册 EP + 加载模型
@@ -184,7 +184,7 @@ fn main() -> ort::Result<()> {
 
     // ② 预处理，拿到标准 ndarray 的 [1,3,640,640]（ort 直接吃标准 ndarray，不用像 tract 那样桥接）
     let img: RgbImage = image::open("test.jpg").unwrap().to_rgb8();
-    let (input, _info): (Array4<f32>, _) = preprocess(&img);
+    let (input, _info): (Array4<f32>, _) = preprocess(&img, 640);
 
     // ③ 构造输入并 run。"images" 是模型的输入名（第 12 章读元数据得到）。
     //    TensorRef::from_array_view 是“借用”数据、零拷贝，最省内存。
@@ -251,7 +251,7 @@ fn main() -> ort::Result<()> {
 
 **1. 会话(Session)只创建一次，反复复用。** 加载模型要读文件、建图、优化，动辄几百毫秒到几秒、还吃几百 MB 内存。**千万别放进循环**：
 
-```rust
+```rust,ignore
 // ❌ 每帧都重新加载模型：每次几秒 + 内存反复申请释放，程序又慢又抖
 for frame in frames { let model = load_model(); model.run(...); }
 
@@ -262,7 +262,7 @@ for frame in frames { model.run(...); }
 
 **2. 一定要预热（warmup）。** 引擎**第一次推理往往慢 2~10 倍**——内存首次分配、计算核首次编译、CPU 缓存冷启动、GPU 上下文初始化都挤在这一发里。所以：正式服务前先空跑几次把它"焐热"；做性能测试(benchmark)时更要先预热再计时，否则数字毫无意义。
 
-```rust
+```rust,ignore
 use std::time::Instant;
 
 // 预热：拿真实尺寸的输入空跑几次

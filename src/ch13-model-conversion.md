@@ -353,25 +353,27 @@ assert max_err < 1e-3, "误差过大，转换可能出错了！"
 
 ### Rust 侧：加载转换后 ONNX 的冒烟测试
 
-转换、验证都在 Python 里做完了，最后在 Rust 里确认一下——**这个 ONNX 能被我们的推理引擎加载、能前向、输出形状对**。用写作规范里的 `ort`（ONNX Runtime 的 Rust 绑定）写一个最小冒烟测试：
+转换、验证都在 Python 里做完了，最后在 Rust 里确认一下——**这个 ONNX 能被我们的推理引擎加载、能前向、输出形状对**。用第 14 章介绍的 `ort`（ONNX Runtime 的 Rust 绑定）写一个最小冒烟测试：
 
-```rust
+```rust,ignore
 use ndarray::Array4;
-use ort::{session::Session, value::Tensor};
+use ort::{session::Session, value::TensorRef};
 
 fn main() -> ort::Result<()> {
     // 1) 加载转换/导出好的 onnx
-    let session = Session::builder()?.commit_from_file("yolov8n.onnx")?;
+    let mut session = Session::builder()?.commit_from_file("yolov8n.onnx")?;
 
     // 2) 造一个假输入：全 0 的 [1,3,640,640]，只为验证"能跑通"，不关心结果对不对
     let x = Array4::<f32>::zeros((1, 3, 640, 640));
 
     // 3) 按导出时起的输入名 "images" 喂进去（怎么查输入名？第 12 章教过）
-    let outputs = session.run(ort::inputs!["images" => Tensor::from_array(x)?]?)?;
+    let outputs = session.run(ort::inputs![
+        "images" => TensorRef::from_array_view(&x)?
+    ])?;
 
     // 4) 取出名为 "output0" 的输出，打印形状，确认是我们期待的 [1, 84, 8400]
-    let (shape, _data) = outputs["output0"].try_extract_tensor::<f32>()?;
-    println!("跑通了！输出形状 = {shape:?}"); // 期望 [1, 84, 8400]
+    let output = outputs["output0"].try_extract_array::<f32>()?;
+    println!("跑通了！输出形状 = {:?}", output.shape()); // 期望 [1, 84, 8400]
     Ok(())
 }
 ```

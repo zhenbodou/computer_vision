@@ -37,10 +37,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-4d8e5ec0.js";
+            window.path_to_searchindex_js = "searchindex-ba421b3e.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-c1d54236.js"></script>
+        <script src="toc-68b1d651.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -223,7 +223,7 @@
 <li>一组 logits <strong>加起来不等于 1</strong>（互斥单标签的概率总和应是 100%）。</li>
 </ul>
 <p>所以要一个函数，把任意一组实数“挤“成一组“非负、且加起来正好等于 1“的数——这就是 <strong>Softmax</strong>。它的思路是：先用指数 $e^x$ 把每个数变成正数（并且拉大差距，大的更大），再除以总和做归一化，让它们凑成 100%。就像把全班同学的原始分先各自取指数、再换算成“占全班的百分比“。</p>
-<p>公式（数学补漏见附录 A.6）：</p>
+<p>公式（数学补漏见附录 A.10）：</p>
 <p>$$\text{softmax}(x_i) = \frac{e^{x_i}}{\sum_{j} e^{x_j}}$$</p>
 <p><strong>手算一遍</strong>（本章统一用这组小数字 <code>logits = [2.0, 1.0, 0.1]</code>，假设只有 3 类）：</p>
 <pre><code class="language-text">第一步：每个数取指数 e^x
@@ -252,9 +252,7 @@
    概率 = [1.000/1.518, 0.368/1.518, 0.150/1.518] ≈ [0.659, 0.242, 0.099]
 </code></pre>
 <p>和上面<strong>一模一样</strong>，但过程里再也不会出现 <code>e^100</code> 这种大数——最大的指数项永远是 <code>e^0 = 1</code>。用 Rust 实现就照这个稳定版来：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>/// 数值稳定版 Softmax：把一组 logits 变成加起来为 1 的概率
+<pre><code class="language-rust ignore">/// 数值稳定版 Softmax：把一组 logits 变成加起来为 1 的概率
 fn softmax(logits: &amp;[f32]) -&gt; Vec&lt;f32&gt; {
     // ① 找最大值，用来平移，防止 exp 溢出
     let max = logits.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
@@ -263,8 +261,7 @@ fn softmax(logits: &amp;[f32]) -&gt; Vec&lt;f32&gt; {
     // ③ 求和，逐个归一化
     let sum: f32 = exps.iter().sum();
     exps.iter().map(|&amp;e| e / sum).collect()
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
 <blockquote>
 <p><strong>要不要自己做 Softmax？</strong> 看模型。多数分类模型的输出就是 logits，需要你自己过 Softmax；但有的模型在导出时把 Softmax “焊“进了计算图（Netron 里能看到输出前有个 <code>Softmax</code> 节点，第 12 章），那输出就已经是概率，你再做一次就错了。<strong>先查清楚，别重复激活。</strong></p>
 </blockquote>
@@ -276,9 +273,7 @@ fn softmax(logits: &amp;[f32]) -&gt; Vec&lt;f32&gt; {
 </ul>
 <p><strong>为什么要 Top-5？</strong> ImageNet 里有大量细分类（好几种猫、几十种狗），一张图里也常有不止一个东西。要求模型“第一个答案就完全命中“太苛刻，“正确答案排进前 5“是更宽容也更实用的评价——<strong>Top-5 准确率</strong>因此成了经典指标。工程上给用户看结果时，也常列 Top-3/Top-5 供参考（“最像埃及猫，其次虎斑猫”）。</p>
 <p>Rust 实现。先是 argmax（Top-1）：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>/// 返回最大值所在的下标（Top-1 类别号）
+<pre><code class="language-rust ignore">/// 返回最大值所在的下标（Top-1 类别号）
 fn argmax(scores: &amp;[f32]) -&gt; usize {
     scores
         .iter()
@@ -287,12 +282,9 @@ fn argmax(scores: &amp;[f32]) -&gt; usize {
         .max_by(|(_, a), (_, b)| a.total_cmp(b))
         .map(|(i, _)| i)
         .unwrap_or(0)
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
 <p>再是 Top-K：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>/// 取分数最高的 k 个，返回 (类别号, 分数)，按分数从高到低排列
+<pre><code class="language-rust ignore">/// 取分数最高的 k 个，返回 (类别号, 分数)，按分数从高到低排列
 fn top_k(scores: &amp;[f32], k: usize) -&gt; Vec&lt;(usize, f32)&gt; {
     // 把 (下标, 分数) 配成对
     let mut indexed: Vec&lt;(usize, f32)&gt; =
@@ -301,17 +293,13 @@ fn top_k(scores: &amp;[f32], k: usize) -&gt; Vec&lt;(usize, f32)&gt; {
     indexed.sort_unstable_by(|a, b| b.1.total_cmp(&amp;a.1));
     indexed.truncate(k.min(indexed.len())); // 只留前 k 个（k 过大也不越界）
     indexed
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
 <p>注意两个细节：比较 <code>f32</code> 一律用 <strong><code>total_cmp</code></strong>，别用 <code>partial_cmp().unwrap()</code>——万一分数里混进 <code>NaN</code>，<code>unwrap</code> 会直接 panic。另外，对 1000 个数做整排是够快的；<strong>工程上通常会</strong>在类别成千上万时改用 <code>select_nth_unstable</code>（只把前 k 个选出来、不全排），省掉不必要的排序开销。</p>
 <p>把本章的零件串起来，一个分类模型的后处理就成型了（假设推理已拿到 <code>logits: &amp;[f32]</code>，共 1000 个，怎么拿到见第 14 章）：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>let probs = softmax(logits);          // logits → 概率
+<pre><code class="language-rust ignore">let probs = softmax(logits);          // logits → 概率
 for (id, p) in top_k(&amp;probs, 5) {     // 取 Top-5
     println!("{:&gt;5.1}%  类别 {}", p * 100.0, id);
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
 <p>但打印出“类别 285“没人看得懂——还差一步：把类别号翻译成名字。</p>
 <h2 id="155-标签映射从类别号到类别名"><a class="header" href="#155-标签映射从类别号到类别名">15.5 标签映射：从类别号到类别名</a></h2>
 <p>模型永远只吐<strong>类别号</strong>（0、1、2……），因为它内部只认数字。要变成“埃及猫““柯基犬“这种人话，得靠一个**标签文件（labels file）**做 <code>id → 名字</code> 的映射。</p>
@@ -325,24 +313,18 @@ great white shark     ← 第 2 类
 （共 1000 行）
 </code></pre>
 <p>用 Rust 读进来就是一个 <code>Vec&lt;String&gt;</code>，下标即类别号：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use std::fs;
+<pre><code class="language-rust ignore">use std::fs;
 
 /// 从 labels.txt 加载类别表：每行一个名字，行号 = 类别号
 fn load_labels(path: &amp;str) -&gt; std::io::Result&lt;Vec&lt;String&gt;&gt; {
     let text = fs::read_to_string(path)?;
     Ok(text.lines().map(|s| s.trim().to_string()).collect())
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
 <p>配上 15.4 的结果就能打印人话了（数值为示意）：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>let labels = load_labels("imagenet_classes.txt")?; // 1000 行
+<pre><code class="language-rust ignore">let labels = load_labels("imagenet_classes.txt")?; // 1000 行
 for (id, p) in top_k(&amp;probs, 5) {
     println!("{:&gt;5.1}%  {}", p * 100.0, labels[id]); // 用类别号去查名字
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
 <pre><code class="language-text"> 65.9%  Egyptian cat
  24.2%  tabby cat
   9.9%  lynx
@@ -352,7 +334,7 @@ for (id, p) in top_k(&amp;probs, 5) {
 <h2 id="156-多标签分类softmax-还是-sigmoid"><a class="header" href="#156-多标签分类softmax-还是-sigmoid">15.6 多标签分类：Softmax 还是 Sigmoid</a></h2>
 <p>前面都假设“一张图只属于一个类“——猫就是猫，不会同时是狗。这叫<strong>单标签分类</strong>，用 Softmax 正合适：它天生让所有类概率<strong>加起来为 1</strong>，即“这些类互相竞争、此消彼长“。</p>
 <p>但很多场景不是这样。一张海边度假照，可以<strong>同时</strong>属于“户外““沙滩”“人”“晴天“好几个标签——它们<strong>并不互斥</strong>。这叫<strong>多标签分类（multi-label classification）</strong>。这时候再用 Softmax 就错了：Softmax 强行让总和为 1，“户外“分高了就会<strong>压低</strong>“沙滩”，可现实里这两个本该都高。</p>
-<p>正确做法是<strong>放弃 Softmax，改成逐类独立地过 Sigmoid，再各自和一个阈值比</strong>。<strong>Sigmoid</strong>（附录 A.5）把<strong>单个</strong> logit 压进 <code>(0, 1)</code>，<code>σ(0)=0.5</code>，越大越接近 1：</p>
+<p>正确做法是<strong>放弃 Softmax，改成逐类独立地过 Sigmoid，再各自和一个阈值比</strong>。<strong>Sigmoid</strong>（附录 A.9）把<strong>单个</strong> logit 压进 <code>(0, 1)</code>，<code>σ(0)=0.5</code>，越大越接近 1：</p>
 <p>$$\sigma(x) = \frac{1}{1 + e^{-x}}$$</p>
 <p>每个类各算各的 Sigmoid，互不影响，超过阈值（比如 0.5）就判定为“命中“。一张图因此可以命中 0 个、1 个或多个标签。</p>
 <p>Softmax 和 Sigmoid 的区别是本章的核心分水岭，用表格钉死：</p>
@@ -372,9 +354,7 @@ for (id, p) in top_k(&amp;probs, 5) {
 </table>
 </div>
 <p>多标签的 Rust 实现，比 Softmax 还简单——没有归一化，逐类算、逐类筛：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>/// Sigmoid：把单个 logit 压到 (0, 1)
+<pre><code class="language-rust ignore">/// Sigmoid：把单个 logit 压到 (0, 1)
 fn sigmoid(x: f32) -&gt; f32 {
     1.0 / (1.0 + (-x).exp())
 }
@@ -388,8 +368,7 @@ fn multi_label(logits: &amp;[f32], threshold: f32) -&gt; Vec&lt;(usize, f32)&gt;
         .map(|(i, &amp;x)| (i, sigmoid(x)))    // 每一类独立算概率
         .filter(|&amp;(_, p)| p &gt;= threshold)  // 只保留过阈值的
         .collect()
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
 <p>一句话总结怎么选：<strong>“这张图是哪一个？“用 Softmax；“这张图有哪些？“用 Sigmoid。</strong></p>
 <h2 id="157-工程坑预处理必须和训练一致"><a class="header" href="#157-工程坑预处理必须和训练一致">15.7 工程坑：预处理必须和训练一致</a></h2>
 <p>这是本章最要命、也最容易让新手“能跑通但结果全乱“的坑，单独拎出来讲。</p>
@@ -408,10 +387,8 @@ fn multi_label(logits: &amp;[f32], threshold: f32) -&gt; Vec&lt;(usize, f32)&gt;
 </tbody>
 </table>
 </div>
-<p>也就是说，检测器那套“读进来除以 255 就完事“的预处理，<strong>直接套到分类模型上是错的</strong>——你漏掉了 ImageNet 的均值方差这一步（这套统计值是在 ImageNet 训练集上算出来的，含义见附录 A.4）。分类模型正确的预处理片段（假设已把图缩放到 224×224、RGB、每像素 3 个 <code>u8</code>，缩放细节见第 10 章）：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>// ImageNet 训练时的逐通道均值/标准差（RGB 顺序）
+<p>也就是说，检测器那套“读进来除以 255 就完事“的预处理，<strong>直接套到分类模型上是错的</strong>——你漏掉了 ImageNet 的均值方差这一步（这套统计值是在 ImageNet 训练集上算出来的，方差、标准差和标准化见附录 A.6~A.7）。分类模型正确的预处理片段（假设已把图缩放到 224×224、RGB、每像素 3 个 <code>u8</code>，缩放细节见第 10 章）：</p>
+<pre><code class="language-rust ignore">// ImageNet 训练时的逐通道均值/标准差（RGB 顺序）
 const MEAN: [f32; 3] = [0.485, 0.456, 0.406];
 const STD:  [f32; 3] = [0.229, 0.224, 0.225];
 
@@ -430,8 +407,7 @@ fn imagenet_normalize(rgb: &amp;[u8], w: usize, h: usize) -&gt; Vec&lt;f32&gt; {
         }
     }
     chw
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
 <p>和检测器预处理相比，就多了 <code>(v - MEAN[c]) / STD[c]</code> 这一步，但少了它结果就废。<strong>另外三个连带的坑</strong>：通道顺序（是 RGB 还是 BGR？OpenCV 系模型常是 BGR）、mean/std 是按 <code>0~1</code> 还是按 <code>0~255</code> 给的（本例是 <code>0~1</code>）、以及 15.5 说的类别顺序。这些约定和归一化一样，<strong>模型文件里查不到，得翻 model card / 训练代码</strong>（第 12 章反复强调过）。工程上最稳的自检办法：拿一张官方示例图，比对你的 Rust 结果和官方 Python demo 的 Top-5 是否一致——一致了，预处理才算真的对上了。</p>
 <h2 id="158-联系主线检测框里藏着一个分类"><a class="header" href="#158-联系主线检测框里藏着一个分类">15.8 联系主线：检测框里藏着一个分类</a></h2>
 <p>学完分类，你其实已经看懂了主线检测器输出的“半壁江山“。回忆第 12 章解剖过的 YOLOv8 输出 <code>[1, 84, 8400]</code>，每个候选框有 84 个数字：</p>

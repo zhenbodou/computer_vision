@@ -100,7 +100,7 @@
 
 现在把 7.2~7.4 的道理落成一段能跑的代码。为了看清底层，我们**不依赖任何图像库**，直接对一个"行优先排列的灰度数组 `&[f32]`"做卷积，把边界处理也一并做对。
 
-```rust
+```rust,ignore
 /// 边界填充方式：滑窗探出图像外时，用什么值补上（对应 7.4 的三种）
 #[derive(Clone, Copy)]
 enum Padding {
@@ -166,7 +166,7 @@ fn convolve3x3(src: &[f32], w: usize, h: usize, kernel: &[f32; 9], pad: Padding)
 
 配两个和 `image` crate 打通的小工具，把灰度图和 `Vec<f32>` 互相转换（`GrayImage` 内部就是行优先的 `Vec<u8>`，正好对得上）：
 
-```rust
+```rust,ignore
 use image::{GrayImage, Luma};
 
 /// 灰度图 → f32 数组（顺带返回宽高）
@@ -202,7 +202,7 @@ fn f32_to_gray(data: &[f32], w: usize, h: usize) -> GrayImage {
 
 用我们的引擎跑一次均值滤波：
 
-```rust
+```rust,ignore
 let (buf, w, h) = gray_to_f32(&gray);            // gray 是一张 GrayImage
 let box_kernel = [1.0 / 9.0; 9];                 // 均值核
 let blurred = convolve3x3(&buf, w, h, &box_kernel, Padding::Replicate);
@@ -240,7 +240,7 @@ f32_to_gray(&blurred, w, h).save("box_blur.png")?;
 
 工程上通常不手填核里的数字，而是给一个 σ，让库去生成核。`imageproc` 直接提供了高斯模糊（内部按 f32 计算，精度好）：
 
-```rust
+```rust,ignore
 use imageproc::filter::gaussian_blur_f32;
 
 let gray = image::open("test.jpg")?.to_luma8();
@@ -266,7 +266,7 @@ g.save("gaussian.png")?;
 
 `imageproc` 提供了中值滤波，参数是 x、y 两个方向的**半径**，窗口大小是 `(2·x_radius+1) × (2·y_radius+1)`：
 
-```rust
+```rust,ignore
 use imageproc::filter::median_filter;
 
 let gray = image::open("salt_pepper.jpg")?.to_luma8();
@@ -311,7 +311,7 @@ $$\text{锐化图} = \text{原图} + \text{amount} \times (\text{原图} - \text
 
 `amount` 是锐化强度。用 `imageproc` 的高斯模糊就能实现一版 USM：
 
-```rust
+```rust,ignore
 use imageproc::filter::gaussian_blur_f32;
 use image::{GrayImage, Luma};
 
@@ -342,7 +342,7 @@ fn unsharp_mask(gray: &GrayImage, sigma: f32, amount: f32) -> GrayImage {
 
 直觉：中心那个 5，可以拆成 `1（原图本身） + 4`，多出来的 `4·中心 − 4·邻居` 正是"中心比邻居突出多少"。平坦区邻居和中心一样，这一项为 0，不变；边缘处中心和邻居差得多，这一项就把差异放大，边缘随之凸显。
 
-```rust
+```rust,ignore
 let (buf, w, h) = gray_to_f32(&gray);
 let sharpen = [0.0, -1.0, 0.0, -1.0, 5.0, -1.0, 0.0, -1.0, 0.0];
 let s = convolve3x3(&buf, w, h, &sharpen, Padding::Replicate);

@@ -37,10 +37,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-4d8e5ec0.js";
+            window.path_to_searchindex_js = "searchindex-ba421b3e.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-c1d54236.js"></script>
+        <script src="toc-68b1d651.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -234,10 +234,8 @@
 <h2 id="203-第一步--人脸检测框--5-个关键点"><a class="header" href="#203-第一步--人脸检测框--5-个关键点">20.3 第一步 · 人脸检测：框 + 5 个关键点</a></h2>
 <p>人脸检测常用 <strong>RetinaFace</strong> 或更轻快的 <strong>SCRFD</strong>。和普通检测器相比，它多输出一样东西：每张脸的 <strong>5 个关键点（landmarks）</strong>——<strong>左眼、右眼、鼻尖、左嘴角、右嘴角</strong>。</p>
 <p>为什么检测器要顺手吐出这 5 个点？因为下一步“对齐“正需要它们当“锚点“。这也呼应第 17 章：那里讲关键点模型的原理（热力图、坐标还原），这里我们只当<strong>使用方</strong>，直接拿它给的坐标。</p>
-<p>框的部分我们<strong>复用全书统一的 <code>BBox</code></strong>（左上-右下像素坐标，见写作规范第 6 节），只是外面再包一层带关键点的结构：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use crate::BBox; // 复用第 16 章的统一边界框：{ x1, y1, x2, y2 }
+<p>框的部分我们<strong>复用全书统一的 <code>BBox</code></strong>（左上-右下像素坐标，见第 3.8 节），只是外面再包一层带关键点的结构：</p>
+<pre><code class="language-rust ignore">use crate::BBox; // 复用第 16 章的统一边界框：{ x1, y1, x2, y2 }
 
 /// 人脸检测结果：框 + 置信度 + 5 个关键点
 #[derive(Clone, Debug)]
@@ -245,8 +243,7 @@ pub struct FaceDetection {
     pub bbox: BBox,                  // 复用统一 BBox，坐标已还原到原图像素
     pub score: f32,                  // "是一张脸"的置信度 0~1
     pub landmarks: [(f32, f32); 5],  // 顺序：左眼、右眼、鼻尖、左嘴角、右嘴角
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
 <blockquote>
 <p><strong>和第 16 章的关系</strong>：人脸检测器的后处理（框还原、按置信度过滤、NMS 去重叠框）和第 16 章完全一致，这里不再重复。关键点坐标同样要跟着框一起从模型输入尺寸<strong>还原到原图像素坐标</strong>（letterbox 逆变换见第 10 章），否则后面对齐会全歪。</p>
 </blockquote>
@@ -259,21 +256,16 @@ pub struct FaceDetection {
 <h3 id="怎么对齐5-个关键点--相似变换"><a class="header" href="#怎么对齐5-个关键点--相似变换">怎么对齐：5 个关键点 + 相似变换</a></h3>
 <p>做法呼应第 9 章的<strong>几何变换</strong>：我们定义一张 112×112 的“标准脸模板“，规定 5 个关键点<strong>应该</strong>落在哪里；再用检测得到的 5 个<strong>实际</strong>关键点，求一个<strong>相似变换（similarity transform：只含旋转、等比缩放、平移，不改变脸的长宽比）</strong>，把实际的 5 个点搬到模板位置上，整张脸也就跟着被摆正了。</p>
 <p>标准模板点（insightface 约定的 112×112 坐标）如下：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>/// 对齐后，5 个关键点在 112×112 图上"应该"落在的位置（业界通用模板）
+<pre><code class="language-rust ignore">/// 对齐后，5 个关键点在 112×112 图上"应该"落在的位置（业界通用模板）
 const TEMPLATE_112: [(f32, f32); 5] = [
     (38.2946, 51.6963), // 左眼
     (73.5318, 51.5014), // 右眼
     (56.0252, 71.7366), // 鼻尖
     (41.5493, 92.3655), // 左嘴角
     (70.7299, 92.2041), // 右嘴角
-];
-<span class="boring">}</span></code></pre>
+];</code></pre>
 <p>有了“实际 5 点“和“目标 5 点“两组对应，就是解一个<strong>超定方程组</strong>（5 对点、未知数只有 4 个：旋转+缩放合成的 2 个参数 + 2 个平移），用<strong>最小二乘</strong>求出那个 2×3 仿射矩阵。思路骨架：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>/// 由检测到的 5 个关键点，估计"把这张脸对齐到模板"的 2×3 仿射矩阵（骨架）
+<pre><code class="language-rust ignore">/// 由检测到的 5 个关键点，估计"把这张脸对齐到模板"的 2×3 仿射矩阵（骨架）
 /// 返回 [[a, b, tx], [c, d, ty]]，含义见第 9 章：新点 = M · (x, y, 1)^T
 fn estimate_align_matrix(src: &amp;[(f32, f32); 5]) -&gt; [[f32; 3]; 2] {
     // 目标：找相似变换 M，使 M · src[i] ≈ TEMPLATE_112[i]，误差平方和最小。
@@ -292,8 +284,7 @@ fn align_face(image: &amp;image::RgbImage, det: &amp;FaceDetection) -&gt; image:
     let m = estimate_align_matrix(&amp;det.landmarks);
     // warp_affine 的实现见第 9 章：对目标图每个像素做逆映射 + 双线性采样
     warp_affine(image, &amp;m, 112, 112) // 输出固定 112×112，正好喂给 ArcFace
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
 <p>关键点在于：<strong>对齐用的是关键点，不是那个人脸框</strong>。框只告诉你“脸大概在这块区域“，而 5 个关键点精确到“眼睛在哪、嘴在哪“，才能把脸真正摆正。对齐后所有脸都是 112×112 的标准正脸，尺寸和五官位置统一，这正是识别模型想要的输入。</p>
 <h2 id="205-第三步--特征提取把脸变成一串数字"><a class="header" href="#205-第三步--特征提取把脸变成一串数字">20.5 第三步 · 特征提取：把脸变成一串数字</a></h2>
 <p>对齐好的 112×112 正脸，喂给<strong>识别模型（如 ArcFace）</strong>，它不输出类别、不输出框，而是吐出一个<strong>定长特征向量（embedding，人脸嵌入）</strong>——通常是 <strong>512 维的 <code>f32</code></strong>。</p>
@@ -335,9 +326,7 @@ $$</p>
 <li>相似度：<code>0 / (3 × √5) = 0</code> → <strong>方向无关，判不同人</strong></li>
 </ul>
 <p>看到没：同一个人不管长短怎么变，方向都稳在高位（0.89、1.0），陌生人直接掉到 0。翻成 Rust：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>/// 余弦相似度：两个等长向量方向的接近程度，范围 -1~1
+<pre><code class="language-rust ignore">/// 余弦相似度：两个等长向量方向的接近程度，范围 -1~1
 pub fn cosine_similarity(a: &amp;[f32], b: &amp;[f32]) -&gt; f32 {
     assert_eq!(a.len(), b.len(), "两个向量维度必须相同");
     let (mut dot, mut na, mut nb) = (0.0f32, 0.0f32, 0.0f32);
@@ -347,8 +336,7 @@ pub fn cosine_similarity(a: &amp;[f32], b: &amp;[f32]) -&gt; f32 {
         nb += b[i] * b[i];  // b 的模长平方
     }
     dot / (na.sqrt() * nb.sqrt() + 1e-8) // +1e-8 防止除以 0
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
 <h3 id="顺带一提欧氏距离"><a class="header" href="#顺带一提欧氏距离">顺带一提：欧氏距离</a></h3>
 <p>除了余弦，也有人用<strong>欧氏距离（Euclidean distance）</strong>——就是两个向量端点之间的直线距离 $\sqrt{\sum_i (a_i-b_i)^2}$，<strong>越小越像</strong>（和余弦“越大越像“方向相反）。有个好用的关系：若两个向量都做了 L2 归一化（模长为 1），则 $|\mathbf{a}-\mathbf{b}|^2 = 2 - 2\cos(\mathbf{a},\mathbf{b})$，两者本质等价。工程里余弦更常见，因为它天然落在 −1~1，阈值好设。</p>
 <h3 id="阈值判定11-验证-vs-1n-检索"><a class="header" href="#阈值判定11-验证-vs-1n-检索">阈值判定：1:1 验证 vs 1:N 检索</a></h3>
@@ -372,9 +360,7 @@ pub fn cosine_similarity(a: &amp;[f32], b: &amp;[f32]) -&gt; f32 {
 <h2 id="207-人脸库注册与-1n-检索"><a class="header" href="#207-人脸库注册与-1n-检索">20.7 人脸库：注册与 1:N 检索</a></h2>
 <p>1:N 检索需要一个<strong>人脸库（feature gallery，特征底库）</strong>：注册时把每个人的 id 和 embedding 存进去，识别时把当前脸的向量和库里<strong>所有</strong>向量算相似度，<strong>取最大的那个</strong>，再和阈值比。</p>
 <p>数据结构就是最朴素的 <strong><code>id → Vec&lt;f32&gt;</code></strong> 映射。这里再补一个关键的工程细节：<strong>入库前把向量做 L2 归一化</strong>（缩放到模长 1）。归一化之后，余弦相似度就退化成简单的<strong>点积</strong>，检索时省一半算力；更重要的是，它避免了“忘了归一化导致相似度乱套“这个高频坑。</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>/// L2 归一化：把向量缩放到模长为 1；之后余弦相似度 == 点积
+<pre><code class="language-rust ignore">/// L2 归一化：把向量缩放到模长为 1；之后余弦相似度 == 点积
 pub fn l2_normalize(v: &amp;mut [f32]) {
     let norm: f32 = v.iter().map(|x| x * x).sum::&lt;f32&gt;().sqrt();
     if norm &gt; 1e-8 {
@@ -409,12 +395,9 @@ impl FaceGallery {
             .map(|(id, emb)| (id.clone(), cosine_similarity(&amp;q, emb)))
             .max_by(|a, b| a.1.partial_cmp(&amp;b.1).unwrap()) // 取相似度最大的
     }
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
 <p>调用时再套上阈值，就是一个完整的识别判决：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>let threshold = 0.45; // 经验阈值，需按你的模型和场景实测微调
+<pre><code class="language-rust ignore">let threshold = 0.45; // 经验阈值，需按你的模型和场景实测微调
 match gallery.search(&amp;query_embedding) {
     Some((id, sim)) if sim &gt; threshold =&gt; {
         println!("识别为：{}（相似度 {:.3}）", id, sim);
@@ -423,16 +406,13 @@ match gallery.search(&amp;query_embedding) {
         println!("陌生人（最高相似度 {:.3}，未过阈值 {}）", sim, threshold);
     }
     None =&gt; println!("人脸库为空"),
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
 <blockquote>
 <p><strong>工程上通常会</strong>在库很大（几十万人）时，把逐一点积换成向量检索引擎（如 faiss、hnsw 的近似最近邻）来提速；小库直接线性扫足够快。这里保持“看得懂“优先。第 25 章会把这套检索接到“脸人绑定“上，让每个人体目标关联上一个身份。</p>
 </blockquote>
 <h3 id="串起来一次完整识别的代码"><a class="header" href="#串起来一次完整识别的代码">串起来：一次完整识别的代码</a></h3>
 <p>把前面四步拼成一个函数，你就能看清整条流水线的数据是怎么流动的。一张图里可能有多张脸，所以外层是个循环，每张脸独立走“对齐 → 提特征 → 检索“：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>/// 对一整幅图做人脸识别，返回每张脸的 (框, 识别结果)
+<pre><code class="language-rust ignore">/// 对一整幅图做人脸识别，返回每张脸的 (框, 识别结果)
 pub fn recognize_image(
     image: &amp;image::RgbImage,
     gallery: &amp;FaceGallery,
@@ -459,8 +439,7 @@ pub fn recognize_image(
         results.push((det.bbox, name)); // bbox 用于后续在原图上画标注
     }
     results
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
 <p><code>detect_faces</code> 和 <code>extract_embedding</code> 内部都是“预处理 → ONNX 推理 → 后处理“的老套路（第 14 章），本章不再展开；重点是看清<strong>四步如何交接</strong>：检测给出框和关键点，关键点喂给对齐，对齐结果喂给特征提取，特征向量喂给库检索——每一步的输出都恰好是下一步的输入。</p>
 <h2 id="208-活体检测与工程避坑"><a class="header" href="#208-活体检测与工程避坑">20.8 活体检测与工程避坑</a></h2>
 <p><strong>活体检测（liveness）</strong> 这里一句话带过：光有识别还不够，得防着有人拿<strong>照片、屏幕视频、面具</strong>冒充本人——活体检测就是判断“镜头前是不是一个活人“。它在真实门禁/支付里是<strong>必配</strong>的一环，缺了它，一张打印照片就能骗过整套系统。</p>

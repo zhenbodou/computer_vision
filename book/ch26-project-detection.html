@@ -37,10 +37,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-4d8e5ec0.js";
+            window.path_to_searchindex_js = "searchindex-ba421b3e.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-c1d54236.js"></script>
+        <script src="toc-68b1d651.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -255,8 +255,8 @@ edition = "2021"
 
 [dependencies]
 image = "0.25"                                    # 解码/编码 JPG/PNG，第 5 章
-ndarray = "0.16"                                  # 张量，第 3 章
-ort = { version = "2", features = ["ndarray"] }   # ONNX Runtime 绑定，第 14 章
+ndarray = "0.17"                                  # 与 ort rc.13 使用的 ndarray 主版本一致
+ort = { version = "=2.0.0-rc.13", features = ["ndarray"] } # ONNX Runtime 绑定，第 14 章
 anyhow = "1"                                      # 好用的错误处理
 clap = { version = "4", features = ["derive"] }   # 命令行解析
 imageproc = "0.25"                                # 画矩形、画文字
@@ -266,15 +266,13 @@ rayon = "1"                                       # 批量处理时的数据并�
 <p>几个工程提醒：</p>
 <ul>
 <li><strong><code>ort</code> 默认会自动下载对应平台的 ONNX Runtime 动态库</strong>，第一次编译会联网拉一份，无需自己装。若目标机器不能联网，要改用系统已装的库（见 <code>ort</code> 文档的 <code>load-dynamic</code>）。</li>
-<li><strong><code>ndarray</code> 版本必须和 <code>ort</code> 依赖的那份对上</strong>。这是新手常栽的隐坑：你的 <code>Array4&lt;f32&gt;</code> 和 <code>ort</code> 内部的 <code>ndarray::Array4&lt;f32&gt;</code> 若来自两个不同大版本，类型就“看起来一样其实不兼容“，编译报一堆莫名其妙的 trait 错。对不上时，最省事的办法是直接用 <code>ort</code> 重新导出的那个：<code>use ort::ndarray;</code>。</li>
+<li><strong><code>ndarray</code> 版本必须和 <code>ort</code> 依赖的那份对上</strong>。这是新手常栽的隐坑：你的 <code>Array4&lt;f32&gt;</code> 和 <code>ort</code> 使用的 ndarray 类型若来自两个不同大版本，就会“看起来一样其实不兼容“。上面的依赖统一锁在 <code>ndarray 0.17</code>；升级 <code>ort</code> 时要重新检查它的依赖版本。</li>
 <li><code>ab_glyph</code> 需要一个真实的 <code>.ttf</code> 字体文件。随便找一个开源字体（如 DejaVuSans）放进 <code>assets/</code> 即可；想画中文标签就换一个含中文字形的字体。</li>
 </ul>
 <hr>
 <h2 id="263-用-clap-定义命令行"><a class="header" href="#263-用-clap-定义命令行">26.3 用 clap 定义命令行</a></h2>
 <p>一个像样的 CLI 工具，参数要能自解释、能 <code>--help</code>。<strong>clap</strong> 的 derive 模式让我们只写一个结构体，命令行解析、类型转换、帮助文档全自动生成。</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use clap::Parser;
+<pre><code class="language-rust ignore">use clap::Parser;
 
 /// 端到端 YOLOv8 目标检测：输入一张图，输出画好框的图
 #[derive(Parser, Debug)]
@@ -304,8 +302,7 @@ struct Args {
     /// 不填则保留所有类别
     #[arg(long, value_delimiter = ',')]
     classes: Option&lt;Vec&lt;usize&gt;&gt;,
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
 <p>几处值得说的：</p>
 <ul>
 <li><code>#[arg(short, long)]</code> 让 <code>--input</code> 同时有短选项 <code>-i</code>；<code>default_value_t</code> 用于有 <code>Display</code> 的类型（数字），<code>default_value</code> 用于字符串。</li>
@@ -317,14 +314,15 @@ struct Args {
 <h2 id="264-主流程-run把四步串成一条线"><a class="header" href="#264-主流程-run把四步串成一条线">26.4 主流程 <code>run()</code>：把四步串成一条线</a></h2>
 <p>程序的核心是一个 <code>run()</code> 函数，返回 <code>anyhow::Result&lt;()&gt;</code>。<strong><code>anyhow</code> 让我们用 <code>?</code> 一路上抛错误、用 <code>.with_context()</code> 给错误加上“当时在干嘛“的上下文</strong>，出错时报的不是干巴巴的 <code>NotFound</code>，而是“打开图片失败: dog.jpg: No such file“。</p>
 <p>先看 <code>model.rs</code>——它把 Session 的加载、预热、推理封装成一个 <code>Detector</code>：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>// src/model.rs
-use anyhow::Result;
+<pre><code class="language-rust ignore">// src/model.rs
+use anyhow::{Context, Result};
+use image::RgbImage;
 use ndarray::{Array3, Array4, Ix3};
 use ort::session::Session;
+use ort::value::TensorRef;
+use crate::postprocess::Detection; // 第 16 章的统一检测结果类型
 
-/// 持有一个加载好的 ONNX Session。整个程序只该有一个。
+/// 持有一个加载好的 ONNX Session。单线程推理流水线只需创建一个并反复复用。
 pub struct Detector {
     session: Session,
 }
@@ -334,37 +332,59 @@ impl Detector {
     pub fn load(model_path: &amp;str) -&gt; Result&lt;Self&gt; {
         let session = Session::builder()?
             .commit_from_file(model_path)?;   // 从 .onnx 文件建 Session
-        let det = Detector { session };
+        let mut det = Detector { session };
         det.warmup()?;                        // 先空跑一次，见下方说明
         Ok(det)
     }
 
     /// 预热：拿一张全 0 假图先跑一次，触发内部的懒初始化和显存/内存分配。
     /// 这样正式计时或第一帧不会被"首次运行开销"拖慢——高帧率场景尤其明显。
-    fn warmup(&amp;self) -&gt; Result&lt;()&gt; {
+    fn warmup(&amp;mut self) -&gt; Result&lt;()&gt; {
         let dummy = Array4::&lt;f32&gt;::zeros((1, 3, 640, 640));
-        let _ = self.session.run(ort::inputs!["images" =&gt; dummy]?)?;
+        let _ = self.session.run(ort::inputs![
+            "images" =&gt; TensorRef::from_array_view(&amp;dummy)?
+        ])?;
         Ok(())
     }
 
     /// 跑一次前向，返回原始输出张量 [1, 84, 8400]
-    pub fn infer(&amp;self, input: Array4&lt;f32&gt;) -&gt; Result&lt;Array3&lt;f32&gt;&gt; {
+    pub fn infer(&amp;mut self, input: Array4&lt;f32&gt;) -&gt; Result&lt;Array3&lt;f32&gt;&gt; {
         // 输入名 "images" 是 Ultralytics 导出的约定；不同导出可能不同（26.7）
-        let outputs = self.session.run(ort::inputs!["images" =&gt; input]?)?;
+        let outputs = self.session.run(ort::inputs![
+            "images" =&gt; TensorRef::from_array_view(&amp;input)?
+        ])?;
         // 取出名为 "output0" 的输出，转成 f32 的三维视图 [1,84,8400]
         let view = outputs["output0"]
             .try_extract_array::&lt;f32&gt;()?          // → ArrayViewD&lt;f32&gt;
             .into_dimensionality::&lt;Ix3&gt;()?;       // → ArrayView3&lt;f32&gt;
         Ok(view.to_owned())                       // 拷成 owned，脱离 outputs 生命周期
     }
-}
-<span class="boring">}</span></code></pre>
+
+    /// 高层便捷方法：一帧原图 RgbImage → 一批**原图像素坐标**的 Detection。
+    /// 把 26.4 的三步（preprocess → infer → postprocess）打包成一次调用，
+    /// 用一组通用默认阈值（conf 0.25 / NMS IoU 0.45）。
+    /// 第 27、28 章的视频系统只需要「喂一帧、拿一批框」，用它最省事；
+    /// 要按命令行自定义阈值，仍可像 run_single 那样走 infer + postprocess 两步。
+    pub fn detect(&amp;mut self, img: &amp;RgbImage) -&gt; Result&lt;Vec&lt;Detection&gt;&gt; {
+        let (tensor, info) = crate::preprocess::preprocess(img, 640);
+        let output = self.infer(tensor)?;
+        let flat = output.as_slice().context("模型输出不是连续内存")?;
+        Ok(crate::postprocess::postprocess(
+            flat,
+            info.scale,
+            (info.pad_x, info.pad_y),
+            0.25, // 默认 conf：偏低，让上层按业务再过滤（如第 27 章的 score_thresh）
+            0.45, // 默认 NMS IoU
+        ))
+    }
+}</code></pre>
 <blockquote>
-<p>关于 <code>ort</code> 的两处版本差异（<code>ort</code> 2.x 还在迭代，以你 <code>cargo add ort</code> 拉到的版本文档为准）：一是喂输入，有的版本能直接把 <code>Array4</code> 传进 <code>ort::inputs!</code>，有的要先 <code>Tensor::from_array(input)?</code> 再传；二是取输出，拿 ndarray 视图的方法名可能是 <code>try_extract_array</code> 或 <code>try_extract_tensor</code>。逻辑不变——<strong>进去一个 <code>[1,3,640,640]</code>，出来一个 <code>[1,84,8400]</code></strong>。</p>
+<p>关于 <code>ort</code> 的两处版本差异（<code>ort</code> 2.x 还在迭代，以你 <code>cargo add ort</code> 拉到的版本文档为准）：一是喂输入，有的版本能直接把 <code>Array4</code> 传进 <code>ort::inputs!</code>，当前锁定版本可用 <code>TensorRef::from_array_view(&amp;input)?</code> 借用连续数组；二是取输出，拿 ndarray 视图的方法名可能是 <code>try_extract_array</code> 或 <code>try_extract_tensor</code>。逻辑不变——<strong>进去一个 <code>[1,3,640,640]</code>，出来一个 <code>[1,84,8400]</code></strong>。</p>
 </blockquote>
 <p><code>infer</code> 里 <code>to_owned()</code> 把输出拷成独立的 <code>Array3</code>，代价是复制约 84×8400≈70 万个 <code>f32</code>（约 2.7 MB），单张图完全无所谓；要跑高帧率视频再考虑把后处理直接放进这里、避免拷贝。</p>
+<p><code>infer</code> 之外还多给了一个 <code>detect(&amp;img)</code>：它把“预处理 → 推理 → 后处理“三步打成一次调用，直接吐出原图坐标的 <code>Vec&lt;Detection&gt;</code>。本章的 <code>run_single</code> 因为要把命令行的 <code>--conf/--iou</code> 透传下去，仍然显式走三步；但<strong>第 27、28 章的视频系统只关心“喂一帧、拿一批框“</strong>，那里统一调 <code>detector.detect(frame)?</code> 就够了——这也是为什么把它做成 <code>Detector</code> 的方法。注意它返回 <code>Result</code>（推理可能因显存、形状不符等真实原因失败），所以<strong>下游的 <code>process_frame</code> 也要返回 <code>Result</code></strong>，主循环里用 <code>if let Err(e) = ...</code> 跳过坏帧、别让一帧异常掀翻整条 7×24 的流水线。</p>
 <p>再看 <code>main.rs</code> 的 <code>run()</code>——<strong>这就是那张数据流图的代码化</strong>：</p>
-<pre class="playground"><code class="language-rust">// src/main.rs
+<pre><code class="language-rust ignore">// src/main.rs
 mod preprocess;
 mod model;
 mod postprocess;
@@ -376,12 +396,13 @@ use model::Detector;
 
 fn main() -&gt; Result&lt;()&gt; {
     let args = Args::parse();
-    run_single(&amp;Detector::load(&amp;args.model)
-        .with_context(|| format!("加载模型失败: {}", args.model))?, &amp;args.input, &amp;args)
+    let mut detector = Detector::load(&amp;args.model)
+        .with_context(|| format!("加载模型失败: {}", args.model))?;
+    run_single(&amp;mut detector, &amp;args.input, &amp;args)
 }
 
 /// 处理单张图：解码 → 预处理 → 推理 → 后处理 → 画框保存
-fn run_single(detector: &amp;Detector, input: &amp;str, args: &amp;Args) -&gt; Result&lt;()&gt; {
+fn run_single(detector: &amp;mut Detector, input: &amp;str, args: &amp;Args) -&gt; Result&lt;()&gt; {
     // ① 解码：读图并转成 RGB8（第 5 章）
     let img = image::open(input)
         .with_context(|| format!("打开图片失败: {}", input))?
@@ -394,7 +415,14 @@ fn run_single(detector: &amp;Detector, input: &amp;str, args: &amp;Args) -&gt; R
     let output = detector.infer(tensor)?;
 
     // ④ 后处理：解码 + 阈值 + 坐标还原 + 按类 NMS，得到原图坐标的干净框（第 16 章）
-    let mut dets = postprocess::postprocess(&amp;output.view(), &amp;info, args.conf, args.iou);
+    let flat = output.as_slice().context("模型输出不是连续内存")?;
+    let mut dets = postprocess::postprocess(
+        flat,
+        info.scale,
+        (info.pad_x, info.pad_y),
+        args.conf,
+        args.iou,
+    );
 
     // 可选：只保留命令行指定的类别
     if let Some(keep) = &amp;args.classes {
@@ -419,31 +447,34 @@ fn run_single(detector: &amp;Detector, input: &amp;str, args: &amp;Args) -&gt; R
     println!("已保存到 {}", args.output);
     Ok(())
 }</code></pre>
-<p>注意 <code>Detector::load</code> 在 <code>main</code> 里<strong>只调用一次</strong>，再把 <code>&amp;Detector</code> 传给处理函数。加载模型（读文件、建计算图、分配算子）是整个流程里最贵的一步，几百毫秒起步——<strong>每处理一张图就重建一次 Session，是新手最容易犯、也最拖性能的错</strong>（26.6 会再强调）。模型加载一次、反复复用，是所有推理服务的铁律。</p>
-<p><code>postprocess(&amp;output.view(), &amp;info, args.conf, args.iou)</code> 这行把第 16 章的后处理接上：<code>output.view()</code> 拿到 <code>ArrayView3</code>，<code>info</code> 是预处理时记下的 <code>LetterboxInfo</code>（含 <code>scale</code>、<code>pad_x</code>、<code>pad_y</code>、原图宽高），后处理内部据此把框从 640 letterbox 坐标还原回原图像素——<strong>预处理和后处理靠 <code>LetterboxInfo</code> 这根扁担串起来</strong>，一头挑着“当初怎么缩放填充的“，一头据此“倒着还原回去“。</p>
+<p>注意 <code>Detector::load</code> 在 <code>main</code> 里<strong>只调用一次</strong>，再把 <code>&amp;mut Detector</code> 传给处理函数。加载模型（读文件、建计算图、分配算子）是整个流程里最贵的一步，几百毫秒起步——<strong>每处理一张图就重建一次 Session，是新手最容易犯、也最拖性能的错</strong>（26.6 会再强调）。模型加载一次、反复复用，是所有推理服务的铁律。</p>
+<p>这里先用 <code>output.as_slice()</code> 取得第 16 章 <code>postprocess</code> 所需的连续切片，再从 <code>LetterboxInfo</code> 传入 <code>scale</code> 和 <code>(pad_x, pad_y)</code>。后处理据此把框从 640 letterbox 坐标还原回原图像素——<strong>预处理和后处理靠 <code>LetterboxInfo</code> 这根扁担串起来</strong>，一头记着“当初怎么缩放填充的“，一头据此“倒着还原回去“。</p>
 <hr>
 <h2 id="265-画框与标签"><a class="header" href="#265-画框与标签">26.5 画框与标签</a></h2>
 <p>后处理吐出的 <code>Vec&lt;Detection&gt;</code> 每个都带着原图坐标、类别号、置信度。画图要做三件事：<strong>画矩形框、写“类别名 置信度%“、给不同类别配不同颜色</strong>。用 <code>imageproc</code> 画形状和文字，用 <code>ab_glyph</code> 加载字体。</p>
 <p>先是 COCO 80 类的类别名。顺序不能乱——第几个名字对应类别号几，必须和模型训练时一致（Ultralytics 官方顺序）：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>// src/draw.rs
-/// COCO 80 类名（顺序必须与模型一致）。此处为片段，完整 80 个照抄官方顺序。
+<pre><code class="language-rust ignore">// src/draw.rs
+/// COCO 80 类名（顺序必须与模型一致）。
 pub const COCO_NAMES: [&amp;str; 80] = [
     "person", "bicycle", "car", "motorcycle", "airplane", "bus", "train",
     "truck", "boat", "traffic light", "fire hydrant", "stop sign",
     "parking meter", "bench", "bird", "cat", "dog", "horse", "sheep", "cow",
-    // … 省略中间 60 个，务必补齐到 80 个、顺序不能错 …
+    "elephant", "bear", "zebra", "giraffe", "backpack", "umbrella", "handbag",
+    "tie", "suitcase", "frisbee", "skis", "snowboard", "sports ball", "kite",
+    "baseball bat", "baseball glove", "skateboard", "surfboard", "tennis racket",
+    "bottle", "wine glass", "cup", "fork", "knife", "spoon", "bowl", "banana",
+    "apple", "sandwich", "orange", "broccoli", "carrot", "hot dog", "pizza",
+    "donut", "cake", "chair", "couch", "potted plant", "bed", "dining table",
+    "toilet", "tv", "laptop", "mouse", "remote", "keyboard", "cell phone",
+    "microwave", "oven", "toaster", "sink", "refrigerator", "book", "clock",
+    "vase", "scissors", "teddy bear",
     "hair drier", "toothbrush",
-];
-<span class="boring">}</span></code></pre>
+];</code></pre>
 <blockquote>
 <p>验证一下我们熟悉的几个：数组下标 0 是 <code>person</code>、2 是 <code>car</code>、15 是 <code>cat</code>、16 是 <code>dog</code>——和全书约定一致。少一个、错一位，画出来就会“狗标成猫“，而且不报错，极难发现。</p>
 </blockquote>
 <p>配色：同一类别永远同一个颜色（这样一眼能分清“哪些是人、哪些是车“）。不必真去查表，用类别号<strong>散列</strong>出一个稳定颜色即可：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use image::Rgb;
+<pre><code class="language-rust ignore">use image::Rgb;
 
 /// 由类别号散列出一个稳定颜色：同类同色、异类多半异色
 fn color_for_class(class_id: usize) -&gt; Rgb&lt;u8&gt; {
@@ -451,26 +482,23 @@ fn color_for_class(class_id: usize) -&gt; Rgb&lt;u8&gt; {
     let g = (91 * (class_id + 1) % 200 + 40) as u8;
     let b = (167 * (class_id + 1) % 200 + 40) as u8;
     Rgb([r, g, b])  // +40 是为了避开太暗的颜色，画在深色背景上也看得见
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
 <p>然后是画框和标签的主函数：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use ab_glyph::{FontRef, PxScale};
-use anyhow::Result;
+<pre><code class="language-rust ignore">use ab_glyph::{FontArc, PxScale};
+use anyhow::{anyhow, Result};
 use image::RgbImage;
 use imageproc::drawing::{draw_filled_rect_mut, draw_hollow_rect_mut, draw_text_mut};
 use imageproc::rect::Rect;
 use crate::postprocess::Detection;
 
-/// 加载字体（ab_glyph 需要一个 ttf）。把字体编进二进制，免得部署时丢文件
-pub fn load_font() -&gt; Result&lt;FontRef&lt;'static&gt;&gt; {
-    let bytes = include_bytes!("../assets/DejaVuSans.ttf");
-    Ok(FontRef::try_from_slice(bytes)?)
+/// 加载字体（ab_glyph 需要一个真实存在的 ttf 文件）。
+pub fn load_font() -&gt; Result&lt;FontArc&gt; {
+    let bytes = std::fs::read("assets/DejaVuSans.ttf")?;
+    FontArc::try_from_vec(bytes).map_err(|_| anyhow!("无效的字体文件: assets/DejaVuSans.ttf"))
 }
 
 /// 在图上画出所有检测框 + 标签
-pub fn draw_detections(img: &amp;mut RgbImage, dets: &amp;[Detection], font: &amp;FontRef) {
+pub fn draw_detections(img: &amp;mut RgbImage, dets: &amp;[Detection], font: &amp;FontArc) {
     let (iw, ih) = (img.width() as i32, img.height() as i32);
     for d in dets {
         let color = color_for_class(d.class_id);
@@ -499,29 +527,22 @@ pub fn draw_detections(img: &amp;mut RgbImage, dets: &amp;[Detection], font: &am
         draw_filled_rect_mut(img, Rect::at(x1, bar_y).of_size(bar_w, bar_h as u32), color);
         draw_text_mut(img, Rgb([255, 255, 255]), x1 + 2, bar_y + 2, scale, font, &amp;label);
     }
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
 <p>几个工程细节：</p>
 <ul>
 <li><strong>1 像素的框在高分辨率图上细得几乎看不见</strong>，所以用三层同心矩形凑出 3px 粗细，这是最省事的“加粗“办法。</li>
 <li><strong>白字直接写在图上常常糊成一团</strong>（背景可能也是浅色），所以先铺一条与框同色的实心底衬，再写白字，对比度立刻拉满。</li>
-<li><strong>字体用 <code>include_bytes!</code> 编进可执行文件</strong>，部署时就一个二进制、不怕字体文件丢失。想省体积再改成运行时读文件。</li>
+<li>示例从 <code>assets/DejaVuSans.ttf</code> 运行时加载字体，因此开始前要把字体文件放到该路径。若希望部署时只带一个二进制，可在项目确实包含该文件后改用 <code>include_bytes!</code>。</li>
 </ul>
 <hr>
 <h2 id="266-批量处理一整个文件夹"><a class="header" href="#266-批量处理一整个文件夹">26.6 批量处理一整个文件夹</a></h2>
 <p>单张图跑通后，真实需求往往是“把这个文件夹里几百张图全检测一遍“。这里正好演示两件工程事：<strong>遍历目录</strong>和<strong>用 <code>rayon</code> 并行</strong>。</p>
-<p>关键认知：<strong>ONNX Runtime 的 <code>Session</code> 是线程安全的，<code>&amp;Session</code> 可以被多个线程并发调用 <code>run</code></strong>。所以我们<strong>加载一次模型</strong>，然后让多张图在多个线程上共享这同一个 <code>&amp;Detector</code> 并行推理——不用给每张图各建一个 Session。</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use rayon::prelude::*;
+<p>关键认知：本书锁定的 <code>ort 2.0.0-rc.13</code> 中，<code>Session::run</code> 需要 <code>&amp;mut Session</code>，不能把同一个 <code>&amp;Session</code> 交给多个线程同时 <code>run</code>。批处理若要并发推理，可以让<strong>每个 Rayon 工作线程各自创建并长期复用一个 <code>Detector</code></strong>；代价是每个线程各占一份模型内存。显存或内存紧张时，更稳妥的方案是保留一个推理线程，用 batch 提高吞吐。</p>
+<pre><code class="language-rust ignore">use rayon::prelude::*;
 use std::path::{Path, PathBuf};
 
-/// 处理一个目录：加载一次模型，rayon 并行跑所有图
+/// 处理一个目录：每个 Rayon 工作线程加载并复用一个模型
 fn run_dir(dir: &amp;Path, args: &amp;Args) -&gt; Result&lt;()&gt; {
-    // 模型只加载一次！下面所有图共享这一个 detector
-    let detector = Detector::load(&amp;args.model)
-        .with_context(|| format!("加载模型失败: {}", args.model))?;
-
     // 收集目录下所有 jpg/png
     let paths: Vec&lt;PathBuf&gt; = std::fs::read_dir(dir)?
         .filter_map(|e| e.ok().map(|e| e.path()))
@@ -531,24 +552,38 @@ fn run_dir(dir: &amp;Path, args: &amp;Args) -&gt; Result&lt;()&gt; {
         ))
         .collect();
     println!("共 {} 张图待处理", paths.len());
+    std::fs::create_dir_all(&amp;args.output)?;
 
-    // 并行处理：par_iter 把这些图分到多个线程，每个线程共用 &amp;detector
-    paths.par_iter().for_each(|path| {
-        match process_one(&amp;detector, path, args) {
-            Ok(n) =&gt; println!("{}: {} 个目标", path.display(), n),
-            // 单张失败不该拖垮整批：打印错误、跳过、继续
-            Err(e) =&gt; eprintln!("{} 处理失败: {:#}", path.display(), e),
+    // for_each_init 的初始化器每个工作线程只执行一次，不会每张图重建 Session。
+    paths.par_iter().for_each_init(
+        || Detector::load(&amp;args.model),
+        |detector, path| match detector {
+            Ok(detector) =&gt; match process_one(detector, path, args) {
+                Ok(n) =&gt; println!("{}: {} 个目标", path.display(), n),
+                Err(e) =&gt; eprintln!("{} 处理失败: {:#}", path.display(), e),
+            },
+            Err(e) =&gt; eprintln!("工作线程加载模型失败: {:#}", e),
         }
-    });
+    );
     Ok(())
 }
 
 /// 处理单张并存盘，输出文件名在原名前加 "det_"
-fn process_one(detector: &amp;Detector, path: &amp;Path, args: &amp;Args) -&gt; Result&lt;usize&gt; {
+fn process_one(detector: &amp;mut Detector, path: &amp;Path, args: &amp;Args) -&gt; Result&lt;usize&gt; {
     let img = image::open(path)?.to_rgb8();
     let (tensor, info) = preprocess::preprocess(&amp;img, 640);
     let output = detector.infer(tensor)?;
-    let dets = postprocess::postprocess(&amp;output.view(), &amp;info, args.conf, args.iou);
+    let flat = output.as_slice().context("模型输出不是连续内存")?;
+    let mut dets = postprocess::postprocess(
+        flat,
+        info.scale,
+        (info.pad_x, info.pad_y),
+        args.conf,
+        args.iou,
+    );
+    if let Some(keep) = &amp;args.classes {
+        dets.retain(|d| keep.contains(&amp;d.class_id));
+    }
 
     let mut canvas = img;
     let font = draw::load_font()?;
@@ -559,21 +594,20 @@ fn process_one(detector: &amp;Detector, path: &amp;Path, args: &amp;Args) -&gt; 
     let out = Path::new(&amp;args.output).join(format!("det_{name}"));
     canvas.save(&amp;out)?;
     Ok(dets.len())
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
 <p><code>main</code> 里根据 <code>--input</code> 是文件还是目录分流即可：</p>
-<pre class="playground"><code class="language-rust">fn main() -&gt; Result&lt;()&gt; {
+<pre><code class="language-rust ignore">fn main() -&gt; Result&lt;()&gt; {
     let args = Args::parse();
     let input = Path::new(&amp;args.input);
     if input.is_dir() {
         run_dir(input, &amp;args)                                   // 批量
     } else {
-        let detector = Detector::load(&amp;args.model)?;
-        run_single(&amp;detector, &amp;args.input, &amp;args)               // 单张
+        let mut detector = Detector::load(&amp;args.model)?;
+        run_single(&amp;mut detector, &amp;args.input, &amp;args)           // 单张
     }
 }</code></pre>
 <blockquote>
-<p><strong>每张图重建 Session 是大坑。</strong> 这是第 24、29 章反复强调的口径——“重活只做一次”。有人图省事，把 <code>Session::builder()...commit_from_file()</code> 写进循环体里，结果 90% 的时间耗在反复加载模型上，推理本身反而没花多少。模型加载一次、反复复用；<code>rayon</code> 并行的是“图“，不是“模型“。</p>
+<p><strong>每张图重建 Session 是大坑。</strong> 这是第 14、29 章反复强调的口径——“重活只做一次”。有人图省事，把 <code>Session::builder()...commit_from_file()</code> 写进图片循环体里，结果大量时间耗在反复加载模型上。上面的并行版是每个工作线程创建一次、随后反复复用；若一份模型已经很占内存，就只保留一个推理线程或改用 batch。</p>
 </blockquote>
 <p>还有一层要留个心眼：<strong><code>rayon</code> 的数据并行和 ONNX Runtime 内部的算子并行会叠加</strong>。ort 默认会开多个线程加速单次 <code>run</code>（intra-op 线程），你再用 <code>rayon</code> 同时跑好几张图，两边的线程数一乘可能远超 CPU 核数，线程互相抢占反而变慢。真要压满吞吐时，通常会把 ort 的 intra-op 线程数调小（甚至设 1），把并行度交给 <code>rayon</code> 那一层——这类调优是第 29 章的主题，这里先知道有这么回事。</p>
 <hr>
@@ -590,10 +624,10 @@ fn process_one(detector: &amp;Detector, path: &amp;Path, args: &amp;Args) -&gt; 
 <tr><td>取 <code>output0</code> 失败 / 提取张量报维度错</td><td>输出名不叫 <code>output0</code>，或形状其实是 <code>[1,8400,84]</code></td><td>打印输出名和 shape（第 12 章）；布局是 <code>[1,8400,84]</code> 时后处理取值方式要变（第 16 章）</td></tr>
 <tr><td>一个框都没有</td><td><code>--conf</code> 太高全被筛掉；或模型是“裸“导出、分数还是 logit 没过 sigmoid</td><td>先把 <code>--conf</code> 降到 0.05 看有没有候选；确认导出是否已激活（第 16 章 16.4）</td></tr>
 <tr><td>框位置全错、缩在左上角</td><td>自己瞎解码时把 <code>cxcywh</code> 当 <code>xyxy</code>，或内存布局取反</td><td>别手写解码，交给第 16 章验证过的 <code>postprocess</code></td></tr>
-<tr><td>框整体偏移、套不准</td><td>后处理没拿到正确的 <code>scale</code>/<code>pad</code>（<code>LetterboxInfo</code> 传错）</td><td>确认预处理返回的 <code>info</code> 原样传给了 <code>postprocess</code>（26.4）</td></tr>
+<tr><td>框整体偏移、套不准</td><td>后处理没拿到正确的 <code>scale</code>/<code>pad</code></td><td>确认传给 <code>postprocess</code> 的参数来自同一张图的 <code>info.scale/info.pad_x/info.pad_y</code>（26.4）</td></tr>
 <tr><td>画出来颜色发蓝、发怪</td><td>RGB/BGR 弄反了</td><td>全程用 RGB（<code>image</code> 默认就是 RGB）；只有 OpenCV 那套才是 BGR（第 4 章）</td></tr>
 <tr><td>框比物体偏了一截</td><td>原图带 EXIF 旋转信息，<code>image</code> 没自动转正</td><td>读图后按 EXIF orientation 先把图转正再检测</td></tr>
-<tr><td>编译报一堆 <code>ndarray</code> 类型不匹配</td><td>你的 <code>ndarray</code> 版本和 <code>ort</code> 依赖的不是同一个大版本</td><td>对齐版本，或直接 <code>use ort::ndarray;</code>（26.2）</td></tr>
+<tr><td>编译报一堆 <code>ndarray</code> 类型不匹配</td><td>你的 <code>ndarray</code> 版本和 <code>ort</code> 依赖的不是同一个大版本</td><td>按 26.2 将两者对齐；本书锁定为 <code>ndarray 0.17</code> + <code>ort 2.0.0-rc.13</code></td></tr>
 </tbody>
 </table>
 </div>
@@ -606,9 +640,9 @@ fn process_one(detector: &amp;Detector, path: &amp;Path, args: &amp;Args) -&gt; 
 <li><strong>clap derive</strong> 把参数变成一个结构体，<code>--input/--model/--conf/--iou/--output/--classes</code> 一应俱全，还白送 <code>--help</code>；调阈值不用改代码。</li>
 <li><strong><code>run()</code> 用 <code>anyhow::Result</code> 串起五步</strong>，<code>?</code> 上抛、<code>.with_context()</code> 加上下文；模型 <code>load</code> 一次、<code>warmup</code> 一次，是性能的第一条铁律。</li>
 <li><strong>画框靠 <code>imageproc</code> + <code>ab_glyph</code></strong>：三层矩形加粗、色条底衬白字、按类别散列配色，同类同色。</li>
-<li><strong>批量用 <code>rayon</code> 并行</strong>，多张图共享同一个 <code>&amp;Session</code>（线程安全）；切记模型只加载一次，别在循环里重建 Session；注意 rayon 与 ort 内部线程会叠加。</li>
+<li><strong>批量用 <code>rayon</code> 并行</strong>，每个工作线程各持有并复用一个 <code>Session</code>；不要每张图重建，也不要在 <code>ort 2.0.0-rc.13</code> 下共享同一个 Session 并发 <code>run</code>。线程数还会与 ORT 内部线程叠加，需要实测并限制。</li>
 </ul>
-<p>下一章（第 27 章）会把这个“单张图检测器“升级成<strong>周界入侵报警系统</strong>：接入视频流逐帧检测、加空间过滤器（ROI/拌线，第 22、23 章）、把“检测到人“变成“该不该报警“。第 28 章再叠上跟踪与人脸抓拍。本章这个骨架，就是它们共同的地基。</p>
+<p>下一章（第 27 章）会把这个“单张图检测器“升级成<strong>周界入侵报警系统</strong>：接入视频流逐帧检测、加空间过滤器（ROI/绊线，第 22、23 章）、把“检测到人“变成“该不该报警“。第 28 章再叠上跟踪与人脸抓拍。本章这个骨架，就是它们共同的地基。</p>
 <h2 id="269-练习"><a class="header" href="#269-练习">26.9 练习</a></h2>
 <ol>
 <li><strong>加 <code>--save-crops</code></strong>：新增一个开关参数，打开后把每个检测框从原图里<strong>抠出来</strong>（<code>image::imageops::crop</code> 或按坐标取子图），按 <code>类别名_序号.jpg</code> 存进一个 <code>crops/</code> 目录。想想坐标要不要先 clamp 到图像范围内，否则抠图会 panic。</li>

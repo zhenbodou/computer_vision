@@ -259,7 +259,7 @@ CHW 之上，模型输入最外层还要再套一个维度 **N（batch，一批�
 
 如果你用 `ndarray` 的 `permuted_axes` 来做 HWC→CHW，会有个陷阱——**它只是换了"看数据的角度"，底层内存一个字节都没动**，得到的是一个**非连续视图**：
 
-```rust
+```rust,ignore
 use ndarray::Array3;
 
 // 假设已有一个 HWC 的 f32 数组，形状 [640, 640, 3]
@@ -290,7 +290,7 @@ cargo add image ndarray
 
 然后是完整实现（可编译）：
 
-```rust
+```rust,ignore
 use image::{imageops::FilterType, RgbImage};
 use ndarray::Array4;
 
@@ -321,9 +321,12 @@ pub fn preprocess(img: &RgbImage, target: u32) -> (Array4<f32>, LetterboxInfo) {
     let new_w = (orig_w as f32 * scale).round() as u32;
     let new_h = (orig_h as f32 * scale).round() as u32;
 
-    // ③ 居中放置：左右/上下各留多少灰边
-    let pad_x = (target as f32 - new_w as f32) / 2.0;
-    let pad_y = (target as f32 - new_h as f32) / 2.0;
+    // ③ 居中放置：左/上边距取整；若总边距为奇数，多出的 1 像素放到右/下。
+    //    记录的 pad 必须和真正写入画布的整数偏移完全一致，否则反算坐标会偏半个像素。
+    let off_x = ((target - new_w) / 2) as usize;
+    let off_y = ((target - new_h) / 2) as usize;
+    let pad_x = off_x as f32;
+    let pad_y = off_y as f32;
 
     // ④ 等比缩放(插值算法原理见第 9 章；这里用双线性 Triangle，和 YOLO 默认一致)
     let resized = image::imageops::resize(img, new_w, new_h, FilterType::Triangle);
@@ -335,8 +338,6 @@ pub fn preprocess(img: &RgbImage, target: u32) -> (Array4<f32>, LetterboxInfo) {
 
     // ⑥ 把缩放后的像素写入张量：一次遍历同时完成
     //    HWC→CHW 布局转换、u8→f32、/255 归一化、以及居中平移。
-    let off_x = pad_x.round() as usize;
-    let off_y = pad_y.round() as usize;
     for y in 0..new_h as usize {
         for x in 0..new_w as usize {
             let px = resized.get_pixel(x as u32, y as u32); // &Rgb<u8>
@@ -354,7 +355,7 @@ pub fn preprocess(img: &RgbImage, target: u32) -> (Array4<f32>, LetterboxInfo) {
 
 怎么用它：
 
-```rust
+```rust,ignore
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 第 3 章：读图并转成 RGB(RgbImage)
     let img = image::open("street.jpg")?.to_rgb8();

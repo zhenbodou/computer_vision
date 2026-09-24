@@ -37,10 +37,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-4d8e5ec0.js";
+            window.path_to_searchindex_js = "searchindex-ba421b3e.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-c1d54236.js"></script>
+        <script src="toc-68b1d651.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -304,9 +304,7 @@ $$</p>
 <p><strong>最后一步和检测框一模一样</strong>：从“模型输入坐标系“还原回<strong>原图</strong>，要逆着预处理时做的几何变换来一遍——letterbox 就减 pad、除 scale（第 10 章、第 16 章反复讲的那套），裁剪-缩放就套裁剪的逆变换。这条“预处理做了啥、后处理就逆着做啥“的镜像原则（第 10 章 10.9 节），在关键点这里同样成立。</p>
 <h3 id="代码argmax--缩放到输入坐标"><a class="header" href="#代码argmax--缩放到输入坐标">代码：argmax + 缩放到输入坐标</a></h3>
 <p>先写一个“在一张热力图上找峰值“的函数，再写“把 K 张热力图批量解码“的函数：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use ndarray::{ArrayView2, ArrayView3, Axis};
+<pre><code class="language-rust ignore">use ndarray::{ArrayView2, ArrayView3, Axis};
 
 // 复用本章 17.6 会定义的 Keypoint（这里先假设它已存在）
 
@@ -345,8 +343,7 @@ fn decode_heatmaps(heatmaps: ArrayView3&lt;f32&gt;, input_w: f32, input_h: f32) 
         kps.push(Keypoint { x, y, score });
     }
     kps
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
 <blockquote>
 <p><strong>工程上通常会</strong>在 argmax 之后再做一次<strong>亚像素微调</strong>：看峰值格子上下左右邻居的数值，往数值更大的方向偏移零点几个格子（经典做法叫 DARK / 泰勒展开修正）。这能显著提升精度，但原理不变——本书先掌握“argmax + 缩放“这条主干。</p>
 </blockquote>
@@ -373,10 +370,8 @@ fn decode_heatmaps(heatmaps: ArrayView3&lt;f32&gt;, input_w: f32, input_h: f32) 
 <p>候选还没去重——多个候选可能框住同一个人。<strong>去重靠 NMS</strong>（非极大值抑制），做法和第 16 章检测的 NMS 一模一样（按框 IoU 抑制，抑制时把整条 56 个数一起丢弃或保留）。本章不重复 NMS，只聚焦“关键点这部分怎么解出来、怎么还原、怎么画“。</p>
 <hr>
 <h2 id="176-统一数据类型keypoint-与-pose"><a class="header" href="#176-统一数据类型keypoint-与-pose">17.6 统一数据类型：Keypoint 与 Pose</a></h2>
-<p>按全书惯例（写作规范第 6 节），一个新概念先定好统一的数据结构，全书复用。关键点这里新增两个类型，并<strong>直接复用第 3 / 16 章的 <code>BBox</code></strong>，不另起炉灶：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>/// 边界框：左上-右下像素坐标（全书统一类型，见第 3、16 章，此处直接复用）
+<p>按全书惯例，一个新概念先定好统一的数据结构，全书复用。关键点这里新增两个类型，并<strong>直接复用第 3 / 16 章的 <code>BBox</code></strong>，不另起炉灶：</p>
+<pre><code class="language-rust ignore">/// 边界框：左上-右下像素坐标（全书统一类型，见第 3、16 章，此处直接复用）
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct BBox {
     pub x1: f32,
@@ -399,8 +394,7 @@ pub struct Pose {
     pub keypoints: Vec&lt;Keypoint&gt;, // 顺序固定！索引含义见 17.2 的 COCO 17 点表
     pub bbox: BBox,               // 这个人的框（复用统一 BBox）
     pub score: f32,               // 整个人的置信度（YOLOv8-pose 输出的第 5 个数）
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
 <p>设计要点：</p>
 <ul>
 <li><code>Keypoint.score</code> 是<strong>每个点各自</strong>的置信度，<code>Pose.score</code> 是<strong>整个人</strong>的置信度，两者不是一回事。画图时用前者决定“这个点画不画“，用后者决定“这个人要不要“。</li>
@@ -410,9 +404,7 @@ pub struct Pose {
 <hr>
 <h2 id="177-坐标还原到原图--可见性过滤"><a class="header" href="#177-坐标还原到原图--可见性过滤">17.7 坐标还原到原图 + 可见性过滤</a></h2>
 <p>模型吐出来的坐标，都在 640×640 那张 letterbox 画布里。要画到原图上、要算真实世界的动作，必须先<strong>还原回原图像素坐标</strong>。这一步和第 16 章还原检测框<strong>用的是同一把钥匙</strong>——第 10 章预处理时存下来的 <code>LetterboxInfo</code>：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>/// 第 10 章预处理留下的"回执"：怎么缩放、怎么填边，还原坐标全靠它
+<pre><code class="language-rust ignore">/// 第 10 章预处理留下的"回执"：怎么缩放、怎么填边，还原坐标全靠它
 #[derive(Clone, Copy, Debug)]
 pub struct LetterboxInfo {
     pub scale: f32,   // 原图 → 640 画布的等比缩放系数
@@ -420,16 +412,13 @@ pub struct LetterboxInfo {
     pub pad_y: f32,   // 顶部灰边高度
     pub orig_w: u32,  // 原图宽（还原后夹取边界用）
     pub orig_h: u32,  // 原图高
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
 <p>还原公式就是第 10 章那条镜像逆运算（先减 pad、再除 scale）：</p>
 <p>$$
 x_{\text{原图}} = \frac{x_{\text{模型}} - \text{pad_x}}{\text{scale}}, \qquad y_{\text{原图}} = \frac{y_{\text{模型}} - \text{pad_y}}{\text{scale}}
 $$</p>
 <p>关键点和框坐标都套这条公式。把 17.5 拆好的 <code>[1,56,8400]</code> 结构、加上还原，写成一个“解码一个候选“的函数——它几乎就是第 16 章检测解码的“加长版“，只是多解了后面 51 个关键点数：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use ndarray::ArrayView3;
+<pre><code class="language-rust ignore">use ndarray::ArrayView3;
 
 /// 把一个关键点从 640 letterbox 坐标还原回原图（和框还原同一套公式）
 fn restore_keypoint(kx: f32, ky: f32, score: f32, lb: &amp;LetterboxInfo) -&gt; Keypoint {
@@ -474,8 +463,7 @@ fn decode_one_pose(
     }
 
     Some(Pose { keypoints, bbox, score: person_score })
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
 <p>注意 <code>base = 5 + k * 3</code> 这个下标：前 5 个槽被“框 4 + 人置信度 1“占掉，从第 5 个（索引 5）起，每个关键点连续占 3 个槽。这类“按固定步长拆一长条数字“的活儿，写错一格就全偏，务必和输出定义（17.5）对齐着写。</p>
 <h3 id="可见性过滤遮挡的点不要画"><a class="header" href="#可见性过滤遮挡的点不要画">可见性过滤：遮挡的点不要画</a></h3>
 <p>关键点有个和框很不一样的特性：<strong>一个人身上，总有些点是看不见的</strong>——背对镜头时脸上的点、被桌子挡住的腿。模型对这些点会给一个<strong>很低的可见性分数</strong>。工程上的规矩是：</p>
@@ -487,9 +475,7 @@ fn decode_one_pose(
 <h2 id="178-骨架连线把点连成火柴人"><a class="header" href="#178-骨架连线把点连成火柴人">17.8 骨架连线：把点连成火柴人</a></h2>
 <p>17 个孤零零的点，人眼看着费劲。把它们按人体结构<strong>连成线</strong>，就成了一目了然的“火柴人“。连哪两个点，由一张预定义的**骨架（skeleton）**表决定——它就是一组“该连线的点对“。</p>
 <p>用点的索引（0~16，见 17.2）把骨架边列出来。下面是一套常用的 COCO 骨架连线（0 基索引的点对）：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>/// COCO 17 点的骨架边：每个元组是"该连线的两个关键点索引"（0 基）
+<pre><code class="language-rust ignore">/// COCO 17 点的骨架边：每个元组是"该连线的两个关键点索引"（0 基）
 const SKELETON: &amp;[(usize, usize)] = &amp;[
     // 两条腿 + 髋部横杆
     (15, 13), (13, 11), (16, 14), (14, 12), (11, 12),
@@ -499,16 +485,13 @@ const SKELETON: &amp;[(usize, usize)] = &amp;[
     (5, 7), (7, 9), (6, 8), (8, 10),
     // 头部：鼻-眼、眼-耳
     (0, 1), (0, 2), (1, 3), (2, 4),
-];
-<span class="boring">}</span></code></pre>
+];</code></pre>
 <p>举个例子，<code>(5, 7)</code> 表示“把左肩（5）和左肘（7）连起来“，<code>(7, 9)</code> 再把左肘（7）连到左手腕（9）——一整条左臂就画出来了。</p>
 <p>画图用第 3 章介绍过的 <code>imageproc</code>：画点用 <code>draw_filled_circle_mut</code>，画线用 <code>draw_line_segment_mut</code>。先加依赖：</p>
 <pre><code class="language-bash">cargo add image imageproc ndarray
 </code></pre>
 <p>然后写一个“在原图上画一个人“的函数——<strong>先连线、后画点</strong>（点盖在线头上更好看），每条边、每个点都过一遍可见性阈值：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use image::{Rgb, RgbImage};
+<pre><code class="language-rust ignore">use image::{Rgb, RgbImage};
 use imageproc::drawing::{draw_filled_circle_mut, draw_line_segment_mut};
 
 /// 在原图上画出一个人的骨架和关键点（火柴人）。
@@ -535,20 +518,16 @@ fn draw_pose(img: &amp;mut RgbImage, pose: &amp;Pose, kpt_thresh: f32) {
         // draw_filled_circle_mut 要 i32 圆心；半径 3px 的实心小圆当"关节"
         draw_filled_circle_mut(img, (kp.x.round() as i32, kp.y.round() as i32), 3, point_color);
     }
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
 <p>用起来就是把整条流水线串起来——预处理（第 10 章）→ 推理（第 14 章）→ 解码 + NMS（本章 <code>decode_one_pose</code> + 第 16 章）→ 画：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>let mut img = image::open("gym.jpg")?.to_rgb8();
+<pre><code class="language-rust ignore">let mut img = image::open("gym.jpg")?.to_rgb8();
 // let (input, lb) = preprocess(&amp;img, 640);   // 第 10 章，拿到张量 + LetterboxInfo
 // let out = model.run(input)?;                // 第 14 章，得到 [1,56,8400]
 // let poses: Vec&lt;Pose&gt; = decode_and_nms(out.view(), &amp;lb, 0.5); // 本章解码 + 第 16 章 NMS
 for pose in &amp;poses {
     draw_pose(&amp;mut img, pose, 0.5);            // 关键点可见性阈值 0.5
 }
-img.save("pose_out.png")?;
-<span class="boring">}</span></code></pre>
+img.save("pose_out.png")?;</code></pre>
 <blockquote>
 <p>如果还想把每个人的<strong>框</strong>也画出来，直接用第 3 / 16 章画 <code>BBox</code> 的老办法（<code>imageproc::draw_hollow_rect_mut</code>）画 <code>pose.bbox</code> 即可——姿态目标的框就是统一的 <code>BBox</code>，工具链完全通用。给不同的人配不同颜色，视频里就能一眼分清谁是谁（真正的“谁是谁“跨帧稳定 ID，要靠第 21 章的跟踪）。</p>
 </blockquote>
@@ -605,10 +584,10 @@ img.save("pose_out.png")?;
 <h2 id="1712-练习"><a class="header" href="#1712-练习">17.12 练习</a></h2>
 <ol>
 <li>
-<p><strong>手算热力图解码</strong>：给定一张 5×5 的关键点热力图，峰值 0.88 落在第 1 行、第 4 列（行、列都从 0 数）。已知模型输入是 <code>160×160</code>、热力图是 <code>40×40</code>。求：① 步长 stride 是多少？② 用“格子中心 +0.5“公式，算出该点在输入坐标系的 <code>(x, y)</code>。③ 若预处理时 <code>scale=0.5, pad_x=0, pad_y=20</code>，再用第 10 章还原公式算出它在原图的坐标。</p>
+<p><strong>手算热力图解码</strong>：给定一张 <code>40×40</code> 的关键点热力图，峰值 0.88 落在第 1 行、第 4 列（行、列都从 0 数）。已知模型输入是 <code>160×160</code>。求：① 步长 stride 是多少？② 用“格子中心 +0.5“公式，算出该点在输入坐标系的 <code>(x, y)</code>。③ 若预处理时 <code>scale=0.5, pad_x=0, pad_y=20</code>，再用第 10 章还原公式算出它在原图的坐标。</p>
 </li>
 <li>
-<p><strong>拆输出下标</strong>：YOLOv8-pose 的输出是 <code>[1, 56, 8400]</code>。写出：① 第 <code>i</code> 个候选的“人置信度“取哪个下标？② 第 12 个关键点（左膝，索引 11）的 <code>x / y / 可见性</code> 分别在第几个属性位（提示：<code>base = 5 + k*3</code>）？③ 若某模型改成输出 21 个关键点，中间那一维会变成多少？</p>
+<p><strong>拆输出下标</strong>：YOLOv8-pose 的输出是 <code>[1, 56, 8400]</code>。写出：① 第 <code>i</code> 个候选的“人置信度“取哪个下标？② 第 12 个关键点（左髋，索引 11）的 <code>x / y / 可见性</code> 分别在第几个属性位（提示：<code>base = 5 + k*3</code>）？③ 若某模型改成输出 21 个关键点，中间那一维会变成多少？</p>
 </li>
 <li>
 <p><strong>补全遮挡过滤</strong>：改写 <code>draw_pose</code>，让它在画线时不仅看两端点的可见性，还统计“这个人一共有几个可见关键点“；当可见点少于 5 个时，认为这个人太不完整，整个跳过不画。想一想：为什么“整人级“的过滤有时比“逐点“过滤更稳？</p>

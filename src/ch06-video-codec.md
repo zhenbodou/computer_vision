@@ -125,7 +125,7 @@
 
 拿到一路流，不代表每一帧都要处理。**抽帧（取哪些帧来分析）是实时系统的第一个设计决策。**
 
-**策略一：解码全部帧。** 跟踪（第 21 章）、拌线计数（第 23 章）、动作识别这类任务需要**连续帧**，必须逐帧解码，一帧不落。
+**策略一：解码全部帧。** 跟踪（第 21 章）、绊线计数（第 23 章）、动作识别这类任务需要**连续帧**，必须逐帧解码，一帧不落。
 
 **策略二：只取关键帧（I 帧）做稀疏分析。** 如果只是"每隔一会儿看看画面里有没有人/车"，完全不必解码 P/B 帧——只挑 I 帧（或每秒抽 1 帧）送去检测/分类，计算量骤降。因为 I 帧本来就能独立解码，抽起来最省事。
 
@@ -154,7 +154,7 @@
 
 先定义一个**帧处理器**接口，把"取帧"和"处理帧"解耦——后续章节（预处理、检测、跟踪）只要实现这个 trait 就能接进来：
 
-```rust
+```rust,ignore
 use opencv::{core, prelude::*, videoio};
 
 /// 帧处理器：每来一帧调用一次 on_frame。
@@ -177,7 +177,7 @@ impl FrameSink for Printer {
 
 核心是这个**拉流取帧循环**：
 
-```rust
+```rust,ignore
 /// 打开视频源（本地文件路径 / rtsp:// 地址 / 摄像头），循环取帧喂给 sink。
 fn run_capture(source: &str, sink: &mut dyn FrameSink) -> opencv::Result<()> {
     // CAP_FFMPEG：强制走 FFmpeg 后端，文件和 RTSP 都能开
@@ -196,7 +196,7 @@ fn run_capture(source: &str, sink: &mut dyn FrameSink) -> opencv::Result<()> {
     loop {
         // read() = grab() + retrieve()，把下一帧解码进 frame（已按显示顺序排好）
         let ok = cap.read(&mut frame)?;
-        if !ok || frame.empty()? {
+        if !ok || frame.empty() {
             // 文件读到结尾，或网络流断开
             eprintln!("流结束或读取失败，退出循环");
             break;
@@ -217,14 +217,14 @@ fn main() -> opencv::Result<()> {
 
 打开 **USB 摄像头**只需换一行——用索引而不是路径：
 
-```rust
+```rust,ignore
 // 打开第 0 个摄像头（Linux 的 /dev/video0）
 let mut cap = videoio::VideoCapture::new(0, videoio::CAP_ANY)?;
 ```
 
 **把帧接上前几章的图像/张量。** `Mat` 是 OpenCV 的图像类型，我们要把它变回第 3 章的 `ndarray`，才能喂给第 10 章的 letterbox 预处理：
 
-```rust
+```rust,ignore
 use ndarray::Array3;
 
 /// 把 BGR 的 Mat 转成第 3 章的 ndarray（形状 HxWx3, u8）。
@@ -239,7 +239,7 @@ fn mat_to_ndarray(frame: &core::Mat) -> opencv::Result<Array3<u8>> {
 }
 ```
 
-> **坑提示**：`Mat` 的每一行可能有对齐**填充（padding）**，`data_bytes()` 不一定是紧凑的 `H×W×3`。生产代码要先判断 `frame.is_continuous()?`，不连续时用 `frame.clone()` 拷成连续内存，或按行 `step` 逐行拷贝。另外记得 OpenCV 是 **BGR** 顺序，喂给多数模型前要转成 RGB（第 4、10 章会反复处理这件事）。
+> **坑提示**：`Mat` 的每一行可能有对齐**填充（padding）**，`data_bytes()` 不一定是紧凑的 `H×W×3`。生产代码要先判断 `frame.is_continuous()`，不连续时用 `frame.clone()` 拷成连续内存，或按行 `step` 逐行拷贝。另外记得 OpenCV 是 **BGR** 顺序，喂给多数模型前要转成 RGB（第 4、10 章会反复处理这件事）。
 
 现在，一路视频就变成了"源源不断的 `Array3<u8>`"，后面接检测、跟踪都顺理成章。
 
@@ -265,7 +265,7 @@ ffprobe in.mp4
 
 在 Rust 里把它当外部命令调用即可：
 
-```rust
+```rust,ignore
 use std::process::Command;
 
 /// 调用系统 ffmpeg，每秒抽 1 帧到 out_dir。适合离线批处理。
@@ -307,11 +307,11 @@ fn extract_frames(input: &str, out_dir: &str) -> std::io::Result<()> {
 
 **1. 丢包花屏。** UDP 传的 RTSP 一旦丢包，P/B 帧就拿不到完整的参考数据，画面会**糊成马赛克/拖影**，直到下一个 I 帧才恢复。对策：优先用 **TCP 传输**（命令行 `-rtsp_transport tcp`）；让摄像头**缩短 GOP**（关键帧更密，花屏恢复更快）；解码报错时别崩，丢掉坏帧继续读。
 
-**2. 时间戳跳变 / 回绕。** 别天真地拿 `dt = pts₂ - pts₁` 当帧间隔。摄像头对时、重连都可能让 pts **突然跳变**；而某些格式的时间戳位宽有限会**回绕（wraparound）**（比如 MPEG-TS 的 33 位时钟约 26.5 小时绕一圈，绕回去后 `pts₂ - pts₁` 会变成一个巨大的负数）。对策：对帧间隔做合理性检查（异常的负值/超大值就丢弃或钳制），必要时退回用**本机墙上时钟**估算节奏。
+**2. 时间戳跳变 / 回绕。** 别天真地拿 `dt = pts₂ - pts₁` 当帧间隔。摄像头对时、重连都可能让 pts **突然跳变**；而某些格式的时间戳位宽有限会**回绕（wraparound）**（比如 MPEG-TS 的 33 位时钟约 26.5 小时绕一圈，绕回去后 `pts₂ - pts₁` 会变成一个巨大的负数）。对策：对帧间隔做合理性检查（异常的负值/超大值就丢弃或钳制），必要时退回用**本机单调时钟**估算节奏。
 
 **3. 断流自动重连。** 网络摄像头掉线是常态，`read()` 会返回 `false` 或空帧。生产代码要把拉流包在一个**带退避的重连循环**里，而不是一断就退出：
 
-```rust
+```rust,ignore
 /// 断流后自动重连，永不退出。注意退避，别 tight-loop 把 CPU 打满。
 fn run_forever(source: &str, sink: &mut dyn FrameSink) {
     loop {

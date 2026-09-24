@@ -37,10 +37,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-4d8e5ec0.js";
+            window.path_to_searchindex_js = "searchindex-ba421b3e.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-c1d54236.js"></script>
+        <script src="toc-68b1d651.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -288,7 +288,7 @@
 </ul>
 <h2 id="66-抽帧策略与硬件解码"><a class="header" href="#66-抽帧策略与硬件解码">6.6 抽帧策略与硬件解码</a></h2>
 <p>拿到一路流，不代表每一帧都要处理。<strong>抽帧（取哪些帧来分析）是实时系统的第一个设计决策。</strong></p>
-<p><strong>策略一：解码全部帧。</strong> 跟踪（第 21 章）、拌线计数（第 23 章）、动作识别这类任务需要<strong>连续帧</strong>，必须逐帧解码，一帧不落。</p>
+<p><strong>策略一：解码全部帧。</strong> 跟踪（第 21 章）、绊线计数（第 23 章）、动作识别这类任务需要<strong>连续帧</strong>，必须逐帧解码，一帧不落。</p>
 <p><strong>策略二：只取关键帧（I 帧）做稀疏分析。</strong> 如果只是“每隔一会儿看看画面里有没有人/车“，完全不必解码 P/B 帧——只挑 I 帧（或每秒抽 1 帧）送去检测/分类，计算量骤降。因为 I 帧本来就能独立解码，抽起来最省事。</p>
 <p><strong>策略三：实时流按需丢帧保时效。</strong> 这是本节的重点。如果你的模型每帧要 80 ms（≈12 fps），而流是 30 fps，那流每秒送 30 帧、你只吃得下 12 帧。<strong>多出来的帧不能排队等</strong>，否则你处理的永远是“几秒前“的旧画面，延迟越拖越长（详见 6.10）。正确做法：<strong>只保留最新帧，旧帧直接丢</strong>。宁可漏看几帧，也要保证“现在看到的就是现在“。</p>
 <p><strong>硬件解码（hardware decoding）：边缘设备的生命线。</strong> 软件解码（CPU 硬算）1080p H.264 30fps，往往要吃掉整整一个 CPU 核心——一路就吃满一核，四路摄像头 CPU 就爆了，哪还有算力留给模型推理？<strong>硬件解码</strong>用的是芯片里专门的解码电路：</p>
@@ -317,9 +317,7 @@
 <p>然后 <code>cargo add opencv</code>（版本以拉到的最新为准）。如果只是离线批量抽帧，不想背这么重的依赖，可以直接用 6.8 的 ffmpeg 命令行。</p>
 </blockquote>
 <p>先定义一个<strong>帧处理器</strong>接口，把“取帧“和“处理帧“解耦——后续章节（预处理、检测、跟踪）只要实现这个 trait 就能接进来：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use opencv::{core, prelude::*, videoio};
+<pre><code class="language-rust ignore">use opencv::{core, prelude::*, videoio};
 
 /// 帧处理器：每来一帧调用一次 on_frame。
 /// 后续章节可以让它做 letterbox→推理→NMS（见第 10、16 章）。
@@ -336,10 +334,9 @@ impl FrameSink for Printer {
         println!("帧 #{idx}: {}x{} (宽x高)", frame.cols(), frame.rows());
         Ok(())
     }
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
 <p>核心是这个<strong>拉流取帧循环</strong>：</p>
-<pre class="playground"><code class="language-rust">/// 打开视频源（本地文件路径 / rtsp:// 地址 / 摄像头），循环取帧喂给 sink。
+<pre><code class="language-rust ignore">/// 打开视频源（本地文件路径 / rtsp:// 地址 / 摄像头），循环取帧喂给 sink。
 fn run_capture(source: &amp;str, sink: &amp;mut dyn FrameSink) -&gt; opencv::Result&lt;()&gt; {
     // CAP_FFMPEG：强制走 FFmpeg 后端，文件和 RTSP 都能开
     let mut cap = videoio::VideoCapture::from_file(source, videoio::CAP_FFMPEG)?;
@@ -357,7 +354,7 @@ fn run_capture(source: &amp;str, sink: &amp;mut dyn FrameSink) -&gt; opencv::Res
     loop {
         // read() = grab() + retrieve()，把下一帧解码进 frame（已按显示顺序排好）
         let ok = cap.read(&amp;mut frame)?;
-        if !ok || frame.empty()? {
+        if !ok || frame.empty() {
             // 文件读到结尾，或网络流断开
             eprintln!("流结束或读取失败，退出循环");
             break;
@@ -375,15 +372,10 @@ fn main() -&gt; opencv::Result&lt;()&gt; {
     run_capture(&amp;source, &amp;mut sink)
 }</code></pre>
 <p>打开 <strong>USB 摄像头</strong>只需换一行——用索引而不是路径：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>// 打开第 0 个摄像头（Linux 的 /dev/video0）
-let mut cap = videoio::VideoCapture::new(0, videoio::CAP_ANY)?;
-<span class="boring">}</span></code></pre>
+<pre><code class="language-rust ignore">// 打开第 0 个摄像头（Linux 的 /dev/video0）
+let mut cap = videoio::VideoCapture::new(0, videoio::CAP_ANY)?;</code></pre>
 <p><strong>把帧接上前几章的图像/张量。</strong> <code>Mat</code> 是 OpenCV 的图像类型，我们要把它变回第 3 章的 <code>ndarray</code>，才能喂给第 10 章的 letterbox 预处理：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use ndarray::Array3;
+<pre><code class="language-rust ignore">use ndarray::Array3;
 
 /// 把 BGR 的 Mat 转成第 3 章的 ndarray（形状 HxWx3, u8）。
 fn mat_to_ndarray(frame: &amp;core::Mat) -&gt; opencv::Result&lt;Array3&lt;u8&gt;&gt; {
@@ -394,10 +386,9 @@ fn mat_to_ndarray(frame: &amp;core::Mat) -&gt; opencv::Result&lt;Array3&lt;u8&gt
     let arr = Array3::from_shape_vec((h, w, 3), data.to_vec())
         .expect("shape 与数据长度不符");
     Ok(arr)
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
 <blockquote>
-<p><strong>坑提示</strong>：<code>Mat</code> 的每一行可能有对齐<strong>填充（padding）</strong>，<code>data_bytes()</code> 不一定是紧凑的 <code>H×W×3</code>。生产代码要先判断 <code>frame.is_continuous()?</code>，不连续时用 <code>frame.clone()</code> 拷成连续内存，或按行 <code>step</code> 逐行拷贝。另外记得 OpenCV 是 <strong>BGR</strong> 顺序，喂给多数模型前要转成 RGB（第 4、10 章会反复处理这件事）。</p>
+<p><strong>坑提示</strong>：<code>Mat</code> 的每一行可能有对齐<strong>填充（padding）</strong>，<code>data_bytes()</code> 不一定是紧凑的 <code>H×W×3</code>。生产代码要先判断 <code>frame.is_continuous()</code>，不连续时用 <code>frame.clone()</code> 拷成连续内存，或按行 <code>step</code> 逐行拷贝。另外记得 OpenCV 是 <strong>BGR</strong> 顺序，喂给多数模型前要转成 RGB（第 4、10 章会反复处理这件事）。</p>
 </blockquote>
 <p>现在，一路视频就变成了“源源不断的 <code>Array3&lt;u8&gt;</code>“，后面接检测、跟踪都顺理成章。</p>
 <h2 id="68-用-ffmpeg-命令行抽帧当外部工具"><a class="header" href="#68-用-ffmpeg-命令行抽帧当外部工具">6.8 用 ffmpeg 命令行抽帧（当外部工具）</a></h2>
@@ -416,9 +407,7 @@ ffprobe in.mp4
 </code></pre>
 <p>两个要点：<code>-rtsp_transport tcp</code> 强制 RTSP 走 TCP，比默认 UDP 更抗丢包（少花屏，见 6.10）；<code>-c copy</code> 是“只搬运不转码“，省 CPU 也不损画质。</p>
 <p>在 Rust 里把它当外部命令调用即可：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use std::process::Command;
+<pre><code class="language-rust ignore">use std::process::Command;
 
 /// 调用系统 ffmpeg，每秒抽 1 帧到 out_dir。适合离线批处理。
 fn extract_frames(input: &amp;str, out_dir: &amp;str) -&gt; std::io::Result&lt;()&gt; {
@@ -430,8 +419,7 @@ fn extract_frames(input: &amp;str, out_dir: &amp;str) -&gt; std::io::Result&lt;(
         eprintln!("ffmpeg 退出码非 0");
     }
     Ok(())
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
 <p><strong>如何取舍</strong>：离线、批量、一次性的活儿，<code>ffmpeg</code> 命令行最省事；实时、在进程内、要逐帧接推理的活儿，用 6.7 的 <code>opencv</code>（或下一节的库）更合适——总不能对着一路直播每秒 fork 一个进程。</p>
 <h2 id="69-纯-rust-方向ffmpeg-next--video-rs--retina"><a class="header" href="#69-纯-rust-方向ffmpeg-next--video-rs--retina">6.9 纯 Rust 方向：ffmpeg-next / video-rs / retina</a></h2>
 <p>如果你希望更“Rust 原生“、少依赖 OpenCV 那一大坨，可以看这三个方向：</p>
@@ -457,11 +445,9 @@ fn extract_frames(input: &amp;str, out_dir: &amp;str) -&gt; std::io::Result&lt;(
 <h2 id="610-工程坑花屏时间戳断流重连缓冲堆积"><a class="header" href="#610-工程坑花屏时间戳断流重连缓冲堆积">6.10 工程坑：花屏、时间戳、断流重连、缓冲堆积</a></h2>
 <p>拉流循环写出来只是“能跑“，离“能上线跑一年“还差这几个坑：</p>
 <p><strong>1. 丢包花屏。</strong> UDP 传的 RTSP 一旦丢包，P/B 帧就拿不到完整的参考数据，画面会<strong>糊成马赛克/拖影</strong>，直到下一个 I 帧才恢复。对策：优先用 <strong>TCP 传输</strong>（命令行 <code>-rtsp_transport tcp</code>）；让摄像头<strong>缩短 GOP</strong>（关键帧更密，花屏恢复更快）；解码报错时别崩，丢掉坏帧继续读。</p>
-<p><strong>2. 时间戳跳变 / 回绕。</strong> 别天真地拿 <code>dt = pts₂ - pts₁</code> 当帧间隔。摄像头对时、重连都可能让 pts <strong>突然跳变</strong>；而某些格式的时间戳位宽有限会<strong>回绕（wraparound）</strong>（比如 MPEG-TS 的 33 位时钟约 26.5 小时绕一圈，绕回去后 <code>pts₂ - pts₁</code> 会变成一个巨大的负数）。对策：对帧间隔做合理性检查（异常的负值/超大值就丢弃或钳制），必要时退回用<strong>本机墙上时钟</strong>估算节奏。</p>
+<p><strong>2. 时间戳跳变 / 回绕。</strong> 别天真地拿 <code>dt = pts₂ - pts₁</code> 当帧间隔。摄像头对时、重连都可能让 pts <strong>突然跳变</strong>；而某些格式的时间戳位宽有限会<strong>回绕（wraparound）</strong>（比如 MPEG-TS 的 33 位时钟约 26.5 小时绕一圈，绕回去后 <code>pts₂ - pts₁</code> 会变成一个巨大的负数）。对策：对帧间隔做合理性检查（异常的负值/超大值就丢弃或钳制），必要时退回用<strong>本机单调时钟</strong>估算节奏。</p>
 <p><strong>3. 断流自动重连。</strong> 网络摄像头掉线是常态，<code>read()</code> 会返回 <code>false</code> 或空帧。生产代码要把拉流包在一个<strong>带退避的重连循环</strong>里，而不是一断就退出：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>/// 断流后自动重连，永不退出。注意退避，别 tight-loop 把 CPU 打满。
+<pre><code class="language-rust ignore">/// 断流后自动重连，永不退出。注意退避，别 tight-loop 把 CPU 打满。
 fn run_forever(source: &amp;str, sink: &amp;mut dyn FrameSink) {
     loop {
         match run_capture(source, sink) {
@@ -471,8 +457,7 @@ fn run_forever(source: &amp;str, sink: &amp;mut dyn FrameSink) {
         eprintln!("2 秒后重连 {source} ...");
         std::thread::sleep(std::time::Duration::from_secs(2)); // 退避
     }
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
 <p><strong>4. 缓冲堆积导致延迟越跑越大。</strong> 这是实时视觉<strong>最经典</strong>的坑。只要<strong>解码速度 &gt; 推理速度</strong>，帧就会在队列里越堆越多，你处理的永远是几秒前的旧画面，延迟单调增长、再也回不来。根因就是 6.6 说的“没有丢帧“。对策：用<strong>有界队列</strong>，满了就丢最旧的帧、只留最新帧。6.7 里那句 <code>cap.set(CAP_PROP_BUFFERSIZE, 1.0)</code> 也是同一思路——从源头就少缓冲。</p>
 <p><strong>5. 解码线程与推理线程解耦。</strong> 正确的实时架构是<strong>生产者-消费者</strong>：解码线程按实时速率不停取帧、往一个小容量队列里塞；推理线程从队列取“当前最新的一帧“来算，算得慢没关系，因为旧帧早被丢了。</p>
 <pre><code class="language-text"> [解码线程/生产者]                         [推理线程/消费者]

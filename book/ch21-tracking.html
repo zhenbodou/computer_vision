@@ -37,10 +37,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-4d8e5ec0.js";
+            window.path_to_searchindex_js = "searchindex-ba421b3e.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-c1d54236.js"></script>
+        <script src="toc-68b1d651.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -178,7 +178,7 @@
                     <main>
                         <h1 id="第-21-章--多目标跟踪sort卡尔曼与-bytetrack"><a class="header" href="#第-21-章--多目标跟踪sort卡尔曼与-bytetrack">第 21 章 · 多目标跟踪：SORT、卡尔曼与 ByteTrack</a></h1>
 <blockquote>
-<p><strong>本章导读</strong>：第 15 到第 20 章，我们把“单帧模型“挨个拆了个遍——分类、检测、关键点、分割、差分、人脸。但它们有个共同的“失忆症“：每一帧都从零开始看，认不出“这个人上一帧也在“。<strong>从本章起进入第七部分·视频分析，第一课就是跟踪（tracking）：检测是单帧的，跟踪负责把跨帧的框连成同一个 ID。</strong> 读完你会明白多目标跟踪（MOT）到底在解决什么问题，掌握 <strong>tracking-by-detection</strong> 范式、用 <strong>IoU</strong> 做<strong>数据关联</strong>、<strong>卡尔曼滤波</strong>怎么“预测 + 更新“，并亲手写出一个复用全书统一 <code>Track</code> 类型、<strong>能编译</strong>的简化 SORT 跟踪器；最后理解 <strong>ByteTrack</strong>“低分框也别扔“的巧思，以及 <strong>MOTA / IDF1 / ID switch</strong> 这几个评价指标。<strong>一句话先记住：给每个目标一个跨帧稳定的 ID，是后面拌线、计数、脸人绑定所有业务过滤器的前提。</strong></p>
+<p><strong>本章导读</strong>：第 15 到第 20 章，我们把“单帧模型“挨个拆了个遍——分类、检测、关键点、分割、差分、人脸。但它们有个共同的“失忆症“：每一帧都从零开始看，认不出“这个人上一帧也在“。<strong>从本章起进入第七部分·视频分析，第一课就是跟踪（tracking）：检测是单帧的，跟踪负责把跨帧的框连成同一个 ID。</strong> 读完你会明白多目标跟踪（MOT）到底在解决什么问题，掌握 <strong>tracking-by-detection</strong> 范式、用 <strong>IoU</strong> 做<strong>数据关联</strong>、<strong>卡尔曼滤波</strong>怎么“预测 + 更新“，并亲手写出一个复用全书统一 <code>Track</code> 类型、<strong>能编译</strong>的简化 SORT 跟踪器；最后理解 <strong>ByteTrack</strong>“低分框也别扔“的巧思，以及 <strong>MOTA / IDF1 / ID switch</strong> 这几个评价指标。<strong>一句话先记住：给每个目标一个跨帧稳定的 ID，是后面绊线、计数、脸人绑定所有业务过滤器的前提。</strong></p>
 </blockquote>
 <p><strong>学习目标：</strong></p>
 <ul>
@@ -203,7 +203,7 @@
 <li><strong>没法数、没法判</strong>：你想“数一共来了几个人““判断有没有人越过警戒线”，前提都是<strong>知道“这还是刚才那个人“</strong>——否则同一个人会被数很多次，越线也无从谈起。</li>
 </ul>
 <p><strong>跟踪（tracking）就是来补这个身份的。</strong> 打个生活比方：老师带一队小朋友出门春游，光“看见几个小朋友“没用，一转身就乱了。聪明的做法是<strong>点名发号牌</strong>——每个人别一个号牌，1 号、2 号、3 号……以后无论谁跑到哪，只要认出“这是 3 号“，就知道“还是刚才那个小孩“。<strong>多目标跟踪要做的，正是给画面里每个目标发一个跨帧稳定的号牌——我们叫它 <code>id</code>。</strong></p>
-<p>有了稳定 ID，视频分析才真正开始：<strong>拌线判越界</strong>（第 23 章）要看“同一个 ID 从线这边走到了那边“；<strong>人流计数</strong>（第 24 章）要靠“同一个 ID 只算一次“来去重；<strong>脸人绑定</strong>（第 25 章）要把“人脸这条轨迹“和“人体那条轨迹“关联起来。所以本章是整个第七部分的<strong>地基</strong>。</p>
+<p>有了稳定 ID，视频分析才真正开始：<strong>绊线判越界</strong>（第 23 章）要看“同一个 ID 从线这边走到了那边“；<strong>时间去重</strong>（第 24 章）要靠“同一个 ID 只算一次“；<strong>脸人绑定</strong>（第 25 章）要把人脸和人体关联起来；完整的人流计数实战在第 28 章。所以本章是整个第七部分的<strong>地基</strong>。</p>
 <blockquote>
 <p><strong>术语</strong>：给多个目标同时维护身份，叫<strong>多目标跟踪（Multi-Object Tracking，MOT）</strong>；只跟一个目标的叫单目标跟踪（SOT）。本书讲的、工程里最常用的，都是 MOT。</p>
 </blockquote>
@@ -223,13 +223,11 @@
 </code></pre>
 <p>注意两点，都是全书一以贯之的约定：</p>
 <ul>
-<li>跟踪器的输入是 <strong><code>Detection</code></strong>（第 16 章：<code>bbox</code> + <code>score</code> + <code>class_id</code>），输出是 <strong><code>Track</code></strong>（写作规范：多了一个 <code>id: u64</code>）。跟踪器<strong>不做检测、不看像素</strong>，它只在框的层面做“连连看“。所以<strong>换检测模型不用动跟踪器</strong>，这是这套范式最大的工程好处。</li>
+<li>跟踪器的输入是 <strong><code>Detection</code></strong>（第 16 章：<code>bbox</code> + <code>score</code> + <code>class_id</code>），输出是 <strong><code>Track</code></strong>（相较检测结果多了一个 <code>id: u64</code>）。跟踪器<strong>不做检测、不看像素</strong>，它只在框的层面做“连连看“。所以<strong>换检测模型不用动跟踪器</strong>，这是这套范式最大的工程好处。</li>
 <li>所有坐标<strong>自始至终是原图像素</strong>（第 10 章逆 letterbox 之后的结果）。跟踪器里算距离、算重叠，都在原图坐标系里进行——<strong>千万别把 640 画布坐标和原图坐标混着喂</strong>，否则 IoU 全错（这是 21.10 会重点敲的坑）。</li>
 </ul>
-<p>复用一下写作规范里的核心类型，本章通篇就围着它们转：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>/// 一个检测结果（第 16 章定义，跟踪器的输入）
+<p>先列出本章使用的核心类型，本章通篇就围着它们转：</p>
+<pre><code class="language-rust ignore">/// 一个检测结果（第 16 章定义，跟踪器的输入）
 #[derive(Clone, Debug)]
 pub struct Detection {
     pub bbox: BBox,      // 原图像素坐标的框
@@ -244,12 +242,11 @@ pub struct Track {
     pub bbox: BBox,
     pub class_id: usize,
     pub score: f32,
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
 <p>剩下的问题只有一个，却是全部难点所在：<strong>这一帧的框，怎么和已有的轨迹对上号？</strong> 这就是<strong>数据关联</strong>。</p>
 <h2 id="213-数据关联iou代价矩阵与匈牙利算法"><a class="header" href="#213-数据关联iou代价矩阵与匈牙利算法">21.3 数据关联：IoU、代价矩阵与匈牙利算法</a></h2>
 <p><strong>数据关联（data association）<strong>要回答的是：“新来的 3 个框，分别是老的哪几条轨迹？“人是怎么下意识判断的？——<strong>位置差不多、大小差不多的，多半就是同一个。</strong> 一个人一帧只走几个像素，不会瞬移。所以“新框和旧轨迹</strong>像不像</strong>”，最简单好用的度量就是<strong>框重叠得多不多</strong>。</p>
-<p>这正好复用第 16 章 NMS 里那个 <strong>IoU（交并比，Intersection over Union）</strong>：两个框交集面积 ÷ 并集面积，<code>0</code> 表示完全不沾边，<code>1</code> 表示完全重合。它已经作为方法定义在 <code>BBox</code> 上了（<code>a.iou(&amp;b)</code>，见写作规范），这里直接拿来用——<strong>同一个 IoU，第 16 章用来“去重复框“，本章用来“认老朋友“</strong>。</p>
+<p>这正好复用第 16 章 NMS 里那个 <strong>IoU（交并比，Intersection over Union）</strong>：两个框交集面积 ÷ 并集面积，<code>0</code> 表示完全不沾边，<code>1</code> 表示完全重合。它已经作为方法定义在 <code>BBox</code> 上了（<code>a.iou(&amp;b)</code>），这里直接拿来用——<strong>同一个 IoU，第 16 章用来“去重复框“，本章用来“认老朋友“</strong>。</p>
 <p>假设上一帧有两条轨迹 <code>T1 / T2</code>，这一帧检到两个框 <code>D1 / D2</code>。把每条轨迹和每个检测两两算 IoU，就得到一张 <strong>IoU 矩阵</strong>：</p>
 <pre><code class="language-text">IoU 矩阵（行 = 轨迹，列 = 检测）
           D1      D2
@@ -264,9 +261,7 @@ pub struct Track {
 </code></pre>
 <p>现在问题变成一句数学：<strong>从矩阵里挑若干个格子，每行最多挑一个、每列最多挑一个，让挑中格子的代价之和最小。</strong> 这是运筹学里的经典<strong>指派问题（assignment problem）</strong>，有个最优解法叫<strong>匈牙利算法（Hungarian algorithm，又叫 Kuhn–Munkres）</strong>——它保证找到<strong>全局代价最小</strong>的匹配，复杂度 $O(n^3)$，对跟踪那点框（几十个）快得很。</p>
 <p>匈牙利算法的<strong>代码不短</strong>，本章不展开推导；工程里直接用现成实现即可（Rust 生态有 <code>pathfinding</code> 的 <code>kuhn_munkres</code>、<code>lapjv</code> 等）。但为了让你<strong>看懂它在追求什么</strong>、也为了后面的 Tracker 能自足编译，我们先写一个<strong>贪心近似（greedy matching）</strong>：<strong>反复挑当前 IoU 最大的一对配上，配过的行、列就划掉，直到没有能配的为止。</strong></p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>/// 贪心匹配：反复挑 IoU 最大的一对 (轨迹 i, 检测 j) 配上，
+<pre><code class="language-rust ignore">/// 贪心匹配：反复挑 IoU 最大的一对 (轨迹 i, 检测 j) 配上，
 /// 配过的行/列不再参与；返回一批 (i, j) 配对。
 /// iou[i][j] = 第 i 条轨迹与第 j 个检测的 IoU。
 fn greedy_match(iou: &amp;[Vec&lt;f32&gt;], thresh: f32) -&gt; Vec&lt;(usize, usize)&gt; {
@@ -292,8 +287,7 @@ fn greedy_match(iou: &amp;[Vec&lt;f32&gt;], thresh: f32) -&gt; Vec&lt;(usize, us
         out.push((i, j));
     }
     out
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
 <p><strong>贪心和匈牙利差在哪？</strong> 贪心只顾“眼前最像的先配“，可能因小失大。看一个精心构造的例子（阈值 0.3）：</p>
 <pre><code class="language-text">IoU 矩阵            D1      D2
            T1     0.90    0.60
@@ -328,9 +322,7 @@ fn greedy_match(iou: &amp;[Vec&lt;f32&gt;], thresh: f32) -&gt; Vec&lt;(usize, us
 <p>数学上只需记住两个直觉（<strong>不推导</strong>，想深究见附录 A）：预测是“当前状态乘一个’往前走一步’的矩阵 $F$“，更新是“用一个自动算出的权重 $K$（卡尔曼增益）把实测和预测拉到一起”。最小的一组式子长这样，看个大概即可：</p>
 <p>$$\hat{x}<em>{预测} = F,x, \qquad x</em>{更新} = \hat{x}<em>{预测} + K,(z - H\hat{x}</em>{预测})$$</p>
 <p>其中 $z$ 是这一帧实测（检测框中心），$H$ 负责“从状态里取出能和 $z$ 比的部分“，$(z - H\hat{x})$ 就是“实测比预测偏了多少“。下面用 <code>nalgebra</code> 给一个<strong>匀速模型骨架</strong>——它能编译，帮助你把上面两步“摸得着“（实际项目里可直接用它，也可用现成 crate）：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use nalgebra::{Matrix2, Matrix2x4, Matrix4, Matrix4x2, Vector2, Vector4};
+<pre><code class="language-rust ignore">use nalgebra::{Matrix2, Matrix2x4, Matrix4, Matrix4x2, Vector2, Vector4};
 
 /// 匀速模型卡尔曼滤波：状态 = [中心x, 中心y, 速度vx, 速度vy]
 struct Kalman {
@@ -379,8 +371,7 @@ impl Kalman {
         self.x += k * y;                                     // 按 K 修正状态
         self.p = (Matrix4::identity() - k * self.h) * self.p;
     }
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
 <p>用起来就是“每帧先 <code>predict()</code>，匹配上了再 <code>update(实测中心)</code>“。<strong>先建立直觉，再照抄骨架，别一上来啃矩阵公式</strong>——这是本书对待数学一贯的态度。</p>
 <h2 id="215-sort预测--匹配--生命周期"><a class="header" href="#215-sort预测--匹配--生命周期">21.5 SORT：预测 + 匹配 + 生命周期</a></h2>
 <p>把前两节拼起来，就是 2016 年那篇又快又好使的 <strong>SORT（Simple Online and Realtime Tracking）</strong>。它的配方简单到一句话：</p>
@@ -429,23 +420,20 @@ impl Kalman {
   ④ 输出所有 Confirmed 且本帧刚更新过的轨迹（带稳定 id）
 </code></pre>
 <p>对应的骨架接口，用全书统一的 <code>Detection</code> 进、<code>Track</code> 出：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>pub struct Tracker { /* 内部若干轨迹，每条带 id、卡尔曼、命中/漏检计数，见下节 */ }
+<pre><code class="language-rust ignore">pub struct Tracker { /* 内部若干轨迹，每条带 id、卡尔曼、命中/漏检计数，见下节 */ }
 
 impl Tracker {
     pub fn new() -&gt; Self { /* ... */ }
     /// 每帧喂一批 Detection，拿回一批"活着且确认"的、带稳定 id 的 Track
     pub fn update(&amp;mut self, dets: &amp;[Detection]) -&gt; Vec&lt;Track&gt; { /* ... */ }
-}
-<span class="boring">}</span></code></pre>
+    /// 本帧被清理（连续漏检达 max_age）的 track id——供上层订阅"目标消失"事件
+    pub fn just_removed(&amp;self) -&gt; Vec&lt;u64&gt; { /* ... */ }
+}</code></pre>
 <p>记住这个 <code>update</code> 签名——<strong>框进、带 ID 的框出</strong>。下一节把它填成能编译的完整代码。</p>
 <h2 id="216-动手实现一个简化-tracker"><a class="header" href="#216-动手实现一个简化-tracker">21.6 动手实现一个简化 Tracker</a></h2>
 <p>现在把 21.3 的贪心匹配、21.5 的生命周期落成<strong>一段能编译、能跑</strong>的代码。为了聚焦跟踪逻辑，这里做两点简化，都在注释里点明“真实 SORT 会怎样“：预测这步用“沿用上一帧框“代替卡尔曼（要上卡尔曼，把每条轨迹换成 21.4 的 <code>Kalman</code> 即可），匹配用贪心代替匈牙利。<strong>数据类型全部复用全书统一定义。</strong></p>
 <p>先把自足需要的 <code>BBox</code> 列全（<code>iou</code> / <code>center</code> 第 16 章已定义，这里为让代码独立而附上）：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>/// 边界框：左上-右下像素坐标（全书统一类型，第 16 章定义）
+<pre><code class="language-rust ignore">/// 边界框：左上-右下像素坐标（全书统一类型，第 16 章定义）
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct BBox { pub x1: f32, pub y1: f32, pub x2: f32, pub y2: f32 }
 
@@ -466,12 +454,9 @@ impl BBox {
         let union = self.area() + o.area() - inter;
         if union &lt;= 0.0 { 0.0 } else { inter / union }
     }
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
 <p>跟踪器内部每条轨迹，比对外的 <code>Track</code> 多几个“管生命周期“的字段：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>/// 跟踪器内部的一条轨迹（比对外 Track 多了状态字段）
+<pre><code class="language-rust ignore">/// 跟踪器内部的一条轨迹（比对外 Track 多了状态字段）
 struct TrackState {
     id: u64,
     bbox: BBox,
@@ -480,17 +465,15 @@ struct TrackState {
     hits: u32,              // 累计匹配上的次数（用于转正）
     time_since_update: u32, // 距上次匹配过了几帧（漏检计数）
     confirmed: bool,        // 是否已转正
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
 <p>主角登场。注意 <code>update</code> 的七步和 21.5 的 ASCII 流程一一对应：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>pub struct Tracker {
+<pre><code class="language-rust ignore">pub struct Tracker {
     tracks: Vec&lt;TrackState&gt;,
     next_id: u64,
     iou_thresh: f32, // 关联阈值：IoU 低于它不认为是同一目标
     max_age: u32,    // 连续漏检超过这么多帧就删轨迹
     min_hits: u32,   // 连续命中够这么多次才转正、才对外输出
+    just_removed: Vec&lt;u64&gt;, // 最近一次 update 里被删除的 track id（供上层订阅"消失"）
 }
 
 impl Tracker {
@@ -501,6 +484,7 @@ impl Tracker {
             iou_thresh: 0.3,
             max_age: 30,       // 30 帧 ≈ 1 秒(30fps)内没接上才判走
             min_hits: 3,
+            just_removed: Vec::new(),
         }
     }
 
@@ -555,7 +539,13 @@ impl Tracker {
             }
         }
 
-        // ⑥ 清理：连续漏检超过 max_age 的轨迹，判定目标已离开，删除
+        // ⑥ 清理：连续漏检超过 max_age 的轨迹，判定目标已离开，删除。
+        //    删除前先把它们的 id 收集到 just_removed，让上层能订阅"目标消失"
+        //    事件（第 28 章人脸抓拍就靠它在 track 结束那一刻落盘）。
+        self.just_removed = self.tracks.iter()
+            .filter(|t| t.time_since_update &gt; max_age)
+            .map(|t| t.id)
+            .collect();
         self.tracks.retain(|t| t.time_since_update &lt;= max_age);
 
         // ⑦ 输出：只报"已转正、且本帧刚更新过"的轨迹
@@ -566,10 +556,16 @@ impl Tracker {
             })
             .collect()
     }
-}
-<span class="boring">}</span></code></pre>
+
+    /// 最近一次 update 中被删除（连续漏检达 max_age）的 track id。
+    /// 返回 owned Vec 而非 &amp;[u64]：调用方通常紧接着还要 &amp;mut 借用自己的
+    /// 其他字段（如清理 HashMap、落盘快照），借用一个 owned 值能避开借用冲突。
+    pub fn just_removed(&amp;self) -&gt; Vec&lt;u64&gt; {
+        self.just_removed.clone()
+    }
+}</code></pre>
 <p>（<code>greedy_match</code> 就是 21.3 那个函数，原样复用。）跑一个两帧的小例子，感受 ID 是怎么稳住的：</p>
-<pre class="playground"><code class="language-rust">fn main() {
+<pre><code class="language-rust ignore">fn main() {
     let mut tracker = Tracker::new();
     let mk = |x1, y1, x2, y2| Detection {
         bbox: BBox { x1, y1, x2, y2 }, score: 0.9, class_id: 0, // 0 = person
@@ -588,6 +584,7 @@ impl Tracker {
 帧 2：输出 1 条轨迹 -&gt; [1]     ← 转正！从此这个人稳定叫 1 号
 </code></pre>
 <p>前两帧不输出，是 <code>min_hits</code> 在“压惊“——真有目标它一定会连命中而转正，虚检则等不到转正就被删。<strong>工程上通常会</strong>把卡尔曼补回去（换掉第 ① 步）、把贪心换成匈牙利、按类别分别跟踪或加类别一致性约束、给 <code>iou_thresh/max_age/min_hits</code> 按帧率和场景调参——但骨架就是这七步，不会变。</p>
+<p>还留了一个小接口值得单独点出：<code>just_removed()</code>。<code>update</code> 每帧在第 ⑥ 步删轨迹前，把“这一帧被删掉的 id“存了下来，<code>just_removed()</code> 就把它交出去。<strong>为什么要暴露它？</strong> 因为下游常常需要在“某个目标彻底离开画面“的那一刻做一件事——第 28 章的人脸抓拍就要在这时把这个人“整段视野里最清晰的一张脸“落盘。跟踪器是唯一知道“谁走了“的人，所以它得把这个生命周期事件报出来。返回的是 owned <code>Vec&lt;u64&gt;</code> 而不是借用，是因为调用方（如 <code>PeopleSystem</code>）拿到这批 id 后，紧接着还要 <code>&amp;mut</code> 借用自己<strong>其他</strong>字段去清理状态、写文件——返回一个独立的值，就不会和那些可变借用打架。</p>
 <h2 id="217-bytetrack低分框也别扔"><a class="header" href="#217-bytetrack低分框也别扔">21.7 ByteTrack：低分框也别扔</a></h2>
 <p>SORT 有个朴素到吃亏的习惯：<strong>它只拿高分框去跟踪，低分框（比如 score &lt; 0.5）直接扔掉。</strong> 想想什么时候框会掉分？——<strong>目标被挡了一半、运动模糊、离得远变小</strong>的时候。可这些恰恰是<strong>目标还在、只是看不太清</strong>的时刻。SORT 一扔，这条轨迹这帧就没框可匹配，<code>time_since_update</code> 涨、甚至被删；等目标重新露脸、分数回升，它只能当新目标<strong>发一个新 ID</strong>——<strong>一次 ID switch（ID 跳变）就这么来了。</strong></p>
 <p>2022 年的 <strong>ByteTrack</strong> 的改进就一句话，却极有效：<strong>低分框也别扔，给它第二次机会。</strong> 做法是<strong>两阶段匹配</strong>——先用高分框正常匹配，剩下没配上的轨迹，再<strong>拿低分框来兜底</strong>：</p>
@@ -636,7 +633,7 @@ impl Tracker {
 </ul>
 <h2 id="2111-小结"><a class="header" href="#2111-小结">21.11 小结</a></h2>
 <ul>
-<li><strong>检测是单帧的、没有身份</strong>；跟踪给每个目标发一个<strong>跨帧稳定的 <code>id</code></strong>，是拌线、计数、脸人绑定等所有视频业务过滤器的地基。</li>
+<li><strong>检测是单帧的、没有身份</strong>；跟踪给每个目标发一个<strong>跨帧稳定的 <code>id</code></strong>，是绊线、计数、脸人绑定等所有视频业务过滤器的地基。</li>
 <li>主流范式是 <strong>tracking-by-detection</strong>：检测器逐帧给 <code>Detection</code>，跟踪器只负责<strong>关联</strong>——把新框接回老轨迹、维护 <code>Track</code>（比 <code>Detection</code> 多一个 <code>id</code>），不碰像素、不做检测。</li>
 <li><strong>数据关联</strong>用 <strong>IoU</strong> 度量“新框和旧轨迹像不像“，构成代价矩阵；<strong>匈牙利算法</strong>求全局最优匹配，本章用<strong>贪心近似</strong>替代（够懂、能编译，工程建议上匈牙利）。</li>
 <li><strong>卡尔曼滤波</strong>给轨迹装上“惯性“：<strong>预测</strong>让漏检时也能续着走、<strong>更新</strong>融合预测与实测；状态含<strong>位置 + 速度</strong>，数学只需记住“预测 + 更新“两步的直觉。</li>

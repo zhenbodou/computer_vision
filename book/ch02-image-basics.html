@@ -37,10 +37,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-4d8e5ec0.js";
+            window.path_to_searchindex_js = "searchindex-ba421b3e.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-c1d54236.js"></script>
+        <script src="toc-68b1d651.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -256,6 +256,11 @@ $$</p>
 <li>蓝关掉：$0$</li>
 </ul>
 <p>所以这个橙色像素就是 <strong>(255, 165, 0)</strong>。反过来看，你以后在代码里看到 <code>(255, 165, 0)</code>，脑子里就能立刻反应过来：“红满、绿六成半、无蓝——这是个偏暖的橙色。“这就是“看懂像素“的感觉。</p>
+<p><strong>顺带记一条公式：彩色怎么转灰度？</strong> 不是把 R、G、B 三个数简单平均，而是按人眼敏感度<strong>加权</strong>——人眼对绿色最敏感、对蓝色最迟钝，所以业界标准公式是：</p>
+<p>$$
+\text{Gray} = 0.299,R + 0.587,G + 0.114,B
+$$</p>
+<p>三个权重加起来正好是 1（所以结果仍落在 0~255）。这条公式在第 3 章手写灰度、第 4 章讲色彩空间、以及附录 A.5 里都会反复用到，先在这儿混个脸熟。</p>
 <blockquote>
 <p>小提醒：三条通道的<strong>顺序</strong>也有讲究。大多数场景是 R、G、B 的顺序，但 OpenCV 这类库偏偏默认用 <strong>BGR（蓝、绿、红）</strong> 的顺序。顺序搞反，红蓝互换，人脸会变成“阿凡达“。为什么会这样、怎么转换，第 4 章专门讲，这里先埋个雷。</p>
 </blockquote>
@@ -343,11 +348,11 @@ $$</p>
 行1: [B B B B B B | P P]
       └── 真像素 ──┘ └padding（不属于图像）
 </code></pre>
-<p>有了 stride，任意坐标 (x, y) 第 c 个通道的字节位置（偏移量 offset）就是：</p>
+<p>有了 stride，任意坐标 (x, y) 第 c 个通道的字节位置（偏移量 offset）就是。下面用 $B$ 表示每个通道值占的字节数：</p>
 <p>$$
-\text{offset} = y \times \text{stride} + x \times C + c
+\text{offset} = y \times \text{stride} + (x \times C + c) \times B
 $$</p>
-<p><strong>没有 padding 时，stride 就等于 $W \times C$</strong>，公式简化成 $y \times W \times C + x \times C + c$。本章后面为了讲清楚，都用“无 padding“的简单情况；但工程里读别人给的图像 buffer，一定要问清楚有没有 padding、stride 是多少，否则每行都会读偏——这是仅次于“W/H 反了“的第二大坑。</p>
+<p>对本章主要讨论的 <code>u8</code> 图像，$B=1$；此时没有 padding 时，stride 就等于 $W \times C$，公式简化成 $y \times W \times C + x \times C + c$。如果是 <code>u16</code>、<code>f32</code> 等类型，不能漏掉 $B$。工程里读别人给的图像 buffer，一定要问清楚元素类型、padding 和 stride，否则每行都会读偏——这是仅次于“W/H 反了“的第二大坑。</p>
 <h3 id="一张图占多少字节"><a class="header" href="#一张图占多少字节">一张图占多少字节</a></h3>
 <p>顺带算笔账。一张 H×W×3 的 8-bit 图（无 padding），占用字节就是：</p>
 <p>$$
@@ -426,7 +431,7 @@ $$</p>
 <p>现在读像素 (x=2, y=1)（值应是 60）。<strong>用对的 stride=4</strong>：$1 \times 4 + 2 \times 1 = 6$，下标 6 = <strong>60</strong>，正确。<strong>若粗心用了 stride=3</strong>：$1 \times 3 + 2 = 5$，下标 5 = <strong>50</strong>——读成了隔壁像素！这就是无视 padding / stride 会踩的经典坑：图像会整体“斜着裂开“。所以拿到 buffer，先确认 stride。</p>
 <h2 id="28-用-rust-摸一摸像素"><a class="header" href="#28-用-rust-摸一摸像素">2.8 用 Rust 摸一摸像素</a></h2>
 <p>把上面的理解翻译成一小段 Rust。注意：这里<strong>故意不用任何图像库</strong>，就用最朴素的 <code>Vec&lt;u8&gt;</code> 和手写的偏移公式，目的是让你看清底层。真正的 <code>image</code> / <code>ndarray</code> API 是第 3 章的事。</p>
-<pre class="playground"><code class="language-rust">/// 一张最朴素的图：记住宽、高、通道数，外加一条连续字节
+<pre><code class="language-rust ignore">/// 一张最朴素的图：记住宽、高、通道数，外加一条连续字节
 struct SimpleImage {
     width: usize,
     height: usize,
@@ -470,17 +475,12 @@ fn main() {
     img.set(1, 0, 2, 0);   // B
 }</code></pre>
 <p>再看一眼 <code>u8</code> → <code>f32</code> 的归一化（就是把模型爱吃的那口喂法演示一下）：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>// 把 0~255 的整数像素，归一化成 0.0~1.0 的浮点（模型偏爱这种）
+<pre><code class="language-rust ignore">// 把 0~255 的整数像素，归一化成 0.0~1.0 的浮点（模型偏爱这种）
 let pixel_u8: u8 = 200;
 let pixel_f32: f32 = pixel_u8 as f32 / 255.0; // ≈ 0.784
-println!("{pixel_u8} 归一化后 = {pixel_f32:.3}");
-<span class="boring">}</span></code></pre>
+println!("{pixel_u8} 归一化后 = {pixel_f32:.3}");</code></pre>
 <p>想遍历整张图算个“平均亮度“之类，也就是三重循环套上 <code>get</code>：</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>// 累加所有像素所有通道，求平均值（演示遍历，注意 u32 防溢出）
+<pre><code class="language-rust ignore">// 累加所有像素所有通道，求平均值（演示遍历，注意 u32 防溢出）
 let mut sum: u32 = 0;
 for y in 0..img.height {
     for x in 0..img.width {
@@ -490,8 +490,7 @@ for y in 0..img.height {
     }
 }
 let count = (img.width * img.height * img.channels) as u32;
-println!("平均值 = {}", sum / count);
-<span class="boring">}</span></code></pre>
+println!("平均值 = {}", sum / count);</code></pre>
 <p>这段代码性能一般（每次 <code>get</code> 都重算偏移、还带边界检查）。<strong>工程上通常会</strong>换成基于切片的连续遍历、甚至零拷贝地把 buffer 直接当张量用，以及交给 <code>image</code> / <code>ndarray</code> 这类库去做——这些都是第 3 章的正题。这里你只要确认一件事：<strong>图像操作的最底层，无非就是“按偏移公式在一串数字里读读写写“</strong>。把这层想通了，后面所有花哨的算法都不神秘。</p>
 <h2 id="29-小结"><a class="header" href="#29-小结">2.9 小结</a></h2>
 <ul>
