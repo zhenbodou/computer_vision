@@ -97,8 +97,8 @@ fn match_one_image(
             }
         }
         // ③ IoU 够大才算命中；命中就占用那个真值（后来者抢不到 → 重复框判 FP）
-        if best_iou >= iou_thr {
-            gt_taken[best_j.unwrap()] = true;
+        if let Some(j) = best_j.filter(|_| best_iou >= iou_thr) {
+            gt_taken[j] = true;
             flags.push((p.score, true));   // TP
         } else {
             flags.push((p.score, false));  // FP
@@ -194,7 +194,7 @@ Precision
 
 **AP（Average Precision，平均精度）就是这条 PR 曲线下的面积**，范围 0~1，一个数概括整条曲线。面积越大 = 曲线越贴右上角 = 在各个召回水平上都能保持高精确率 = 模型越好。
 
-现代标准算法（COCO/VOC2010 之后的 "all-point" 法）分两步：先把 Precision 修成**从右往左单调不增的包络**（消掉曲线的锯齿抖动），再按召回增量求和积分。用 Rust 实现：
+VOC 2010 之后常用的 **all-points** 算法分两步：先把 Precision 修成包络（消掉曲线的锯齿抖动），再按召回增量求和积分。下面的 Rust 实现适合讲清原理。要注意，COCO 官方协议使用 101 个召回采样点，并另有 `maxDets`、面积范围、`crowd/ignore` 等规则；这段代码不能冒充与 COCO 榜单逐位一致的实现。
 
 ```rust,ignore
 /// 给定某个类别、全测试集所有预测的 (分数, 是否TP)，和该类真值总数，算 AP
@@ -213,7 +213,7 @@ fn compute_ap(mut scored_flags: Vec<(f32, bool)>, n_gt: usize) -> f64 {
         precisions.push(tp as f64 / (tp + fp) as f64);
     }
 
-    // ③ 把 precision 修成从右往左单调不增的包络（去掉锯齿）
+    // ③ 从右往左取后缀最大值，使 precision 随 recall 增大而单调不增
     for i in (0..precisions.len().saturating_sub(1)).rev() {
         precisions[i] = precisions[i].max(precisions[i + 1]);
     }
@@ -231,7 +231,7 @@ fn compute_ap(mut scored_flags: Vec<(f32, bool)>, n_gt: usize) -> f64 {
 
 ## 30.6 mAP：检测领域的黄金标准
 
-AP 是**单个类别**的分数。一个检测模型要认 person、car、dog……几十上百个类，把**每个类的 AP 求平均**，就是 **mAP（mean Average Precision）**——检测领域论文、榜单、验收报告里那个最常被报的数字：
+AP 是**单个类别**的分数。一个检测模型要认 person、car、dog……几十上百个类，把**测试集中有真值的各类别 AP 求平均**，就是 **mAP（mean Average Precision）**——检测领域论文、榜单、验收报告里那个最常被报的数字。没有任何真值的类别，其 AP 没有定义，应从平均值中排除：
 
 $$
 \text{mAP} = \frac{1}{C}\sum_{c=1}^{C} \text{AP}_c
@@ -249,8 +249,6 @@ mAP@0.5:0.95 更严是因为它要求框不仅"框住"还要"框准"——IoU=0.
 把 30.3~30.6 串成完整流程，就是一个能对整个测试集算 mAP 的评估器：
 
 ```rust,ignore
-use std::collections::HashMap;
-
 /// 一张图的标注：预测框 + 真值框（真值只需框和类别）
 struct ImageEval {
     preds: Vec<Detection>,           // 模型在这张图上的全部预测
@@ -258,7 +256,7 @@ struct ImageEval {
 }
 
 /// 算整个测试集在某个 IoU 阈值下的 mAP，返回 (mAP, 每类AP)
-fn mean_ap(dataset: &[ImageEval], num_classes: usize, iou_thr: f32) -> (f64, Vec<f64>) {
+fn mean_ap(dataset: &[ImageEval], num_classes: usize, iou_thr: f32) -> (f64, Vec<Option<f64>>) {
     let mut aps = Vec::with_capacity(num_classes);
     for c in 0..num_classes {
         // ① 收集该类：所有图的 (分数, TP/FP) 汇成一堆，并累计该类真值总数
@@ -273,15 +271,17 @@ fn mean_ap(dataset: &[ImageEval], num_classes: usize, iou_thr: f32) -> (f64, Vec
             let (flags, _fn) = match_one_image(preds_c, &gts_c, iou_thr);
             scored_flags.extend(flags);
         }
-        // ② 该类 AP
-        aps.push(compute_ap(scored_flags, n_gt));
+        // ② 该类没有真值时 AP 无定义，不应拿 0 拉低 mAP
+        aps.push((n_gt > 0).then(|| compute_ap(scored_flags, n_gt)));
     }
-    let map = if aps.is_empty() { 0.0 } else { aps.iter().sum::<f64>() / aps.len() as f64 };
+    let valid: Vec<f64> = aps.iter().flatten().copied().collect();
+    let map = if valid.is_empty() { 0.0 } else { valid.iter().sum::<f64>() / valid.len() as f64 };
     (map, aps)
 }
 
-/// COCO 口径：IoU 0.5→0.95 步长 0.05 各算一次再平均
-fn coco_map(dataset: &[ImageEval], num_classes: usize) -> f64 {
+/// 教学版近似：IoU 0.5→0.95 步长 0.05 各算一次再平均。
+/// 精确 COCO 指标应使用官方评测工具。
+fn map_50_95_approx(dataset: &[ImageEval], num_classes: usize) -> f64 {
     let mut sum = 0.0;
     let mut n = 0;
     let mut thr = 0.50;
@@ -295,7 +295,9 @@ fn coco_map(dataset: &[ImageEval], num_classes: usize) -> f64 {
 }
 ```
 
-> 这段代码为讲清原理写得直白（每类每图重新过滤，有重复计算）。生产里会一次遍历同时归好类、缓存 IoU；真做大规模评估建议直接对接成熟工具（如 COCO 官方 `pycocotools` 的评测协议），保证和榜单口径**逐位对齐**——评估代码算错，比模型差更可怕，因为它会让你对着错的数字做决策。
+> 这段代码为讲清原理写得直白（每类每图重新过滤，有重复计算），得到的是 mAP@0.5 和 mAP@0.5:0.95 的教学版近似值。真做验收或榜单对比，应使用 COCO 官方 `pycocotools` 等成熟实现，保证 101 点插值、`maxDets`、忽略标注等细节逐项对齐。评估代码算错，比模型差更危险，因为它会让你对着错的数字做决策。
+
+> **评估时不要先用业务阈值砍掉低分预测。** 第 26 章 `Detector::detect` 默认会按 0.25 过滤，这会截断 PR 曲线、低估可达到的召回率。评估应从尽可能低的置信度开始保留候选（并按既定协议做 NMS），再由评估器按分数排序扫描工作点。
 
 ## 30.7 阈值决策：0.5 不是天经地义
 
@@ -380,7 +382,14 @@ fn regression_gate(
     tol: f64,            // 容忍的最大下降幅度，如 0.01
 ) -> Result<(), Vec<String>> {
     let mut failures = Vec::new();
+    if old.len() != new.len() {
+        failures.push(format!("类别数量不一致: {} → {}", old.len(), new.len()));
+    }
     for (o, n) in old.iter().zip(new.iter()) {
+        if o.name != n.name {
+            failures.push(format!("类别顺序/名称不一致: {} vs {}", o.name, n.name));
+            continue;
+        }
         if n.ap < o.ap - tol {
             failures.push(format!("{} AP 回退: {:.3} → {:.3}", o.name, o.ap, n.ap));
         }
@@ -400,7 +409,7 @@ fn regression_gate(
 
 - **测试集泄漏（最致命）**：训练集和测试集有重叠/同源图片，分数会虚高得离谱。**测试集必须是模型从没见过的数据**，最好来自真实部署现场。评估的第一诫：**测试集干净、且和上线场景同分布**。
 - **测试集不代表现场**：拿白天晴天的图评估，上线却要跑夜间雨天。分数再高也是"考场发挥"，不代表"实战成绩"。测试集要**覆盖你会遇到的光照、天气、角度、遮挡、人群密度**。
-- **类别不平衡骗过总分**：测试集里 person 有 1000 个、cat 只有 5 个，mAP 一平均，cat 类算得再烂也被淹没。**必须看每类 AP，而不只是 mAP**（正是 30.9 逐类对比的理由）。
+- **类别不平衡让指标不稳定**：mAP 对各类别做宏平均，不会让 1000 个 person 直接压过 5 个 cat；但只有 5 个真值的 cat AP 方差很大，少对或少错一个就会剧烈波动。另一方面，一个关键类别的回退仍可能被几十个其他类别的平均值掩盖。必须同时报告每类样本数、每类 AP 和关键类指标。
 - **单一数字迷信**：mAP=0.9 听着漂亮，但没说 IoU 口径、没说哪个阈值、没说各类分布——**任何单一数字脱离上下文都可能是话术**。资深工程师看到一个孤零零的 mAP，会追问"哪个 IoU、什么测试集、逐类多少"。
 - **测试集太小**：几十张图算出来的 mAP 抖动极大，换一批图就变。**测试集要够大够多样**，分数才稳定可信。
 - **忽视"位置精度"**：只看 mAP@0.5，框歪一半也算对；下游要抠图/测距（如第 28 章人脸抓拍要抠脸）时，得看 mAP@0.75 甚至更严的口径。
@@ -412,7 +421,7 @@ fn regression_gate(
 - 肉眼抽查有幸存者偏差，**必须量化评估**：得到能复现、能比较、能定决策的数字，才谈得上对模型负责。
 - 一切的原点是 **TP/FP/FN**（检测里 TN 不计）；检测比分类多一步——用 **IoU ≥ 阈值** 判定一个预测有没有"命中"真值，且一个真值只能被最高分的那个预测认领（重复框自动判 FP）。
 - **精确率**（报的准不准，怕误报看它）与**召回率**（找得全不全，怕漏报看它）是一对跷跷板，靠调阈值滑动；**F1/F-beta** 把两者捏成一个数，选 β 就是把"漏报和误报谁更贵"写进公式。
-- **PR 曲线**扫遍所有阈值，其**曲线下面积 = AP**；各类 AP 求平均 = **mAP**。务必分清 **mAP@0.5**（宽松）和 **mAP@0.5:0.95**（COCO 口径，额外考核框的位置精度）。
+- **PR 曲线**扫遍所有阈值，其**曲线下面积 = AP**；有真值类别的 AP 求平均 = **mAP**。务必分清 **mAP@0.5**（宽松）和 **mAP@0.5:0.95**（更严格）；与 COCO 官方数字对比时还要使用它的 101 点及完整评测协议。
 - **阈值不是天经地义的 0.5**：按业务成本（安防偏召回、门禁偏精确）在曲线上选工作点，写进每个现场的配置。
 - 换模型必做**版本回归**：固定测试集、**逐类逐指标**对比，防"总分涨了但关键类偷偷崩"；把它做成 CI 守门（第 31 章）。
 - 评估的坑几乎都在数据与口径：**测试集泄漏、不代表现场、类别不平衡、单一数字迷信**——评估的可信度决定一切决策的可信度。
@@ -423,7 +432,7 @@ fn regression_gate(
 
 2. **画一条 PR 曲线**：给定 10 个预测（自己编 `(分数, 是否TP)`）和真值总数=6，手动从高分到低分累计 TP/FP，算出每一步的 (Recall, Precision) 并画在纸上，最后用 30.5 的 `compute_ap` 逻辑手算 AP，对照直觉验证"曲线越贴右上角 AP 越大"。
 
-3. **给第 26 章的检测器接上评估**：准备一小批标注好的测试图（或用 COCO val 的一个子集），跑 `Detector::detect` 收集预测，实现 `mean_ap`，算出 mAP@0.5 和 mAP@0.5:0.95，看看两个口径差多少，思考差距说明模型"框得住"还是"框得准"更强。
+3. **给第 26 章的检测器接上评估**：准备一小批标注好的测试图（或用 COCO val 的一个子集），把检测置信度阈值降到足够低后收集预测，实现 `mean_ap`，算出教学版 mAP@0.5 和 mAP@0.5:0.95；再用官方评测工具核对，看看两个口径差多少，并解释差距反映的是"框得住"还是"框得准"。
 
 4. **写一个阈值扫描器**：对同一个测试集，把置信度阈值从 0.1 扫到 0.9（步长 0.05），画出 Precision、Recall、F1 随阈值变化的三条曲线，找出 F1 最高的阈值和 F2 最高的阈值，比较它俩差多少，并解释为什么安防要用后者。
 

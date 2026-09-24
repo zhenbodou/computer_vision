@@ -55,6 +55,12 @@
 - [第 28 章 · 实战三：人流统计与人脸抓拍](ch28-project-people.md)
 - [第 29 章 · 工程化：并发、性能与部署](ch29-engineering.md)
 
+# 第九部分 · 从能用到资深：评估、测试与生产运维
+
+- [第 30 章 · 模型评估与度量：mAP、PR 曲线与阈值决策](ch30-evaluation.md)
+- [第 31 章 · 测试与性能剖析：单测、golden 回归、基准与火焰图](ch31-testing-profiling.md)
+- [第 32 章 · 生产化与运维：热更新、监控闭环与告警投递](ch32-production-ops.md)
+
 # 附录
 
 - [附录 A · 数学补漏：矩阵、均值方差与 Softmax](appendix-a-math.md)

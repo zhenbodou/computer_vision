@@ -1,53 +1,54 @@
 name: Deploy mdBook to GitHub Pages
 
 on:
-  # 每次推送到 main 分支时自动构建并部署
   push:
-    branches: ["main"]
-  # 允许在 Actions 页面手动触发
+    branches: [main]
   workflow_dispatch:
 
-# 授予 GITHUB_TOKEN 部署到 GitHub Pages 所需的权限
 permissions:
+  actions: read
   contents: read
   pages: write
   id-token: write
 
-# 只允许一个部署任务并发运行；不取消正在进行的部署
 concurrency:
-  group: "pages"
-  cancel-in-progress: false
+  group: github-pages
+  cancel-in-progress: true
+
+env:
+  MDBOOK_VERSION: 0.5.4
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    env:
-      MDBOOK_VERSION: "0.5.4"
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - name: Check out repository
+        uses: actions/checkout@v6
 
       - name: Install mdBook
         run: |
-          curl --proto '=https' --tlsv1.2 -LsSf \
-            https://github.com/rust-lang/mdBook/releases/download/v${MDBOOK_VERSION}/mdbook-v${MDBOOK_VERSION}-x86_64-unknown-linux-gnu.tar.gz \
-            | tar -xz
-          echo "$(pwd)" >> "$GITHUB_PATH"
+          mkdir -p "$RUNNER_TEMP/mdbook"
+          curl --proto '=https' --tlsv1.2 -fsSL \
+            "https://github.com/rust-lang/mdBook/releases/download/v${MDBOOK_VERSION}/mdbook-v${MDBOOK_VERSION}-x86_64-unknown-linux-gnu.tar.gz" \
+            | tar -xz -C "$RUNNER_TEMP/mdbook"
+          echo "$RUNNER_TEMP/mdbook" >> "$GITHUB_PATH"
 
-      - name: Setup Pages
+      - name: Configure GitHub Pages
         id: pages
         uses: actions/configure-pages@v5
         with:
-          # 首次运行时自动为仓库启用 GitHub Pages（构建类型 = workflow）
           enablement: true
 
-      - name: Build with mdBook
-        run: mdbook build
+      - name: Test and build book
+        run: |
+          mdbook test
+          mdbook build
+          touch book/.nojekyll
 
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v4
         with:
-          path: ./book
+          path: book
 
   deploy:
     needs: build

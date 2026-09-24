@@ -87,7 +87,11 @@ fn letterbox往返应还原坐标() {
 思路像"对答案"：第一次人工确认结果正确后，把它存成文件（golden）；以后每次跑，新结果和 golden 一比，不一致就报警。
 
 ```rust,ignore
-use std::path::Path;
+#[derive(serde::Deserialize)]
+struct GoldenBBox { x1: f32, y1: f32, x2: f32, y2: f32 }
+
+#[derive(serde::Deserialize)]
+struct GoldenDetection { bbox: GoldenBBox, score: f32, class_id: usize }
 
 /// golden 测试：固定输入图 → 检测 → 和存档结果比对
 #[test]
@@ -96,8 +100,8 @@ fn 检测结果不应偏离golden() -> anyhow::Result<()> {
     let img = image::open("tests/fixtures/street.jpg")?.to_rgb8();
     let dets = detector.detect(&img)?;
 
-    // 读取 golden（第一次运行时用 UPDATE_GOLDEN=1 生成，见下）
-    let golden: Vec<Detection> =
+    // 读取由独立更新脚本或显式更新模式生成并经人工确认的 golden
+    let golden: Vec<GoldenDetection> =
         serde_json::from_reader(std::fs::File::open("tests/golden/street.json")?)?;
 
     // 数量必须一致
@@ -106,7 +110,11 @@ fn 检测结果不应偏离golden() -> anyhow::Result<()> {
     for (a, b) in dets.iter().zip(golden.iter()) {
         assert_eq!(a.class_id, b.class_id, "类别变了");
         assert!((a.score - b.score).abs() < 1e-3, "分数漂移过大");
-        assert!(a.bbox.iou(&b.bbox) > 0.999, "框位置漂移过大");
+        let golden_box = BBox {
+            x1: b.bbox.x1, y1: b.bbox.y1,
+            x2: b.bbox.x2, y2: b.bbox.y2,
+        };
+        assert!(a.bbox.iou(&golden_box) > 0.999, "框位置漂移过大");
     }
     Ok(())
 }
@@ -129,6 +137,18 @@ Golden 测试是"防止手滑改坏整条链路"的性价比之王：**一张图
 ```rust,ignore
 use proptest::prelude::*;
 
+fn any_detection() -> impl Strategy<Value = Detection> {
+    (
+        0.0f32..1000.0, 0.0f32..1000.0,
+        0.1f32..500.0, 0.1f32..500.0,
+        0.0f32..1.0, 0usize..80,
+    ).prop_map(|(x, y, w, h, score, class_id)| Detection {
+        bbox: BBox { x1: x, y1: y, x2: x + w, y2: y + h },
+        score,
+        class_id,
+    })
+}
+
 proptest! {
     // 性质①：IoU 永远落在 [0,1]，无论两个框多离谱
     #[test]
@@ -144,11 +164,18 @@ proptest! {
         prop_assert!((0.0..=1.0).contains(&iou), "IoU 越界: {}", iou);
     }
 
-    // 性质②：NMS 的输出一定是输入的子集，且数量不增
+    // 性质②：NMS 不会凭空创造框，输出来自输入且数量不增
     #[test]
     fn nms输出是输入子集(dets in prop::collection::vec(any_detection(), 0..50)) {
-        let kept = nms(dets.clone(), 0.45);
+        let kept = nms_per_class(dets.clone(), 0.45);
         prop_assert!(kept.len() <= dets.len());
+        for k in &kept {
+            prop_assert!(dets.iter().any(|d|
+                d.class_id == k.class_id
+                    && d.score.to_bits() == k.score.to_bits()
+                    && d.bbox == k.bbox
+            ));
+        }
     }
 }
 ```
@@ -158,13 +185,25 @@ proptest! {
 **模糊测试（fuzzing）**是它的近亲，专门喂**畸形/恶意输入**看程序会不会 panic 或越界：损坏的 JPEG、`0×0` 的图、宽高巨大的图、坐标是 `NaN`/`Inf` 的框。视觉程序天天处理外部来的图像和网络流，**一张坏图不能让整个服务崩**（呼应第 29 章"坏帧跳过不 panic"）。最起码要保证：
 
 ```rust,ignore
+fn validate_image(img: &image::RgbImage) -> anyhow::Result<()> {
+    anyhow::ensure!(img.width() > 0 && img.height() > 0, "图像尺寸不能为 0");
+    Ok(())
+}
+
+fn valid_bbox(b: &BBox) -> bool {
+    [b.x1, b.y1, b.x2, b.y2].iter().all(|v| v.is_finite())
+        && b.x2 >= b.x1
+        && b.y2 >= b.y1
+}
+
 #[test]
-fn 空图和畸形框不panic() {
-    // 0 尺寸图、NaN 坐标框：要么优雅返回空/错误，绝不 panic 或越界
+fn 空图和畸形框应被拒绝() {
+    // 第 10 章的 preprocess 假定输入已经过校验；边界层应先拒绝 0 尺寸图。
     let empty = image::RgbImage::new(0, 0);
-    let _ = std::panic::catch_unwind(|| preprocess(&empty, 640)); // 不应 panic
+    assert!(validate_image(&empty).is_err());
+
     let weird = BBox { x1: f32::NAN, y1: 0.0, x2: 10.0, y2: 10.0 };
-    let _ = weird.area(); // 该有防御，返回 NaN/0 而不是崩
+    assert!(!valid_bbox(&weird));
 }
 ```
 
@@ -192,7 +231,7 @@ criterion_main!(benches);
 
 1. **必须 `--release`**：debug 版慢 10~50 倍（第 29 章），拿 debug 测性能得出的结论全是错的。criterion 默认在 `cargo bench` 下用 release profile。
 2. **单独测每一环**：把解码、预处理、推理、后处理分开各测一个 benchmark，才知道时间花在哪。测整体只能得到一个总数，定位不了瓶颈。
-3. **看分布不只看均值**：criterion 会报中位数、离群值。视频服务更该关心 **p99（99 分位延迟）**——偶尔一帧卡 200ms，均值看不出来，但用户能感觉到卡顿。
+3. **微基准与线上尾延迟分开测**：criterion 会给出均值、中位数、置信区间和离群值，适合比较单个函数。服务的 **p99（99 分位延迟）**还包含排队、线程调度和 I/O，应在压力测试或运行时指标中按请求/帧记录，不能直接拿 criterion 的统计量代替。
 
 ## 31.6 性能剖析：用火焰图找瓶颈，别靠猜
 
@@ -268,7 +307,7 @@ cargo flamegraph --release --bin my_detector -- --input test.mp4
   ① cargo fmt --check     格式规范（团队代码风格一致）
   ② cargo clippy          静态检查（揪出可疑写法、常见错误）
   ③ cargo test            单元测试 + golden 测试 + 属性测试（本章 31.2~31.4）
-  ④ cargo bench 对比      基准回归：比上次慢超过 X% 就报警（31.5）
+  ④ cargo bench + 基线对比 基准回归：保存/比较报告，慢超过 X% 就报警（31.5）
   ⑤ 模型评估门禁          跑固定测试集算 mAP + regression_gate（第30章）
   ↓ 全绿才准合并 / 发布
 ```
@@ -286,7 +325,7 @@ cargo flamegraph --release --bin my_detector -- --input test.mp4
 - 视觉系统的 bug 常是**沉默的错误**（坐标偏、阈值错、颜色反），不崩不报只是结果变差，**肉眼和"跑一次"兜不住**，必须靠自动化测试当哨兵。
 - **测试金字塔**：底座是大量又快又准的**单元测试**（给 IoU/NMS/letterbox 逆变换等纯函数上锁，用手算答案和"往返测试"守住坐标系）；中间是集成测试；顶端是少量**golden 测试**（固定图跑全流程、和存档结果带容差比对，防整条链路被改坏）。
 - **属性测试**（proptest 声明"IoU∈[0,1]""NMS 输出是子集"等性质，机器生成海量输入去砸）和**模糊测试**（畸形图/NaN 框不许 panic）能挖出人写不出的边界用例。
-- **基准测试**（criterion）把快慢变成可比较的数字，三铁律：必须 release、分环节测、看 p99 不只看均值；**性能剖析**（cargo-flamegraph 火焰图）遵循"先测量再优化"和 80/20 法则，把力气押在最宽的柱子上——分配型瓶颈尤其只能靠剖析发现。
+- **基准测试**（criterion）把单个函数的快慢变成可比较的数字；必须使用 release 并分环节测。线上 p99 要在压力测试或运行时另行统计；**性能剖析**（cargo-flamegraph 火焰图）遵循"先测量再优化"和 80/20 法则，把力气押在最宽的柱子上——分配型瓶颈尤其只能靠剖析发现。
 - **压力测试**摸清系统容量拐点（几路开始降级）、**长稳测试**盯资源曲线抓内存/句柄/线程泄漏（健康系统涨到稳态走平，单调上涨就是漏）。
 - 一切测试都要挂进 **CI 门禁**：golden、模型评估回归、基准回归三道硬门，红了自动拦；**没接 CI 的测试等于没写**。
 

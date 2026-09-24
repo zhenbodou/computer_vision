@@ -229,8 +229,10 @@ impl Kalman {
         let z = Vector2::new(zx, zy);
         let y = z - self.h * self.x;                         // 残差：实测 - 预测
         let s = self.h * self.p * self.h.transpose() + self.r;
-        let k: Matrix4x2<f32> =
-            self.p * self.h.transpose() * s.try_inverse().unwrap(); // 卡尔曼增益 K
+        // S 理论上恒正定、必可逆；万一数值退化算不出逆，就跳过这次校正、只保留预测，
+        // 绝不用 unwrap 让一帧坏数据把整个跟踪线程 panic 掉（呼应第 29 章“坏帧不 panic”）。
+        let Some(s_inv) = s.try_inverse() else { return; };
+        let k: Matrix4x2<f32> = self.p * self.h.transpose() * s_inv; // 卡尔曼增益 K
         self.x += k * y;                                     // 按 K 修正状态
         self.p = (Matrix4::identity() - k * self.h) * self.p;
     }

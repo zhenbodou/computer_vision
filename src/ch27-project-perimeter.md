@@ -84,6 +84,35 @@ let cfg: PerimeterConfig =
 
 这里 `calib_size` 字段先埋个伏笔：禁区顶点是运维在 **1280×720** 的预览画面上点的，如果实际跑的是 **1920×1080**，顶点坐标就得按比例放大，否则整块禁区会缩在画面左上角——这是 27.8 节要重点敲的坑。把标定分辨率也写进配置，就是为了运行时能自动做这个缩放。
 
+兑现这个伏笔只要一个方法：加载配置后、一旦知道视频流的真实分辨率，就把所有顶点从"标定坐标系"原地搬到"运行坐标系"。
+
+```rust,ignore
+impl PerimeterConfig {
+    /// 把在 calib_size 分辨率下标定的顶点，缩放到实际运行分辨率（原地改写）。
+    /// 加载配置后、确定视频流真实尺寸时调用一次即可。
+    pub fn scale_to(&mut self, run_w: u32, run_h: u32) {
+        let (cw, ch) = self.calib_size;
+        // 分辨率一致、或标定尺寸缺失（0），都无需缩放，直接返回
+        if cw == 0 || ch == 0 || (cw, ch) == (run_w, run_h) {
+            return;
+        }
+        let (sx, sy) = (run_w as f32 / cw as f32, run_h as f32 / ch as f32);
+        for p in &mut self.zone {                 // 禁区每个顶点
+            p.0 *= sx;
+            p.1 *= sy;
+        }
+        if let Some(wire) = &mut self.tripwire {   // 警戒线两端（若配置了）
+            for end in wire.iter_mut() {
+                end.0 *= sx;
+                end.1 *= sy;
+            }
+        }
+    }
+}
+```
+
+**为什么是加载后立刻缩放，而不是每帧判定时再换算？** 因为顶点是**静态**的——标定完就不动了，缩放一次就永久对齐到运行分辨率；之后每帧的 `point_in_polygon`、`segments_intersect` 都在同一个坐标系里比，既省算力又不会漏掉哪一处忘了换算。这正是"坐标全程统一在原图像素系"（27.8）最省心的落地方式。
+
 ## 27.3 为什么必须先跟踪、再判定
 
 新手最容易问的一句：既然检测每帧都能给出"人在哪"，为什么非要多一步跟踪？直接判断"这一帧有没有人的脚在禁区里"不就行了？
@@ -279,7 +308,7 @@ fn raise_alarm(&self, frame: &RgbImage, hit: &Track) {
 
 几个工程细节：`frame.clone()` 是为了在副本上画，不弄脏送去存档的原始帧；文字 `draw_text_mut` 要渲染中文/emoji 得自带一份 CJK 字体（第 26 章画类别标签时讲过字体加载），这里省略；日志带上**时间戳和 track_id**，是为了事后能对着抓拍图和录像回溯。
 
-> 这里的"报警动作"只是最朴素的落地版。生产系统里，报警通常不是存本地图，而是**推消息队列（MQ）、回调 webhook、写数据库**，让上层平台去弹窗、派单、留证。这套"事件产出后如何可靠地送出去"属于工程化范畴，第 29 章会讲。本章把 `raise_alarm` 写成一个方法，就是留好这个扩展点——换成推 MQ 只改这一个函数。
+> 这里的"报警动作"只是最朴素的落地版。生产系统里，报警通常不是存本地图，而是**推消息队列（MQ）、回调 webhook、写数据库**，让上层平台去弹窗、派单、留证。这套"事件产出后如何可靠地送出去"（重试、去重、下游宕机不丢）属于生产运维范畴，**第 32 章会专门讲**。本章把 `raise_alarm` 写成一个方法，就是留好这个扩展点——换成推 MQ 只改这一个函数。
 
 ## 27.7 完整骨架：`PerimeterAlarm`
 
@@ -364,14 +393,17 @@ impl PerimeterAlarm {
 ```rust,ignore
 fn main() -> anyhow::Result<()> {
     // 加载配置、检测器、跟踪器（各自构造细节见对应章节）
-    let cfg: PerimeterConfig =
+    let mut cfg: PerimeterConfig =
         serde_json::from_reader(std::fs::File::open("perimeter.json")?)?;
     let detector = Detector::load("yolov8n.onnx")?;   // 第 26 章：构造器是 load，不是 new
     let tracker = Tracker::new();                      // 第 21 章：无参，内部默认已适配一般场景
-    let mut alarm = PerimeterAlarm::new(detector, tracker, cfg);
 
-    // 帧源：一个吐 RgbImage 的迭代器（RTSP / 文件，解码见第 6 章）
-    let frame_source = open_frame_source("rtsp://...")?; // impl Iterator<Item = RgbImage>
+    // 帧源：一个解码器句柄——既能迭代取帧，也能查到流的真实分辨率（解码见第 6 章）
+    let frame_source = open_frame_source("rtsp://...")?; // 迭代产出 RgbImage
+    // ★ 兑现 27.2 的伏笔：用流的真实分辨率把禁区/警戒线顶点缩放到运行坐标系。
+    //   漏了这一步，1280×720 标定的禁区跑在 1920×1080 上会缩在左上角——本章最高频翻车点。
+    cfg.scale_to(frame_source.width(), frame_source.height());
+    let mut alarm = PerimeterAlarm::new(detector, tracker, cfg);
 
     for frame in frame_source {
         // 逐帧喂进去；报警在 process_frame 内部产生（存图/日志）。
@@ -392,7 +424,7 @@ fn main() -> anyhow::Result<()> {
 ## 27.8 工程坑位清单
 
 - **坐标必须全程在原图像素系**。禁区顶点、警戒线端点、Track 的框、脚点——统统是**原图像素坐标**（呼应第 21、22 章）。检测器内部的 letterbox 坐标、跟踪器的归一化坐标，出了各自的模块都要还原到原图，否则和禁区一比就是错位。
-- **标定分辨率 ≠ 运行分辨率就要缩放顶点**。这是本章最高频的翻车点。运维在 1280×720 的预览上圈的禁区，拿到 1920×1080 的实际流上跑，禁区会缩在左上角一小块。所以 `config.calib_size` 要存下来，加载后按 `实际宽/标定宽`、`实际高/标定高` 把所有顶点缩放一遍再用。
+- **标定分辨率 ≠ 运行分辨率就要缩放顶点**。这是本章最高频的翻车点。运维在 1280×720 的预览上圈的禁区，拿到 1920×1080 的实际流上跑，禁区会缩在左上角一小块。所以 `config.calib_size` 要存下来，加载后按 `实际宽/标定宽`、`实际高/标定高` 把所有顶点缩放一遍再用——就是 27.2 的 `PerimeterConfig::scale_to`，`main` 里拿到流分辨率后调一次。
 - **ID 跳变会导致重复报警或漏报**。跟踪器把一个人跟丢又重分了新 ID，他的 `last_inside`/`inside_streak` 清零，重新走一遍"确认 → 报警"，于是同一个人被报第二次；反过来，两个人的 ID 被张冠李戴，也可能漏报。**报警系统的上限，就是跟踪的稳定性**（第 21 章）。冷却是最后一道兜底，但治标不治本。
 - **夜间 / 逆光会漏检**。周界报警往往 24 小时值守，而检测器在夜间、逆光、大雨下的召回会明显下降——漏检就没有 Track，再完美的判定逻辑也无米下锅。工程上要么上红外/补光，要么针对夜间场景单独调阈值、换模型。
 - **多路视频的状态必须隔离**。一台机器同时跑十几路摄像头时，**每一路都要有自己独立的一套** `tracker` / `last_inside` / `inside_streak` / `cooldown`。绝不能几路共用——A 路的 track#5 和 B 路的 track#5 是两个完全不相干的目标，状态串了就全乱套。最干净的做法是每路视频一个独立的 `PerimeterAlarm` 实例。
@@ -405,7 +437,7 @@ fn main() -> anyhow::Result<()> {
 - 判定点用**脚底中点** `(cx, y2)`，因为业务关心"脚踩没踩进禁区"；调第 22 章 `point_in_polygon`、第 23 章 `side()`/线段相交，不重复造轮子。
 - **区域入侵**是个极简状态机：`HashMap<u64,bool>` 记上一帧在否，只在 `false→true` 触发；**绊线穿越**则用上一帧到这一帧的中心点连线去和警戒线求交。
 - 三道防线压误报和刷屏：**类别+阈值**过滤只留 person、**N-of-M 连续确认**滤掉单帧误检、**Cooldown** 按 track_id 去重；全部串进 `PerimeterAlarm::process_frame`。
-- 上线要盯死的坑：坐标全程原图像素、标定/运行分辨率不一致要缩放顶点、ID 跳变、夜间漏检、多路状态隔离、HashMap 清理。生产里报警动作通常改成推 MQ/webhook/DB（第 29 章）。
+- 上线要盯死的坑：坐标全程原图像素、标定/运行分辨率不一致要缩放顶点、ID 跳变、夜间漏检、多路状态隔离、HashMap 清理。生产里报警动作通常改成推 MQ/webhook/DB（可靠投递见第 32 章）。
 
 ## 27.10 练习
 

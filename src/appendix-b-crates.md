@@ -49,7 +49,10 @@
 | `rayon` | 数据并行：一行 `.par_iter()` 让循环多线程 | 第 3、29 章 |
 | `crossbeam` | 并发原语：channel、scoped 线程，搭多线程流水线用 | 第 29 章 |
 | `tracing` | 结构化日志，比 println 更适合正式项目 | 第 27、29 章 |
-| `serde` / `serde_json` | 序列化/反序列化，配置文件和报警 API 必备 | 第 27、29 章 |
+| `serde` / `serde_json` | 序列化/反序列化，配置文件和报警 API 必备 | 第 27、29、31、32 章 |
+| `proptest` | 属性测试，自动生成边界输入并缩减失败样例 | 第 31 章 |
+| `criterion` | 统计型微基准测试 | 第 31 章 |
+| `arc-swap` / `once_cell` | 原子热替换共享配置与全局初始化 | 第 32 章 |
 
 ## B.2 参考 Cargo.toml
 
@@ -85,7 +88,15 @@ crossbeam = "0.8"                 # 多线程流水线（第 29 章）
 tracing = "0.1"                   # 结构化日志
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"                  # 配置 / 报警 JSON
+arc-swap = "1"                    # 配置热更新（第 32 章）
+once_cell = "1"                   # 全局配置初始化（第 32 章）
+
+[dev-dependencies]
+proptest = "1"                    # 属性测试（第 31 章）
+criterion = "0.8"                 # 微基准（第 31 章）
 ```
+
+使用 Criterion 时，还需为实际基准文件添加对应的 `[[bench]]`（并设 `harness = false`）；名称应与 `benches/*.rs` 文件一致。
 
 ## B.3 版本说明
 

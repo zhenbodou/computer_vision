@@ -191,7 +191,9 @@ pub fn bind_faces_to_tracks(
         }
     }
     // 2) 按分数从高到低排序，呼应第 21 章的贪心关联
-    cands.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
+    //    用 total_cmp（f32 全序）而非 partial_cmp().unwrap()：包含比理论上非 NaN，
+    //    但坐标一旦出现 NaN/Inf，partial_cmp 会返回 None 直接 panic——total_cmp 永不 panic。
+    cands.sort_by(|a, b| b.0.total_cmp(&a.0));
 
     // 3) 贪心分配：每张脸、每个 track 只能被用一次
     let mut used_face = vec![false; faces.len()];
